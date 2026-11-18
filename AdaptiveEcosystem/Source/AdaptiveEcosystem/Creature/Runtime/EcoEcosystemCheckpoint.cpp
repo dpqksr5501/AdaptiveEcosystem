@@ -1,6 +1,7 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoEcosystemArchive.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoFaunaMotionClock.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
@@ -37,7 +38,9 @@
 
 namespace EcoCheckpoint
 {
-    constexpr uint32 CheckpointVersion = 4;
+    constexpr uint32 CheckpointVersion = 16;
+    constexpr int32 CheckpointHeaderBytes = 4 * sizeof(uint32);
+    constexpr int32 MaxCheckpointPayloadBytes = 16 * 1024 * 1024;
     template<class T,class F> void Array(FArchive& A,TArray<T>& Values,int32 Limit,F Item)
     {
         int32 N=Values.Num();A<<N;if(A.IsError()||N<0||N>Limit){A.SetError();return;}
@@ -152,10 +155,15 @@ struct FEcoEcosystemCheckpoint
         if(!M||!E||!N||!N->IsActive()||!Clock||!Herds||!Journeys||M->GetEntityManagerChecked().IsProcessing()
             ||E->bResourceStepOpen||!E->PendingSpawns.IsEmpty()||!S.BuildAgentLookup())return Reject(TEXT("not a completed authority boundary"));
         auto& EM=M->GetEntityManagerChecked();const int32 NewEpoch=Clock->Current.WorldEpoch;
+        for(int32 I=0;I<N->NumContexts();++I)
+            if(N->GetContext(I)->FoodPatchCache.Layout.IsValid())
+                return Reject(TEXT("S1 patch anchors are experimental; patch checkpoint schema is pending S5"));
         TStrongObjectPtr<UEcologySimulationSubsystem> Staged(NewObject<UEcologySimulationSubsystem>(W));
         TArray<FAgent> Agents;TArray<FRegion> Regions;TArray<FHerd> SavedHerds;
+        TMap<FName,FRegionEnvironmentState> RulesOnlyEnvironment;
         TMap<int64,FEcoHerdJourney> Plans;TMap<int64,double> Shortage,Attempts;
         TMap<FName,FEcoKnownHabitat> HabitatReports;
+        TMap<FName,FEcoRegionalMigrationState> RegionalStates;
         TMap<FName,double> HerbRecovery,WolfRecovery;
         TArray<AEcoCreatureIntegrationSpawner::FPendingBirth> Births;
         TArray<AEcoCreatureIntegrationSpawner::FFaunaBirth> FaunaBirths;
@@ -163,11 +171,38 @@ struct FEcoEcosystemCheckpoint
         TMap<FName, EcoTracesV3::FField> FaunaScent;
         double FaunaBirthScan=0.;
         int32 HabitatStage=S.FaunaHabitatStage;
+        uint16 AdaptiveRoutineMask=S.GetAdaptiveRoutineMask();
+        bool FaunaPursuitFix=S.UsesFaunaPursuitFix();
+        bool FaunaCarrionAccess=S.UsesFaunaCarrionAccess();
+        bool FaunaAttackAdvance=S.UsesFaunaAttackAdvance();
+        bool FaunaFollowWounded=S.UsesFaunaFollowWounded();
+        bool FaunaPersistence=S.UsesFaunaPersistence();
+        float ActivityWindow=S.FaunaPersistence.ActivityMemorySeconds, ForageWindow=S.FaunaPersistence.ForageMemorySeconds;
+        float RareWeight=S.FaunaPersistence.ScarcePreyValue, EncounterHalf=S.FaunaPersistence.PreyHalfSaturation;
         double PatchUpdate=0.;
         TArray<float> PatchStock;
+        TMap<FName,double> PatchSoilMoisture;
+        TArray<FName> PatchWaterHabitatIds;
         TArray<FName> PatchIds;
-        for (const auto& Patch : S.FaunaHabitatPatches) PatchIds.Add(Patch.Id);
+        TArray<TArray<FVector>> PatchAccessPoints;
+        TArray<FVector> WetPatchGeometry;
+        for (const auto& Patch : S.FaunaHabitatPatches)
+        {
+            PatchIds.Add(Patch.Id);
+            // Forage and shelter access are mutually exclusive on a patch.
+            PatchAccessPoints.Add(Patch.ShelterApproachPoints.IsEmpty() ? Patch.ForageAccessPoints : Patch.ShelterApproachPoints);
+            PatchWaterHabitatIds.Add(Patch.ForageWaterHabitatId);
+            if (Patch.bSubmerged)
+            {
+                WetPatchGeometry.Add(Patch.Center);
+                if (Patch.bHasShoreEntry)
+                    WetPatchGeometry.Append({Patch.ShorePoint, Patch.WaterEntryPoint, Patch.DryBankPoint});
+            }
+        }
         const TArray<FName> ExpectedPatchIds=PatchIds;
+        const auto ExpectedPatchAccessPoints = PatchAccessPoints;
+        const auto ExpectedPatchWaterHabitatIds = PatchWaterHabitatIds;
+        const auto ExpectedWetPatchGeometry = WetPatchGeometry;
         TMap<FName,TMap<FName,AEcoCreatureIntegrationSpawner::FSpeciesTotals>> Totals;
         int64 NextPlan=1,NextHerd=1,Step=0,Successful=0,Deaths=0,GlobalT=0;
         uint64 StrikeSerial=0;
@@ -177,6 +212,9 @@ struct FEcoEcosystemCheckpoint
         FString SavedMap=MapName,Build=RuntimeHash(),Brain=N->GetActiveBrain().Id;
         if(Build.IsEmpty())return Reject(TEXT("runtime image hash unavailable"));
         if(!Loading){
+            const double MotionThrough = EcoFaunaMotionClock::CompletedTimeAt(Clock->GetServerTime().ServerTimeSeconds);
+            if (!S.FaunaSpecies.IsEmpty() && MotionThrough - FMath::Max(0., S.FaunaMotionTime) > UE_SMALL_NUMBER)
+                return Reject(TEXT("pending fauna motion; retry after the simulation catches up"));
             for(int32 I=0;I<N->NumContexts();++I){const auto& C=*N->GetContext(I);
                 if(!C.bSpatialFoodRegistered||C.Sim.Rng.External||!ValidGrid(C.Sim.Food))return Reject(TEXT("unsupported native context"));
                 auto& R=Regions.AddDefaulted_GetRef();R.Id=C.RegionId;R.Origin=C.OriginCm;R.StartFood=C.StartFood;R.Sequence=C.ResourceReceiptSequence;R.Sim=C.Sim;R.Traces=C.MovementTraces;
@@ -185,6 +223,12 @@ struct FEcoEcosystemCheckpoint
                 R.AdoptedDeer=C.AdoptedDeer;R.AdoptedWolves=C.AdoptedWolves;
                 const auto* Actor=W->GetSubsystem<UEcologyWorldSubsystem>()->GetRegion(C.RegionId);
                 if(!Actor)return Reject(TEXT("missing environment provider"));R.Environment=Actor->GetEnvironmentState();
+            }
+            for(const auto& Group:S.Groups){
+                if(!Group.bRulesOnly)continue;
+                const auto* Actor=W->GetSubsystem<UEcologyWorldSubsystem>()->GetRegion(Group.RegionId);
+                if(!Actor)return Reject(TEXT("missing rules-only environment provider"));
+                RulesOnlyEnvironment.Add(Group.RegionId,Actor->GetEnvironmentState());
             }
             for(const auto Entity:S.Owned){
                 const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entity);
@@ -199,8 +243,8 @@ struct FEcoEcosystemCheckpoint
                 A.Death=EM.GetFragmentDataChecked<FEcoDeathFragment>(Entity);A.Lifecycle=EM.GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(Entity);
                 if(Link)A.Link=*Link;
                 if(const auto* Motion=EM.GetFragmentDataPtr<FMassVelocityFragment>(Entity))A.Velocity=Motion->Value;
-                if(Fauna){A.bFauna=true;A.Fauna=*Fauna;continue;}
                 A.Travel=EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity);
+                if(Fauna){A.bFauna=true;A.Fauna=*Fauna;continue;}
                 if(const auto* Member=EM.GetFragmentDataPtr<FEcoHerdMemberFragment>(Entity)){FEcoHerdRuntimeData Data;if(Herds->GetHerdData(Member->HerdRuntimeIndex,Data))A.Herd=Data.PersistentHerdId;}
                 if(const auto* J=EM.GetFragmentDataPtr<FEcoHerdTravelFragment>(Entity))A.Journey=*J;
                 if(const auto* B=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(Entity)){
@@ -213,11 +257,12 @@ struct FEcoEcosystemCheckpoint
             for(const auto& H:Herds->ActiveHerds)if(H.PersistentHerdId>0&&Herds->HerdSpeciesIndices.IsValidIndex(H.RuntimeIndex)
                 &&E->SpeciesIds.IsValidIndex(Herds->HerdSpeciesIndices[H.RuntimeIndex]))SavedHerds.Add({H.PersistentHerdId,E->SpeciesIds[Herds->HerdSpeciesIndices[H.RuntimeIndex]],H.Center});
             Plans=Journeys->Plans;Shortage=Journeys->ShortageSince;Attempts=Journeys->NextPlanAttempt;NextPlan=Journeys->NextPlan;NextHerd=Herds->NextPersistentHerdId;
-            HabitatReports=Journeys->KnownHabitats;
+            HabitatReports=Journeys->KnownHabitats;RegionalStates=Journeys->RegionalStates;
             Births=S.PendingBirths;BirthScan=S.NextBirthScan;Totals=S.SpeciesTotals;
             FaunaBirths=S.FaunaBirths;FaunaBirthScan=S.NextFaunaBirthScan;
             FaunaCarcasses=S.FaunaCarcasses;FaunaScent=S.FaunaScent;
             PatchStock=S.FaunaPatchStock;PatchUpdate=S.LastFaunaPatchUpdate;
+            PatchSoilMoisture=S.FaunaLocalSoilMoisture;
             HerbRecovery=S.LastHerbRecovery;WolfRecovery=S.LastWolfRecovery;
             Step=S.Step;Successful=S.SuccessfulBirths;Deaths=S.CommittedDeaths;ResourceTime=S.LastResourceTime;MigrationTime=S.NextMigrationTime;
             StrikeSerial=S.StrikeSequence;
@@ -232,29 +277,41 @@ struct FEcoEcosystemCheckpoint
             Array(A,Regions,64,[&](FRegion& R){A<<R.Id<<R.Origin<<R.StartFood<<R.Sequence;World(A,R.Sim);
                 Pod(A,R.Traces.Events);Pod(A,R.Traces.Serial);Pod(A,R.Traces.Cursor);Pod(A,R.HumanDanger);Properties(A,R.Environment);
                 Array(A,R.CoverGround,1024,[&](double& Z){A<<Z;});A<<R.AdoptedDeer<<R.AdoptedWolves;});
+            Map(A,RulesOnlyEnvironment,64,[&](FRegionEnvironmentState& State){Properties(A,State);});
             Array(A,Agents,1024,[&](FAgent& V){Agent(A,V);});
             Array(A,SavedHerds,512,[&](FHerd& H){A<<H.Id<<H.Species<<H.Center;});
             Map(A,Plans,512,[&](FEcoHerdJourney& P){Plan(A,P);});Map(A,Shortage,512,[&](double& V){A<<V;});Map(A,Attempts,512,[&](double& V){A<<V;});
             Map(A,HabitatReports,64,[&](auto& V){Pod(A,V);});
+            Map(A,RegionalStates,64,[&](auto& R){
+                Array(A,R.Residents,1024,[&](int64& Id){A<<Id;});Array(A,R.Approved,1024,[&](int64& Id){A<<Id;});
+                A<<R.ShortageSince<<R.RecoverySince<<R.NextDeparture<<R.Initial<<R.KeepFloor<<R.Supported<<R.Projected<<R.bEpisode<<R.Reason;
+            });
             Map(A,HerbRecovery,64,[&](double& V){A<<V;});Map(A,WolfRecovery,64,[&](double& V){A<<V;});
             A<<NextPlan<<NextHerd;
             Array(A,Births,128,[&](auto& P){A<<P.ParentA<<P.ParentB<<P.Region<<P.Due<<P.bPredator;});
             A<<FaunaBirthScan;
-            Array(A,FaunaBirths,128,[&](auto& P){A<<P.Region<<P.Species<<P.ParentA<<P.ParentB<<P.Due;});
+            Array(A,FaunaBirths,128,[&](auto& P){A<<P.Region<<P.Species<<P.ParentA<<P.ParentB<<P.Due<<P.NestId<<P.NurseryId;});
             Map(A,FaunaCarcasses,1024,[&](auto& C){
                 A<<C.Position<<C.Region<<C.Species<<C.OpenAt<<C.ExpiresAt<<C.ExclusiveUntil<<C.KillerId
-                    <<C.PlacesResetAt<<C.UsedPlaces<<C.FeedingPlaces<<C.bGrounded<<C.Remaining;});
+                    <<C.PlacesResetAt<<C.UsedPlaces<<C.FeedingPlaces<<C.bGrounded<<C.bWaterborne<<C.bFloats<<C.Remaining;});
             Map(A,FaunaScent,64,[&](auto& F){Pod(A,F.Events);Pod(A,F.Serial);Pod(A,F.Cursor);});
-            A<<HabitatStage<<PatchUpdate;
+            A<<HabitatStage<<PatchUpdate<<AdaptiveRoutineMask<<FaunaPursuitFix<<FaunaCarrionAccess<<FaunaAttackAdvance<<FaunaFollowWounded;
+            A<<FaunaPersistence<<ActivityWindow<<ForageWindow<<RareWeight<<EncounterHalf;
             Array(A,PatchIds,64,[&](FName& Id){A<<Id;});
+            Array(A,PatchAccessPoints,64,[&](TArray<FVector>& Points){
+                Array(A,Points,8,[&](FVector& Point){A<<Point;});
+            });
             Array(A,PatchStock,64,[&](float& Stock){A<<Stock;});
+            Array(A,PatchWaterHabitatIds,64,[&](FName& Id){A<<Id;});
+            Array(A,WetPatchGeometry,64*4,[&](FVector& Point){A<<Point;});
+            Map(A,PatchSoilMoisture,64,[&](double& Moisture){A<<Moisture;});
             Map(A,Totals,64,[&](auto& T){Map(A,T,64,[&](auto& V){Pod(A,V);});});
             Ledger(A,Loading?*Staged:*E);
         };
         TArray<uint8> Bytes;
         if(!Loading){
             FMemoryWriter Memory(Bytes);FObjectAndNameAsStringProxyArchive A(Memory,false);Serialize(A);
-            if(A.IsError()||Bytes.Num()>16*1024*1024)return Reject(TEXT("serialization budget"));
+            if(A.IsError()||Bytes.Num()>MaxCheckpointPayloadBytes)return Reject(TEXT("serialization budget"));
             const uint32 Crc=FCrc::MemCrc32(Bytes.GetData(),Bytes.Num());uint32 Magic=0x45434f31,Version=CheckpointVersion,Length=Bytes.Num();
             TArray<uint8> Output;FMemoryWriter Header(Output);Header<<Magic<<Version<<Length;uint32 Check=Crc;Header<<Check;Header.Serialize(Bytes.GetData(),Bytes.Num());
             IFileManager::Get().MakeDirectory(*FPaths::GetPath(File),true);
@@ -265,13 +322,19 @@ struct FEcoEcosystemCheckpoint
             return true;
         }
         const int64 FileSize=IFileManager::Get().FileSize(*File);
-        if(FileSize<16||FileSize>16*1024*1024||!FFileHelper::LoadFileToArray(Bytes,*File))return Reject(TEXT("missing/oversized checkpoint"));
+        if(FileSize<CheckpointHeaderBytes||FileSize>CheckpointHeaderBytes+MaxCheckpointPayloadBytes
+            ||!FFileHelper::LoadFileToArray(Bytes,*File)||Bytes.Num()!=FileSize)return Reject(TEXT("missing/oversized checkpoint"));
         FMemoryReader Memory(Bytes);uint32 Magic=0,Version=0,Length=0,Crc=0;Memory<<Magic<<Version<<Length<<Crc;
-        if(Magic!=0x45434f31||Version!=CheckpointVersion||Length!=uint32(Bytes.Num()-16)||FCrc::MemCrc32(Bytes.GetData()+16,Length)!=Crc)return Reject(TEXT("version/length/checksum mismatch"));
-        FObjectAndNameAsStringProxyArchive A(Memory,false);A.ArMaxSerializeSize=16*1024*1024;Serialize(A);
-        if(A.IsError()||Memory.Tell()!=Bytes.Num()||SavedMap!=MapName||Build!=RuntimeHash()||Brain!=N->GetActiveBrain().Id
-            ||Regions.Num()!=N->NumContexts()||Agents.Num()>2*S.GlobalPopulationLimit||!FMath::IsFinite(Time.ServerTimeSeconds)||Time.ServerTimeSeconds<0
-            ||Step<0||GlobalT<0||Successful<Deaths||Staged->bResourceStepOpen)return Reject(TEXT("incompatible build/map/model or invalid state"));
+        if(Magic!=0x45434f31||Version!=CheckpointVersion||Length!=uint32(Bytes.Num()-CheckpointHeaderBytes)
+            ||FCrc::MemCrc32(Bytes.GetData()+CheckpointHeaderBytes,Length)!=Crc)return Reject(TEXT("version/length/checksum mismatch"));
+        FObjectAndNameAsStringProxyArchive A(Memory,false);A.ArMaxSerializeSize=MaxCheckpointPayloadBytes;Serialize(A);
+        if(SavedMap!=MapName)return Reject(TEXT("map identity mismatch"));
+        if(Build!=RuntimeHash())return Reject(TEXT("runtime image mismatch"));
+        if(Brain!=N->GetActiveBrain().Id)return Reject(TEXT("active brain mismatch"));
+        if(A.IsError()||Memory.Tell()!=Bytes.Num())return Reject(TEXT("invalid checkpoint archive payload"));
+        if(Regions.Num()!=N->NumContexts()||Agents.Num()>2*S.GlobalPopulationLimit
+            ||!FMath::IsFinite(Time.ServerTimeSeconds)||Time.ServerTimeSeconds<0||Step<0||GlobalT<0
+            ||Successful<Deaths||Staged->bResourceStepOpen)return Reject(TEXT("invalid checkpoint clock or population"));
         if(Step<S.Step||GlobalT<N->GlobalT)return Reject(TEXT("live rollback is unsupported; restore this checkpoint during server startup"));
         uint32 ResetRevision=0;for(const auto Entity:S.Owned)
             if(const auto* Reset=EM.GetFragmentDataPtr<FEcoMovementDiscontinuityFragment>(Entity))ResetRevision=FMath::Max(ResetRevision,Reset->Revision);
@@ -312,19 +375,58 @@ struct FEcoEcosystemCheckpoint
             for(const auto& T:R.Traces.Events)if(T.Id&&(!std::isfinite(T.X)||!std::isfinite(T.Y)||!std::isfinite(T.Z)||!std::isfinite(T.Time)
                 ||std::abs(T.X)>100000||std::abs(T.Y)>100000||T.Time<0||T.Time>GlobalT*EcoRepertoireV3::kStepSeconds+1||T.Id>R.Traces.Serial||T.Source<=0))return Reject(TEXT("invalid movement evidence"));
         }
+        int32 RulesOnlyCount=0;
+        for(const auto& Group:S.Groups){
+            if(!Group.bRulesOnly)continue;
+            ++RulesOnlyCount;
+            const FName Id=Group.RegionId;
+            const auto* State=RulesOnlyEnvironment.Find(Id);
+            if(!State||RegionNames.Contains(Id)||!Staged->RegionalStates.Contains(Id)||Staged->SpatialFood.Contains(Id)
+                ||!W->GetSubsystem<UEcologyWorldSubsystem>()->GetRegion(Id)
+                ||!FMath::IsFinite(State->Temperature)||!FMath::IsFinite(State->Humidity)||State->Humidity<0||State->Humidity>1
+                ||!FMath::IsFinite(State->Rainfall)||State->Rainfall<0||State->Rainfall>1
+                ||uint8(State->DayPhase)>uint8(EEcoDayPhase::Dawn)||uint8(State->WeatherState)>uint8(EEcoWeatherState::Drought))
+                return Reject(TEXT("invalid rules-only region or environment"));
+            RegionNames.Add(Id);
+        }
+        if(RulesOnlyCount!=RulesOnlyEnvironment.Num()||RegionNames.Num()!=Staged->RegionIds.Num())
+            return Reject(TEXT("rules-only region layout mismatch"));
         for(const auto* History:{&HerbRecovery,&WolfRecovery})for(const auto& Pair:*History)
             if(!RegionNames.Contains(Pair.Key)||!std::isfinite(Pair.Value)||Pair.Value<0||Pair.Value>Time.ServerTimeSeconds)return Reject(TEXT("invalid recovery operation history"));
         TSet<int64> Ids;int32 Alive=0;for(const auto& V:Agents){
             const auto* C=N->FindContext(V.Region);const bool Herb=V.Species==TEXT("Herbivore");
+            const auto& TravelState = V.Travel;
+            if (uint8(TravelState.State) > uint8(EEcoResidenceState::WaitingForFood)
+                || uint8(TravelState.Reason) > uint8(EEcoMigrationReason::ReturnHome)
+                || TravelState.TargetPosition.ContainsNaN() || !FMath::IsFinite(TravelState.MoveSpeed)
+                || !FMath::IsFinite(TravelState.DepartureTime) || !FMath::IsFinite(TravelState.LastArrivalTime)
+                || !FMath::IsFinite(TravelState.NextDecisionTime) || !FMath::IsFinite(TravelState.FailedTargetUntil)
+                || (TravelState.State == EEcoResidenceState::Traveling
+                    && (!RegionNames.Contains(TravelState.TargetRegionId) || TravelState.DepartureTime < 0.
+                        || TravelState.DepartureTime > Time.ServerTimeSeconds
+                        || (V.bFauna && (TravelState.TargetRegionId == V.Region || TravelState.MoveSpeed <= 0.
+                            || TravelState.NextDecisionTime <= TravelState.DepartureTime)))))
+                return Reject(TEXT("invalid travel state"));
             if(V.bFauna){
                 const auto* Profile=S.FindFauna(V.Species);
                 const auto& F=V.Fauna;
-                if(!C||!Profile||V.Id<=0||Ids.Contains(V.Id)||V.Id>=Staged->NextStableAgentId
+                if(!RegionNames.Contains(V.Region)||!Profile||V.Id<=0||Ids.Contains(V.Id)||V.Id>=Staged->NextStableAgentId
                     ||V.Transform.ContainsNaN()||V.Velocity.ContainsNaN()||!FMath::IsFinite(V.Vitals.HP)||!FMath::IsFinite(V.Vitals.Energy)
                     ||!F.Life.bInitialized||!F.Life.Genome.IsValid()||!FMath::IsFinite(F.Life.Born)
                     ||F.Life.MaturitySeconds!=Profile->MaturitySeconds||F.Home.ContainsNaN()||F.Goal.ContainsNaN()
-                    ||F.LandingPoint.ContainsNaN()||!FMath::IsFinite(F.Stamina)||F.Stamina<0||F.Stamina>1
-                    ||uint8(F.Flight)>uint8(EEcoFaunaFlightPhase::Landing))return Reject(TEXT("invalid fauna identity or state"));
+                    ||F.ForageMemoryPosition.ContainsNaN()||!FMath::IsFinite(F.ForageIntake)||F.ForageIntake<0.f
+                    ||!FMath::IsFinite(F.LastForageIntakeAt)||F.LastForageIntakeAt< -1.||F.LastForageIntakeAt>Time.ServerTimeSeconds
+                    ||!FMath::IsFinite(F.MaintenanceScale)||F.MaintenanceScale<.1f||F.MaintenanceScale>1.f
+                    ||F.LandingPoint.ContainsNaN()||F.SwimEntry.ContainsNaN()
+                    ||!FMath::IsFinite(F.Stamina)||F.Stamina<0||F.Stamina>1
+                    ||uint8(F.Flight)>uint8(EEcoFaunaFlightPhase::Dive)
+                    ||(F.Flight==EEcoFaunaFlightPhase::Dive&&!Profile->bCanDiveHunt)
+                    ||uint8(F.ShorePhase)>uint8(EEcoFaunaShorePhase::ClearingBank)
+                    ||(F.bSwimming&&Profile->Locomotion!=EEcoFaunaLocomotion::Amphibious)
+                    ||(F.ShorePhase==EEcoFaunaShorePhase::ClearingBank
+                        &&(F.bSwimming||Profile->Locomotion!=EEcoFaunaLocomotion::Amphibious))
+                    ||((F.ShorePhase==EEcoFaunaShorePhase::Entering||F.ShorePhase==EEcoFaunaShorePhase::Exiting)
+                        &&!F.bSwimming))return Reject(TEXT("invalid fauna identity or state"));
                 Ids.Add(V.Id);Alive+=V.Vitals.HP>0;
                 continue;
             }
@@ -356,9 +458,21 @@ struct FEcoEcosystemCheckpoint
         // Retained corpses consume snapshot rows, not living population capacity.
         if(Alive>S.GlobalPopulationLimit||Alive!=Successful-Deaths||NextHerd<=0||NextPlan<=0||Staged->RegionIds!=E->RegionIds||Staged->GlobalPopulationLimit!=S.GlobalPopulationLimit)return Reject(TEXT("population/identity allocator mismatch"));
         if(!FMath::IsFinite(FaunaBirthScan))return Reject(TEXT("invalid fauna birth schedule"));
-        if(HabitatStage!=S.FaunaHabitatStage||PatchIds!=ExpectedPatchIds||PatchStock.Num()!=PatchIds.Num()
+        if(HabitatStage!=S.FaunaHabitatStage||AdaptiveRoutineMask!=S.GetAdaptiveRoutineMask()
+            ||FaunaPursuitFix!=S.UsesFaunaPursuitFix()||FaunaCarrionAccess!=S.UsesFaunaCarrionAccess()
+            ||FaunaAttackAdvance!=S.UsesFaunaAttackAdvance()||FaunaFollowWounded!=S.UsesFaunaFollowWounded()
+            ||FaunaPersistence!=S.UsesFaunaPersistence()
+            ||(FaunaPersistence&&(ActivityWindow!=S.FaunaPersistence.ActivityMemorySeconds
+                ||ForageWindow!=S.FaunaPersistence.ForageMemorySeconds||RareWeight!=S.FaunaPersistence.ScarcePreyValue
+                ||EncounterHalf!=S.FaunaPersistence.PreyHalfSaturation))
+            ||PatchIds!=ExpectedPatchIds||PatchAccessPoints!=ExpectedPatchAccessPoints||PatchStock.Num()!=PatchIds.Num()
+            ||WetPatchGeometry!=ExpectedWetPatchGeometry
+            ||PatchWaterHabitatIds!=ExpectedPatchWaterHabitatIds||PatchSoilMoisture.Num()!=S.FaunaLocalSoilMoisture.Num()
             ||!FMath::IsFinite(PatchUpdate)||PatchUpdate<0.||PatchUpdate>Time.ServerTimeSeconds)
             return Reject(TEXT("fauna habitat layout or clock mismatch"));
+        for(const auto& Pair:PatchSoilMoisture)
+            if(!S.FaunaLocalSoilMoisture.Contains(Pair.Key)||!EcoVegetationV3::IsFraction(Pair.Value))
+                return Reject(TEXT("invalid fauna patch soil moisture"));
         for(int32 Index=0;Index<PatchStock.Num();++Index)
         {
             const auto& Patch=S.FaunaHabitatPatches[Index];
@@ -366,13 +480,25 @@ struct FEcoEcosystemCheckpoint
                 ||PatchStock[Index]>(Patch.Stage<=HabitatStage?Patch.Capacity:0.f))
                 return Reject(TEXT("invalid fauna patch stock"));
         }
-        for(const auto& B:FaunaBirths)
-            if(!S.FindFauna(B.Species)||!RegionNames.Contains(B.Region)||!Ids.Contains(B.ParentA)||!Ids.Contains(B.ParentB)
+        for(const auto& B:FaunaBirths){
+            const auto* Species=S.FindFauna(B.Species);
+            if(!Species||!RegionNames.Contains(B.Region)||!Ids.Contains(B.ParentA)||!Ids.Contains(B.ParentB)
                 ||B.ParentA==B.ParentB||!FMath::IsFinite(B.Due))return Reject(TEXT("invalid fauna parent reservation"));
+            const bool bHasSite=!B.NestId.IsNone()&&S.FaunaPerches.ContainsByPredicate([&](const auto& Site){
+                return Site.NestId==B.NestId&&Site.RegionId==B.Region&&Site.SpeciesId==B.Species;
+            });
+            if(Species->NestlingSeconds>0.f?!bHasSite:!B.NestId.IsNone())return Reject(TEXT("invalid fauna nest reservation"));
+            const bool bHasNursery = !B.NurseryId.IsNone() && S.FaunaHabitatPatches.ContainsByPredicate([&](const auto& Patch){
+                return Patch.Id==B.NurseryId && Patch.bAquaticNursery && Patch.Stage<=HabitatStage
+                    && Patch.RegionId==B.Region && Patch.Consumers.Contains(B.Species);
+            });
+            if(Species->IsAquatic()?!bHasNursery:!B.NurseryId.IsNone())return Reject(TEXT("invalid fauna nursery reservation"));
+        }
         for(const auto& Pair:FaunaCarcasses){
             const auto& C=Pair.Value;
             if(Pair.Key<=0||Pair.Key>=Staged->NextStableAgentId||!RegionNames.Contains(C.Region)||C.Species.IsNone()
                 ||C.Position.ContainsNaN()||!FMath::IsFinite(C.OpenAt)||!FMath::IsFinite(C.ExpiresAt)||C.ExpiresAt<C.OpenAt
+                ||(C.bGrounded&&C.bWaterborne)
                 ||!FMath::IsFinite(C.ExclusiveUntil)||!FMath::IsFinite(C.Remaining)||C.Remaining<0.f
                 ||C.FeedingPlaces<=0||C.UsedPlaces<0||C.UsedPlaces>C.FeedingPlaces)return Reject(TEXT("invalid fauna carcass stock"));
         }
@@ -386,17 +512,47 @@ struct FEcoEcosystemCheckpoint
                     return Reject(TEXT("invalid fauna scent evidence"));
             Pair.Value.Rebuild();
         }
+        TMap<int64, const FEcoHerdJourney*> PlansById;
         for(const auto& Pair:Plans){const auto& P=Pair.Value;
-            if(Pair.Key!=P.HerdId||P.Id<=0||P.Id>=NextPlan||P.Points.Num()<2||!RegionNames.Contains(P.Origin)||!RegionNames.Contains(P.Destination))return Reject(TEXT("invalid journey"));
-            for(const auto& V:Agents)if(V.Journey.bActive&&V.Journey.PlanId==P.Id&&(V.Journey.Waypoint<0||V.Journey.Waypoint>=P.Points.Num()))return Reject(TEXT("invalid waypoint"));
+            if(Pair.Key!=P.Id||P.Id<=0||P.Id>=NextPlan||P.Points.Num()<2||!RegionNames.Contains(P.Origin)||!RegionNames.Contains(P.Destination))return Reject(TEXT("invalid journey"));
+            if (PlansById.Contains(P.Id) || uint8(P.State) > uint8(EEcoHerdJourneyState::Abandoned)
+                || !FMath::IsFinite(P.Started) || !FMath::IsFinite(P.Changed) || !FMath::IsFinite(P.CooldownUntil)
+                || P.Started < 0. || P.Started > Time.ServerTimeSeconds || P.Changed < 0. || P.Changed > Time.ServerTimeSeconds
+                || !FMath::IsFinite(P.CorridorWidth) || P.CorridorWidth <= 0.
+                || P.Points.ContainsByPredicate([](const FVector& Point) { return Point.ContainsNaN(); }))
+                return Reject(TEXT("invalid journey geometry or clock"));
+            PlansById.Add(P.Id, &P);
+        }
+        for (const auto& V : Agents)
+        {
+            if (!V.Journey.bActive || V.Vitals.HP <= 0.) continue;
+            const auto* P = PlansById.FindRef(V.Journey.PlanId);
+            if (V.bFauna || V.Species != TEXT("Herbivore") || !P || UEcoHerdMigrationSubsystem::IsTerminal(P->State)
+                || P->HerdId != V.Journey.PersistentHerdId || !P->Members.Contains(V.Id)
+                || !P->Points.IsValidIndex(V.Journey.Waypoint) || V.Journey.Goal.ContainsNaN()
+                || !FMath::IsFinite(V.Journey.LastProgressTime) || !FMath::IsFinite(V.Journey.BestDistance)
+                || V.Travel.State != EEcoResidenceState::Traveling || V.Travel.TargetRegionId != P->Destination)
+                return Reject(TEXT("invalid active journey membership or waypoint"));
+        }
+        TSet<int64> Registered;
+        for(const auto& Pair:RegionalStates){const auto& R=Pair.Value;
+            if(!RegionNames.Contains(Pair.Key)||R.Initial<0||R.KeepFloor<0||R.KeepFloor>R.Initial
+                ||!FMath::IsFinite(R.NextDeparture)||!FMath::IsFinite(R.ShortageSince)||!FMath::IsFinite(R.RecoverySince))return Reject(TEXT("invalid regional migration state"));
+            for(const int64 Id:R.Residents){
+                // Removed/dead residents may remain until the next completed reconcile; cleanup is deterministic.
+                if(Id<=0||Registered.Contains(Id))return Reject(TEXT("duplicate regional registration"));Registered.Add(Id);
+            }
+            TSet<int64> Approved;for(const int64 Id:R.Approved){if(Id<=0||Approved.Contains(Id))return Reject(TEXT("duplicate regional approval"));Approved.Add(Id);}
+            if(R.bEpisode&&R.Approved.Num()>R.Initial-R.KeepFloor)return Reject(TEXT("regional episode budget exceeded"));
         }
         // Prepare new entities before destroying anything. Roll back preparation on
         // allocation failure; malformed/incompatible snapshots never touch live state.
         const auto OldOwned=S.Owned;const auto OldTotals=S.SpeciesTotals;const int64 OldBirths=S.SuccessfulBirths,OldAllocator=E->NextStableAgentId;
+        const auto PreparationTime=Clock->GetServerTime();
         TArray<FMassEntityHandle> NewEntities;
         for(const auto& V:Agents){TArray<FVector> Position{V.Transform.GetLocation()};
-            const int32 Created=V.bFauna?S.SpawnFauna(V.Region,*S.FindFauna(V.Species),Position)
-                :S.Spawn(V.Region,1,V.Species==TEXT("Wolf"),&Position);
+            const int32 Created=V.bFauna?S.SpawnFauna(V.Region,*S.FindFauna(V.Species),Position,PreparationTime)
+                :S.Spawn(V.Region,1,V.Species==TEXT("Wolf"),PreparationTime,&Position);
             if(Created!=1){
                 if(!NewEntities.IsEmpty())EM.BatchDestroyEntities(NewEntities);S.Owned=OldOwned;S.SpeciesTotals=OldTotals;S.SuccessfulBirths=OldBirths;E->NextStableAgentId=OldAllocator;
                 return Reject(TEXT("entity preparation failed; previous world retained"));
@@ -418,12 +574,14 @@ struct FEcoEcosystemCheckpoint
             W->GetSubsystem<UEcologyWorldSubsystem>()->GetRegion(R.Id)->SetEnvironmentState(R.Environment);
             C->MovementTraces.Rebuild();
             C->LastStepFoodEaten=C->Sim.Stats.FoodEaten;C->LastLogStats=C->Sim.Stats;C->LastLogT=GlobalT;C->RecentEaten.Reset();}
+        for(const auto& Pair:RulesOnlyEnvironment)
+            W->GetSubsystem<UEcologyWorldSubsystem>()->GetRegion(Pair.Key)->SetEnvironmentState(Pair.Value);
         Herds->ActiveHerds.Reset();Herds->HerdSpeciesIndices.Reset();Herds->FreeSlots.Reset();Herds->NextPersistentHerdId=NextHerd;
         TMap<int64,int32> HerdIndices;
         for(const auto& H:SavedHerds){FEcoHerdRuntimeData Data;Data.PersistentHerdId=H.Id;Data.RuntimeIndex=Herds->ActiveHerds.Num();Data.Center=H.Center;
             HerdIndices.Add(H.Id,Data.RuntimeIndex);Herds->ActiveHerds.Add(Data);Herds->HerdSpeciesIndices.Add(E->SpeciesIds.Find(H.Species));}
         Herds->InjectedAlarms.Init({},SavedHerds.Num());Herds->ObservedAlarms.Init({},SavedHerds.Num());Herds->NativeV3Alarms.Init({},SavedHerds.Num());
-        Journeys->Plans=MoveTemp(Plans);Journeys->ShortageSince=MoveTemp(Shortage);Journeys->NextPlanAttempt=MoveTemp(Attempts);Journeys->NextPlan=NextPlan;
+        Journeys->RegionalStates=MoveTemp(RegionalStates);Journeys->Plans=MoveTemp(Plans);Journeys->ShortageSince=MoveTemp(Shortage);Journeys->NextPlanAttempt=MoveTemp(Attempts);Journeys->NextPlan=NextPlan;
         Journeys->KnownHabitats=MoveTemp(HabitatReports);
         for(int32 I=0;I<Agents.Num();++I){const auto& V=Agents[I];const auto Entity=NewEntities[I];
             auto& Identity=EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity);Identity.StableAgentId=V.Id;Identity.SpeciesId=V.Species;Identity.SpeciesRuntimeIndex=E->SpeciesIds.Find(V.Species);
@@ -434,6 +592,7 @@ struct FEcoEcosystemCheckpoint
             EM.GetFragmentDataChecked<FEcoLifetimeFragment>(Entity)=V.Lifetime;EM.GetFragmentDataChecked<FEcoDeathFragment>(Entity)=V.Death;
             EM.GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(Entity)=V.Lifecycle;
             if(auto* Motion=EM.GetFragmentDataPtr<FMassVelocityFragment>(Entity))Motion->Value=V.Velocity;
+            auto& T=EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity);T=V.Travel;T.TargetRegionIndex=E->GetRegionRuntimeIndex(T.TargetRegionId);
             if(V.bFauna){
                 auto& F=EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entity);
                 F=V.Fauna;
@@ -443,7 +602,6 @@ struct FEcoEcosystemCheckpoint
                 continue;
             }
             auto& Link=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Entity);Link=V.Link;Link.ContextIndex=N->FindContext(V.Region)->Index;
-            auto& T=EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity);T=V.Travel;T.TargetRegionIndex=E->GetRegionRuntimeIndex(T.TargetRegionId);
             if(auto* J=EM.GetFragmentDataPtr<FEcoHerdTravelFragment>(Entity)){*J=V.Journey;J->MembershipUntil=J->bActive?W->GetTimeSeconds()+10:0;}
             if(auto* Member=EM.GetFragmentDataPtr<FEcoHerdMemberFragment>(Entity))Member->HerdRuntimeIndex=HerdIndices.Contains(V.Herd)?HerdIndices.FindChecked(V.Herd):INDEX_NONE;
             if(auto* B=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(Entity)){
@@ -458,13 +616,19 @@ struct FEcoEcosystemCheckpoint
             if(V.Vitals.HP<=0)EM.RemoveTagFromEntity(Entity,FEcoAliveTag::StaticStruct());
         }
         S.Step=Step;S.SuccessfulBirths=Successful;S.CommittedDeaths=Deaths;S.LastResourceTime=ResourceTime;S.NextMigrationTime=MigrationTime;
+        S.FaunaMotionTime=S.FaunaSpecies.IsEmpty()?-1.:EcoFaunaMotionClock::CompletedTimeAt(Time.ServerTimeSeconds);
+        S.AuthorityClockWorldOrigin=S.GetWorld()->GetTimeSeconds()-Time.ServerTimeSeconds;
+        S.GameplayReasons.Reset();
+        S.FaunaFoodIntents.Reset();
         S.PendingBirths=MoveTemp(Births);S.NextBirthScan=BirthScan;S.SpeciesTotals=MoveTemp(Totals);S.CompletedTime=Completed;S.CompletedTime.WorldEpoch=NewEpoch;
         S.FaunaBirths=MoveTemp(FaunaBirths);S.NextFaunaBirthScan=FaunaBirthScan;
         S.FaunaCarcasses=MoveTemp(FaunaCarcasses);S.FaunaScent=MoveTemp(FaunaScent);
         S.FaunaPatchStock=MoveTemp(PatchStock);S.LastFaunaPatchUpdate=PatchUpdate;
+        S.FaunaLocalSoilMoisture=MoveTemp(PatchSoilMoisture);
         S.LastHerbRecovery=MoveTemp(HerbRecovery);S.LastWolfRecovery=MoveTemp(WolfRecovery);S.PendingRecoveries.Reset();
         S.ResetCombat();S.StrikeSequence=StrikeSerial;S.PlayerStrikes.Reset();
         const bool Valid=S.BuildAgentLookup()&&S.ReconcilePopulation();if(!Valid){S.FailRuntime(TEXT("Checkpoint commit invariant"));return false;}
+        S.PublishForageVisuals();
         S.UpdatePresentationAndNoise(0);S.PublishSummary();
         UE_LOG(LogTemp,Log,TEXT("[EcoCheckpoint] Loaded Slot=%s Agents=%d Step=%lld Native=%lld Epoch=%d TransientShelterLeasesCancelled=1"),*Slot,Agents.Num(),Step,GlobalT,NewEpoch);
         for(const auto& R:Regions)

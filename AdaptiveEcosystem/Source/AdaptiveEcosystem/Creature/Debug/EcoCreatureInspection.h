@@ -16,6 +16,10 @@ public:
     static TArray<int64> GetAuthorityAgentIds(UObject* WorldContext);
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection",meta=(WorldContext="WorldContext"))
     static bool CaptureAgent(UObject* WorldContext,int64 AgentId,FString& Json);
+    /** Uses the same authority clearance query as swimmers. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Inspection",meta=(WorldContext="WorldContext"))
+    static bool InspectFaunaWater(UObject* WorldContext, FName RegionId, FVector Point, float Clearance,
+        FVector2D& BottomAndSurface, FVector& Current);
     /** Authority-only copied debug values. Clients return false and no logical state. */
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection",meta=(WorldContext="WorldContext"))
     static bool CaptureMigration(UObject* WorldContext,FString& Json);
@@ -31,6 +35,17 @@ public:
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection") bool SelectAgentForInspection(int64 AgentId);
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection") void FocusMigrationPlan(int64 PlanId) { MigrationFocus=PlanId; }
 private:
+#if !UE_BUILD_SHIPPING
+    void DrawGrassInspection();
+    bool bGrassInspection = false;
+    FName GrassRegion;
+    double NextGrassRead = 0;
+    FString GrassReadout;
+#endif
+    UPROPERTY(EditDefaultsOnly, Category="Ecology|Grass Debug")
+    FVector2D GrassDryClimate = FVector2D(0, 30);
+    UPROPERTY(EditDefaultsOnly, Category="Ecology|Grass Debug")
+    FVector2D GrassRecoveryClimate = FVector2D(.5, 20);
     FEcoHerdMigrationDebugSnapshot MigrationSnapshot;
     double NextMigrationCapture=0;
     int64 MigrationFocus=0,LastMigrationSelectedAgent=0;

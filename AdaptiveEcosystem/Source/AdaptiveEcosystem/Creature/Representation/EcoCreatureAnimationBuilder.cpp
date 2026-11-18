@@ -2,11 +2,19 @@
 #include "Creature/Representation/EcoCreatureAnimationProfile.h"
 #include "Creature/Representation/EcoCreatureAnimInstance.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
+#include "Creature/Representation/EcoForagePatchVisual.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Animation/AnimBlueprint.h"
 #include "AI/Policy/EcoCreatureV3Trait.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
+#include "Creature/Runtime/EcoFaunaDecision.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "World/EcoNaturalHabitatProfile.h"
+#include "World/EcologyRegion.h"
+#include "World/EcologyWorldSubsystem.h"
+#include "Ecology/EcologySimulationSubsystem.h"
+#include "MassSpawnerSubsystem.h"
+#include "Mass/EntityFragments.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Engine/StaticMeshActor.h"
@@ -163,6 +171,153 @@ bool UEcoCreatureAnimationBuilder::ValidateCopiedGroundSegment(UObject* Context,
     return false;
 #endif
 }
+bool UEcoCreatureAnimationBuilder::ValidateFaunaGroundSegment(UObject* Context,FName RegionId,FName SpeciesId,
+    FVector From,FVector To,float BodyScale)
+{
+#if WITH_EDITOR
+    auto* World = GEngine ? GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull) : nullptr;
+    const double Distance = FVector::Dist2D(From,To);
+    if (!World || From.ContainsNaN() || To.ContainsNaN() || Distance > 600. || !FMath::IsFinite(BodyScale)
+        || BodyScale <= 0.f) return false;
+    const auto* Regions = World->GetSubsystem<UEcologyWorldSubsystem>();
+    const auto* Region = Regions ? Regions->GetRegion(RegionId) : nullptr;
+    if (!RegionId.IsNone() && (!Region || !Region->ContainsPosition(From) || !Region->ContainsPosition(To))) return false;
+    const FEcoFaunaSpecies* Species = nullptr;
+    for (TActorIterator<AEcoCreatureIntegrationSpawner> It(World); It; ++It)
+    {
+        Species = It->FaunaSpecies.FindByPredicate([&](const auto& Profile) { return Profile.SpeciesId == SpeciesId; });
+        if (Species) break;
+    }
+    if (!Species || Species->IsAquatic() || !EcoCreatureMovement::IsWadeableGround(*World,From,Species->WadeDepth)) return false;
+    const int32 Steps = FMath::Max(1,FMath::CeilToInt(Distance / 10.));
+    const float Radius = FMath::Clamp(Species->BodyRadius * BodyScale,1.f,120.f);
+    FVector Current = From;
+    for (int32 Index = 1; Index <= Steps; ++Index)
+    {
+        FVector Next = FMath::Lerp(From,To,double(Index) / Steps);
+        Next.Z = Current.Z;
+        if (!EcoCreatureMovement::ConstrainGroundStep(*World,Current,Next,Radius,Species->MinGroundNormalZ,
+            Species->SweepHeight * BodyScale,Species->StepHeight) || (Region && !Region->ContainsPosition(Next))
+            || FMath::Abs(Next.Z - Current.Z) > Species->StepHeight
+            || !EcoCreatureMovement::IsWadeableGround(*World,Next,Species->WadeDepth)) return false;
+        Current = Next;
+    }
+    return FMath::Abs(Current.Z - To.Z) <= 1.;
+#else
+    return false;
+#endif
+}
+
+bool UEcoCreatureAnimationBuilder::HasFaunaAuditSight(UObject* Context,FVector From,FVector To)
+{
+#if WITH_EDITOR
+    const auto* World = GEngine ? GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull) : nullptr;
+    return World && !From.ContainsNaN() && !To.ContainsNaN()
+        && EcoFaunaDecision::HasClearSight(*World,From,To,0.f,0.f);
+#else
+    return false;
+#endif
+}
+
+bool UEcoCreatureAnimationBuilder::SetIslandAuditFounderPlacement(AEcoCreatureIntegrationSpawner* Spawner,int64 StableId,
+    FName RegionId,FVector Location)
+{
+#if WITH_EDITOR
+    auto* World = Spawner ? Spawner->GetWorld() : nullptr;
+    if (!World || World->WorldType != EWorldType::PIE || World->GetNetMode() != NM_Standalone
+        || !World->GetName().EndsWith(TEXT("LV_JYU_IslandEcosystemRefreshed"))
+        || !Spawner->bReady || Spawner->Step != 0) return false;
+    auto& Manager = World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    const auto* Entity = Spawner->AgentLookup.Find(StableId);
+    if (Manager.IsProcessing() || !Entity || !Manager.IsEntityValid(*Entity)) return false;
+    auto* Fauna = Manager.GetFragmentDataPtr<FEcoFaunaFragment>(*Entity);
+    const auto& Identity = Manager.GetFragmentDataChecked<FEcoIdentityFragment>(*Entity);
+    if (!Fauna || Fauna->Life.Origin != EcoLifeV3::EOrigin::Initial || Fauna->DecisionCount != 0) return false;
+    FEcoFaunaPlacement Placement;
+    Placement.SpeciesId = Identity.SpeciesId;
+    Placement.SpawnPoints.Add(Location);
+    TArray<FVector> Positions;
+    if (!Spawner->BuildFaunaPositions(RegionId,Placement,Positions)) return false;
+    auto& Region = Manager.GetFragmentDataChecked<FEcoRegionFragment>(*Entity);
+    auto* Ecology = World->GetSubsystem<UEcologySimulationSubsystem>();
+    const int32 RegionIndex = Ecology->GetRegionRuntimeIndex(RegionId);
+    if (RegionIndex == INDEX_NONE) return false;
+    auto& OldTotal = Spawner->SpeciesTotals.FindChecked(Region.CurrentRegionId).FindChecked(Identity.SpeciesId);
+    if (OldTotal.Births <= 0) return false;
+    --OldTotal.Births;
+    ++Spawner->SpeciesTotals.FindOrAdd(RegionId).FindOrAdd(Identity.SpeciesId).Births;
+    Region.CurrentRegionId = RegionId;
+    Region.CurrentRegionIndex = RegionIndex;
+    Fauna->Home = Fauna->Goal = Positions[0];
+    Manager.GetFragmentDataChecked<FTransformFragment>(*Entity).GetMutableTransform().SetLocation(Positions[0]);
+    return Spawner->ReconcilePopulation();
+#else
+    return false;
+#endif
+}
+
+bool UEcoCreatureAnimationBuilder::SplitIslandAuditForage(AEcoCreatureIntegrationSpawner* Spawner,FName PatchId,FName NewId,
+    FVector Location,const TArray<FTransform>& OriginalPlants,const TArray<FTransform>& NewPlants)
+{
+#if WITH_EDITOR
+    auto* World = Spawner ? Spawner->GetWorld() : nullptr;
+    if (!World || World->WorldType != EWorldType::PIE || World->GetNetMode() != NM_Standalone
+        || !World->GetName().EndsWith(TEXT("LV_JYU_IslandEcosystemRefreshed"))
+        || !Spawner->bReady || Spawner->Step != 0 || NewId.IsNone() || Location.ContainsNaN()
+        || Spawner->FaunaHabitatPatches.Num() >= 64) return false;
+    auto& Patches = Spawner->FaunaHabitatPatches;
+    auto& Stocks = Spawner->FaunaPatchStock;
+    auto& Visuals = Spawner->FaunaForageVisuals;
+    if (Stocks.Num() != Patches.Num() || Visuals.Num() != Patches.Num()
+        || Patches.ContainsByPredicate([NewId](const auto& Patch) { return Patch.Id == NewId; })) return false;
+    const int32 Index = Patches.IndexOfByPredicate([PatchId](const auto& Patch) { return Patch.Id == PatchId; });
+    if (Index == INDEX_NONE) return false;
+    auto* Visual = Visuals[Index].Get();
+    auto& Source = Patches[Index];
+    FVector Ground;
+    if (!Source.IsPlantForage() || Source.Stage > Spawner->FaunaHabitatStage || Source.ShelterRadius > 0.f
+        || !Visual || OriginalPlants.IsEmpty() || NewPlants.IsEmpty()
+        || OriginalPlants.Num() + NewPlants.Num() != Visual->FullPlantTransforms.Num()
+        || !EcoCreatureMovement::ProjectSpawnPoint(*World,Location,Ground)
+        || !EcoCreatureMovement::IsWadeableGround(*World,Ground,0.f)) return false;
+    const auto* Region = Spawner->FindRegion(Ground);
+    if (!Region || Region->RegionId != Source.RegionId) return false;
+
+    FActorSpawnParameters Params;
+    Params.Template = Visual;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    auto* NewVisual = World->SpawnActor<AEcoForagePatchVisual>(Visual->GetClass(),FTransform(Ground),Params);
+    if (!NewVisual) return false;
+    NewVisual->SetActorLocation(Ground,false,nullptr,ETeleportType::TeleportPhysics);
+    if (!NewVisual->GetActorLocation().Equals(Ground,1.))
+    {
+        NewVisual->Destroy();
+        return false;
+    }
+
+    Source.Capacity *= .5f;
+    Source.RegrowthPerSecond *= .5f;
+    Source.PlantDryLossPerSecond *= .5f;
+    Stocks[Index] *= .5f;
+    FEcoFaunaHabitatPatch NewPatch = Source;
+    NewPatch.Id = NewId;
+    NewPatch.Center = Ground;
+    const float SplitStock = Stocks[Index];
+    Patches.Add(MoveTemp(NewPatch));
+    Stocks.Add(SplitStock);
+    Visual->FullPlantTransforms = OriginalPlants;
+    NewVisual->PatchId = NewId;
+    NewVisual->FullPlantTransforms = NewPlants;
+    Visuals.Add(NewVisual);
+    Visual->RebuildForagePreview();
+    NewVisual->RebuildForagePreview();
+    Spawner->PublishForageVisuals();
+    return true;
+#else
+    return false;
+#endif
+}
+
 bool UEcoCreatureAnimationBuilder::ValidateHabitatGroundSegment(UObject* Context,FVector From,FVector To)
 {
 #if WITH_EDITOR

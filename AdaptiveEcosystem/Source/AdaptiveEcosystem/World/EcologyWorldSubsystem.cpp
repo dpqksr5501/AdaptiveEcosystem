@@ -67,6 +67,16 @@ AEcologyRegion* UEcologyWorldSubsystem::GetRegion(FName InRegionId) const
 	return nullptr;
 }
 
+AEcologyRegion* UEcologyWorldSubsystem::FindRegionAtPosition(const FVector& Position) const
+{
+	AEcologyRegion* Match = nullptr;
+	for (const auto& Pair : RegisteredRegions)
+		if (auto* Region = Pair.Value.Get(); Region && Region->ContainsPosition(Position)
+			&& (!Match || Pair.Key.LexicalLess(Match->RegionId)))
+			Match = Region;
+	return Match;
+}
+
 bool UEcologyWorldSubsystem::GetEnvironmentState(FName InRegionId, FRegionEnvironmentState& OutState) const
 {
 	if (AEcologyRegion* Region = GetRegion(InRegionId))
@@ -77,16 +87,24 @@ bool UEcologyWorldSubsystem::GetEnvironmentState(FName InRegionId, FRegionEnviro
 	return false;
 }
 
-bool UEcologyWorldSubsystem::BuildSpatialSnapshots(TConstArrayView<FName> RegionOrder, TArray<FEcoRegionSpatialSnapshot>& Out) const
+bool UEcologyWorldSubsystem::BuildSpatialSnapshots(TConstArrayView<FName> RegionOrder,
+	TArray<FEcoRegionSpatialSnapshot>& Out, bool bAllowUnavailableRegions) const
 {
 	check(IsInGameThread());
 	Out.Reset();
 	for (FName Id : RegionOrder)
 	{
 		const AEcologyRegion* Region = GetRegion(Id);
-		if (!Region || !Region->RegionBounds) return false;
 		FEcoRegionSpatialSnapshot& Snapshot = Out.AddDefaulted_GetRef();
 		Snapshot.RegionId = Id;
+		if (!Region)
+		{
+			if (!bAllowUnavailableRegions) return false;
+			// Preserve the ledger index. Missing regions have no traversable geometry.
+			Snapshot.bAvailable = false;
+			continue;
+		}
+		if (!Region->RegionBounds) return false;
 		Snapshot.BoundsTransform = Region->RegionBounds->GetComponentTransform();
 		Snapshot.BoundsExtent = Region->RegionBounds->GetUnscaledBoxExtent();
 		Snapshot.ArrivalPosition = Region->GetActorTransform().TransformPosition(Region->ArrivalOffset);
@@ -102,5 +120,8 @@ bool UEcologyWorldSubsystem::BuildSpatialSnapshots(TConstArrayView<FName> Region
 		}
 		Snapshot.AdjacentIndices.Sort();
 	}
+	if (bAllowUnavailableRegions)
+		for (auto& Snapshot : Out)
+			Snapshot.AdjacentIndices.RemoveAll([&Out](int32 Neighbor) { return !Out[Neighbor].bAvailable; });
 	return true;
 }

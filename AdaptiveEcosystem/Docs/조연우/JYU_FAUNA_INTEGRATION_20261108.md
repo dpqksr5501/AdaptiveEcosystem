@@ -4,6 +4,8 @@
 
 현재는 쥐를 포함해 여덟 종이 실행된다. [쥐·사체·플레이어 인계](../Architecture/FAUNA_RAT_AND_CARCASS_20261108.md)에서 최신 설정과 검증을 확인한다. 아래 일곱 종의 설명과 실행 결과는 이전 기록이며 [초기 일곱 종 검증 이력](../Architecture/FAUNA_RUNTIME_AUDIT.md#초기-일곱-종-검증-이력)과 함께 읽는다.
 
+현재 기본 레벨에서 재현할 때는 `LV_JYU_IntegrationR7e`와 `LV_JYU_IntegrationR7eFauna`를 사용한다. 후자는 기존 여섯 규칙 종 프로필을 Forest에 추가한 별도 복사본이다. 소유 전용 맵의 먹이 패치와 지형은 별도로 유지된다. [두 복사본 작성 및 60분 결과](../Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존)
+
 ## 공개 PR과 로컬 재현
 
 공개 PR에는 런타임 C++, 에디터 스크립트와 검증 문서가 포함된다. 문서의 다종 검증은 라이선스가 있는 원본과 생성한 테스트 맵을 갖춘 로컬 작업 환경에서 수행했다. 공개 체크아웃에서 이 맵을 재현하려면 `AnimalVarietyPack`의 돼지·여우·까마귀를 기존 팩 경로에 설치하고, 레오파드·물소 Fab 원본, 발소리 Vault 원본, `mouse.zip`을 각 스크립트가 읽는 로컬 경로에 준비한다. UE Editor에서 [다종 맵 작성 스크립트](../../Tools/Editor/setup_jyu_fauna.py)를 실행하면 종별 표현 에셋과 테스트 맵을 생성한다. 이후 [단계별 검증 절차](../Architecture/FAUNA_POPULATION_BALANCE.md)를 따른다. [Fab 라이선스](https://www.fab.com/eula)

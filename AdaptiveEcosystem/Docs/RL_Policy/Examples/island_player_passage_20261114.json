@@ -1,0 +1,991 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "runs": [
+    {
+      "seed": 20000,
+      "mode": "Still",
+      "start": [
+        37600.0,
+        35750.0,
+        3189.5880159456783
+      ],
+      "peak_displacement_cm": 0.0,
+      "footstep_loudness": [],
+      "footstep_ranges_cm": [],
+      "avoidance_count": 0,
+      "jackrabbit_reaction_signals": [],
+      "jackrabbit_events": [
+        {
+          "authority_seconds": 14,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 32,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 47,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 58,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 61,
+          "reason": "PassageArrived"
+        }
+      ],
+      "first_payment": {
+        "at": 67.0,
+        "patch": "IslandTransitionForbs",
+        "amount": 2.8
+      },
+      "sources": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_player_gait_still/IslandFaunaPIE.json": "794a1162eb07f32755137698e4799c378e90b2845bce52b7a6b01aea416d99b2",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_player_gait_still.log": "20133720a8db2a99b39c3feb619ac2dfe9810e785bcc1b0d0cd808e5788d9923"
+      }
+    },
+    {
+      "seed": 20000,
+      "mode": "Sneak",
+      "start": [
+        37600.0,
+        35750.0,
+        3189.5880159456783
+      ],
+      "peak_displacement_cm": 1105.5674655107287,
+      "footstep_loudness": [
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12
+      ],
+      "footstep_ranges_cm": [
+        2250
+      ],
+      "avoidance_count": 2,
+      "jackrabbit_reaction_signals": [],
+      "jackrabbit_events": [
+        {
+          "authority_seconds": 14,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 32,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 47,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 58,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 61,
+          "reason": "PassageArrived"
+        }
+      ],
+      "first_payment": {
+        "at": 67.0,
+        "patch": "IslandTransitionForbs",
+        "amount": 2.8
+      },
+      "sources": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_player_gait_sneak/IslandFaunaPIE.json": "487964520822b31594ef2f6e5dcbb793351486572dec2c209ea08c62075389e1",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_player_gait_sneak.log": "82760c27cffd263ddf0ac6d128e484771b2b6d885b3ae8ac3b70b43aa2d3c4ad"
+      }
+    },
+    {
+      "seed": 20000,
+      "mode": "Run",
+      "start": [
+        37600.0,
+        35750.0,
+        3189.5880159456783
+      ],
+      "peak_displacement_cm": 1128.1447370737296,
+      "footstep_loudness": [
+        0.79,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.54
+      ],
+      "footstep_ranges_cm": [
+        2250
+      ],
+      "avoidance_count": 31,
+      "jackrabbit_reaction_signals": [
+        0.249,
+        0.322,
+        0.265,
+        0.159
+      ],
+      "jackrabbit_events": [
+        {
+          "authority_seconds": 14,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 22.15,
+          "reason": "ThreatHeard"
+        },
+        {
+          "authority_seconds": 22.6,
+          "reason": "ThreatHeard"
+        },
+        {
+          "authority_seconds": 23.05,
+          "reason": "ThreatHeard"
+        },
+        {
+          "authority_seconds": 23.5,
+          "reason": "ThreatHeard"
+        },
+        {
+          "authority_seconds": 37,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 52,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 63,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 66,
+          "reason": "PassageArrived"
+        }
+      ],
+      "first_payment": {
+        "at": 72.0,
+        "patch": "IslandTransitionForbs",
+        "amount": 2.8
+      },
+      "sources": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_player_gait_run/IslandFaunaPIE.json": "917367fb391b94466a27e898baabd74a659db86edd01a014165054c811258947",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_player_gait_run.log": "e37117f2c95a1fbb4687d73313dd781231cc4c83fd9a7f4d5af6fe0617c29c22"
+      }
+    },
+    {
+      "seed": 20017,
+      "mode": "Still",
+      "start": [
+        37600.0,
+        35750.0,
+        3189.5880159456783
+      ],
+      "peak_displacement_cm": 0.0,
+      "footstep_loudness": [],
+      "footstep_ranges_cm": [],
+      "avoidance_count": 0,
+      "jackrabbit_reaction_signals": [],
+      "jackrabbit_events": [
+        {
+          "authority_seconds": 13,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 30,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 44,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 54,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 57,
+          "reason": "PassageArrived"
+        }
+      ],
+      "first_payment": {
+        "at": 63.0,
+        "patch": "IslandTransitionForbs",
+        "amount": 2.8
+      },
+      "sources": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_player_gait_still/IslandFaunaPIE.json": "bf250d92c8169926d3eec6b65d5c4db0f4975bbfb97b7cf5b983468e9603eca9",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_player_gait_still.log": "78818f4a44b358d0b42cff94c7c84500e1953e5f918e1ebde9f7e0771a99ac9a"
+      }
+    },
+    {
+      "seed": 20017,
+      "mode": "Sneak",
+      "start": [
+        37600.0,
+        35750.0,
+        3189.5880159456783
+      ],
+      "peak_displacement_cm": 1105.5674655107287,
+      "footstep_loudness": [
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12,
+        0.12
+      ],
+      "footstep_ranges_cm": [
+        2250
+      ],
+      "avoidance_count": 2,
+      "jackrabbit_reaction_signals": [],
+      "jackrabbit_events": [
+        {
+          "authority_seconds": 13,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 30,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 44,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 54,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 57,
+          "reason": "PassageArrived"
+        }
+      ],
+      "first_payment": {
+        "at": 63.0,
+        "patch": "IslandTransitionForbs",
+        "amount": 2.8
+      },
+      "sources": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_player_gait_sneak/IslandFaunaPIE.json": "fd56902fe905c9a9aae8b34a4924910b5fd1bc982fcf0b707ad1c3009dbc38f9",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_player_gait_sneak.log": "8181140aa3cab09d2ece9b4ff3fc2672ac63c960a3d19775fae50e0a4b9fb2b3"
+      }
+    },
+    {
+      "seed": 20017,
+      "mode": "Run",
+      "start": [
+        37600.0,
+        35750.0,
+        3189.5880159456783
+      ],
+      "peak_displacement_cm": 1128.1447370737296,
+      "footstep_loudness": [
+        0.79,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.54
+      ],
+      "footstep_ranges_cm": [
+        2250
+      ],
+      "avoidance_count": 30,
+      "jackrabbit_reaction_signals": [
+        0.195,
+        0.256,
+        0.211
+      ],
+      "jackrabbit_events": [
+        {
+          "authority_seconds": 13,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 22.15,
+          "reason": "ThreatHeard"
+        },
+        {
+          "authority_seconds": 22.6,
+          "reason": "ThreatHeard"
+        },
+        {
+          "authority_seconds": 23.05,
+          "reason": "ThreatHeard"
+        },
+        {
+          "authority_seconds": 39,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 49,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "authority_seconds": 52,
+          "reason": "PassageArrived"
+        }
+      ],
+      "first_payment": {
+        "at": 58.0,
+        "patch": "IslandTransitionForbs",
+        "amount": 2.8
+      },
+      "sources": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_player_gait_run/IslandFaunaPIE.json": "d8dd2471471a808677375ab9005820b766cda0391e947c6aae386719861ca79e",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_player_gait_run.log": "cf417cb480bc7d52aa130d0b93151c3eb203b591b8f8ea2f7177a959091c27d8"
+      }
+    }
+  ],
+  "jackrabbit_hearing_profile": {
+    "asset": "/Game/JYU/ExpandedFauna/DA_ExpandedFaunaFootsteps.DA_ExpandedFaunaFootsteps",
+    "hearing_range": 1700.0,
+    "hearing_threshold": 0.11999999731779099,
+    "occluded_hearing": 0.4399999976158142,
+    "source_sha256": {
+      "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_hearing_asset/IslandFaunaPIE.json": "433efc08bf34ea602f4c1b3647eab13ff427224e314d0a6abc4b85f49ddf7ad0",
+      "AdaptiveEcosystem/Content/JYU/ExpandedFauna/DA_ExpandedFaunaFootsteps.uasset": "0ebe676afb02a1d72e8962b2f6bf5d0201897436a547672be62bedf1e37b9b86"
+    }
+  },
+  "measured_hearing": [
+    {
+      "seed": 20000,
+      "reactions": [
+        {
+          "event_id": 6487,
+          "at": 22.15,
+          "source_cm": [
+            37725.156,
+            35750.0,
+            3098.588
+          ],
+          "listener_cm": [
+            38368.039,
+            36720.465,
+            3098.588
+          ],
+          "range_cm": 2250.0,
+          "loudness": 0.790716052,
+          "weather": 1.0,
+          "occluded": false,
+          "signal": 0.249266997
+        },
+        {
+          "event_id": 6604,
+          "at": 22.6,
+          "source_cm": [
+            38047.076,
+            35750.0,
+            3098.588
+          ],
+          "listener_cm": [
+            38453.637,
+            36827.882,
+            3098.588
+          ],
+          "range_cm": 2250.0,
+          "loudness": 1.0,
+          "weather": 1.0,
+          "occluded": false,
+          "signal": 0.322348297
+        },
+        {
+          "event_id": 6744,
+          "at": 23.05,
+          "source_cm": [
+            38467.076,
+            35750.0,
+            3098.588
+          ],
+          "listener_cm": [
+            38522.49,
+            36998.154,
+            3098.588
+          ],
+          "range_cm": 2250.0,
+          "loudness": 1.0,
+          "weather": 1.0,
+          "occluded": false,
+          "signal": 0.265068591
+        },
+        {
+          "event_id": 6808,
+          "at": 23.5,
+          "source_cm": [
+            38617.076,
+            35750.0,
+            3098.588
+          ],
+          "listener_cm": [
+            38538.707,
+            37177.74,
+            3098.588
+          ],
+          "range_cm": 2250.0,
+          "loudness": 1.0,
+          "weather": 1.0,
+          "occluded": false,
+          "signal": 0.158888638
+        }
+      ],
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_hearing_positions/IslandFaunaPIE.json": "4b563ee813a3a95dde64f1ff3d3f4af9c0762723de103d678bd0caa499a1a000",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_hearing_positions.log": "5683248213a4095892da8a5c58886c6a47da5a1d8a7b905402278565e2af69d7"
+      },
+      "movement_samples": [
+        {
+          "pie_seconds": 21.600001126527786,
+          "completed_authority_seconds": 21.0,
+          "position_cm": [
+            38314.01,
+            36680.69,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 21.866667807102203,
+          "completed_authority_seconds": 21.0,
+          "position_cm": [
+            38332.8,
+            36694.53,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 22.13333448767662,
+          "completed_authority_seconds": 21.0,
+          "position_cm": [
+            38351.59,
+            36708.36,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 22.400001168251038,
+          "completed_authority_seconds": 22.0,
+          "position_cm": [
+            38371.02,
+            36722.82,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 22.666667848825455,
+          "completed_authority_seconds": 22.0,
+          "position_cm": [
+            38418.87,
+            36776.46,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 22.933334529399872,
+          "completed_authority_seconds": 22.0,
+          "position_cm": [
+            38473.78,
+            36870.28,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 23.20000120997429,
+          "completed_authority_seconds": 22.0,
+          "position_cm": [
+            38512.78,
+            36972.67,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 23.466667890548706,
+          "completed_authority_seconds": 23.0,
+          "position_cm": [
+            38533.63,
+            37076.52,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 23.733334571123123,
+          "completed_authority_seconds": 23.0,
+          "position_cm": [
+            38538.78,
+            37184.37,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 24.00000125169754,
+          "completed_authority_seconds": 23.0,
+          "position_cm": [
+            38533.09,
+            37291.41,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 24.266667932271957,
+          "completed_authority_seconds": 24.0,
+          "position_cm": [
+            38527.29,
+            37397.84,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 24.533334612846375,
+          "completed_authority_seconds": 24.0,
+          "position_cm": [
+            38521.53,
+            37503.54,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 24.80000129342079,
+          "completed_authority_seconds": 24.0,
+          "position_cm": [
+            38515.81,
+            37608.48,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 25.06666797399521,
+          "completed_authority_seconds": 24.0,
+          "position_cm": [
+            38510.13,
+            37712.69,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 25.333334654569626,
+          "completed_authority_seconds": 25.0,
+          "position_cm": [
+            38506.24,
+            37778.91,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 25.600001335144043,
+          "completed_authority_seconds": 25.0,
+          "position_cm": [
+            38499.18,
+            37789.64,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 25.86666801571846,
+          "completed_authority_seconds": 25.0,
+          "position_cm": [
+            38486.9,
+            37776.32,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 26.133334696292877,
+          "completed_authority_seconds": 25.0,
+          "position_cm": [
+            38478.59,
+            37755.71,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 26.400001376867294,
+          "completed_authority_seconds": 26.0,
+          "position_cm": [
+            38470.21,
+            37734.91,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 26.66666805744171,
+          "completed_authority_seconds": 26.0,
+          "position_cm": [
+            38461.75,
+            37713.93,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 26.93333473801613,
+          "completed_authority_seconds": 26.0,
+          "position_cm": [
+            38453.22,
+            37692.75,
+            3098.59
+          ],
+          "activity": "Wander"
+        }
+      ],
+      "passage_events": [
+        {
+          "at": 14,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "at": 37,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "at": 52,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "at": 63,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "at": 66,
+          "reason": "PassageArrived"
+        }
+      ],
+      "caution_gene": 0.8975575571879414
+    },
+    {
+      "seed": 20017,
+      "reactions": [
+        {
+          "event_id": 6496,
+          "at": 22.15,
+          "source_cm": [
+            37725.156,
+            35750.0,
+            3098.588
+          ],
+          "listener_cm": [
+            38473.404,
+            36789.926,
+            3098.588
+          ],
+          "range_cm": 2250.0,
+          "loudness": 0.790716052,
+          "weather": 1.0,
+          "occluded": false,
+          "signal": 0.194822624
+        },
+        {
+          "event_id": 6611,
+          "at": 22.6,
+          "source_cm": [
+            38047.076,
+            35750.0,
+            3098.588
+          ],
+          "listener_cm": [
+            38566.41,
+            36902.845,
+            3098.588
+          ],
+          "range_cm": 2250.0,
+          "loudness": 1.0,
+          "weather": 1.0,
+          "occluded": false,
+          "signal": 0.256223023
+        },
+        {
+          "event_id": 6766,
+          "at": 23.05,
+          "source_cm": [
+            38467.076,
+            35750.0,
+            3098.588
+          ],
+          "listener_cm": [
+            38649.82,
+            37079.457,
+            3098.588
+          ],
+          "range_cm": 2250.0,
+          "loudness": 1.0,
+          "weather": 1.0,
+          "occluded": false,
+          "signal": 0.210612714
+        }
+      ],
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_hearing_positions/IslandFaunaPIE.json": "4fa34a85d4681086f5856d84586859ee1ab135fc7ce632b513f8821382b9f998",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_hearing_positions.log": "f984b4da8031477653301dcfedb3efad2c610d248626f4bc34ec16f54e6612e2"
+      },
+      "movement_samples": [
+        {
+          "pie_seconds": 21.600001126527786,
+          "completed_authority_seconds": 21.0,
+          "position_cm": [
+            38416.44,
+            36747.16,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 21.866667807102203,
+          "completed_authority_seconds": 21.0,
+          "position_cm": [
+            38436.26,
+            36762.04,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 22.13333448767662,
+          "completed_authority_seconds": 21.0,
+          "position_cm": [
+            38456.07,
+            36776.91,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 22.400001168251038,
+          "completed_authority_seconds": 22.0,
+          "position_cm": [
+            38476.54,
+            36792.46,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 22.666667848825455,
+          "completed_authority_seconds": 22.0,
+          "position_cm": [
+            38527.53,
+            36849.57,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 22.933334529399872,
+          "completed_authority_seconds": 22.0,
+          "position_cm": [
+            38589.83,
+            36947.14,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 23.20000120997429,
+          "completed_authority_seconds": 22.0,
+          "position_cm": [
+            38637.86,
+            37053.08,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 23.466667890548706,
+          "completed_authority_seconds": 23.0,
+          "position_cm": [
+            38667.84,
+            37162.01,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 23.733334571123123,
+          "completed_authority_seconds": 23.0,
+          "position_cm": [
+            38683.99,
+            37275.61,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 24.00000125169754,
+          "completed_authority_seconds": 23.0,
+          "position_cm": [
+            38700.03,
+            37388.43,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 24.266667932271957,
+          "completed_authority_seconds": 24.0,
+          "position_cm": [
+            38715.96,
+            37500.47,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 24.533334612846375,
+          "completed_authority_seconds": 24.0,
+          "position_cm": [
+            38731.78,
+            37611.73,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 24.80000129342079,
+          "completed_authority_seconds": 24.0,
+          "position_cm": [
+            38747.48,
+            37722.2,
+            3098.59
+          ],
+          "activity": "Flee"
+        },
+        {
+          "pie_seconds": 25.06666797399521,
+          "completed_authority_seconds": 24.0,
+          "position_cm": [
+            38760.97,
+            37815.95,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 25.333334654569626,
+          "completed_authority_seconds": 25.0,
+          "position_cm": [
+            38768.52,
+            37843.49,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 25.600001335144043,
+          "completed_authority_seconds": 25.0,
+          "position_cm": [
+            38787.85,
+            37838.43,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 25.86666801571846,
+          "completed_authority_seconds": 25.0,
+          "position_cm": [
+            38807.96,
+            37826.05,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 26.133334696292877,
+          "completed_authority_seconds": 25.0,
+          "position_cm": [
+            38828.25,
+            37813.56,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 26.400001376867294,
+          "completed_authority_seconds": 26.0,
+          "position_cm": [
+            38848.73,
+            37800.95,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 26.66666805744171,
+          "completed_authority_seconds": 26.0,
+          "position_cm": [
+            38869.39,
+            37788.23,
+            3098.59
+          ],
+          "activity": "Wander"
+        },
+        {
+          "pie_seconds": 26.93333473801613,
+          "completed_authority_seconds": 26.0,
+          "position_cm": [
+            38890.23,
+            37775.4,
+            3098.59
+          ],
+          "activity": "Wander"
+        }
+      ],
+      "passage_events": [
+        {
+          "at": 13,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "at": 39,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "at": 49,
+          "reason": "PassageWaypoint"
+        },
+        {
+          "at": 52,
+          "reason": "PassageArrived"
+        }
+      ],
+      "caution_gene": 1.0807160690436095
+    }
+  ]
+}

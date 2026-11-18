@@ -1,0 +1,1228 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "map_package": {
+    "repository_path": "AdaptiveEcosystem/Content/JYU/Maps/LV_JYU_IslandEcosystemRefreshed.umap",
+    "sha256": "20c2f5e313693cb8b90ed6cb9606ec30839352150f7f4f6998164c5832768206"
+  },
+  "region_actor_packages": {
+    "Snowfield": {
+      "repository_path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystemRefreshed/9/4N/XJ68MBGNVBAFIG0M84NUVJ.uasset",
+      "sha256": "94a7f6d80be225fc3397146d7b01e4647d37cfcbb33f9a07d469aff0c5be957b"
+    },
+    "Grassland": {
+      "repository_path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystemRefreshed/A/WU/H403BIOH4ZJ4EK3C03ORCM.uasset",
+      "sha256": "440a3c61544196418fb21bfd55e91449e276a8a3ca65f72d2b8290de1c88fd71"
+    }
+  },
+  "build_sha256": "74e85bfbec991b4079cd3d136c8037b5adbaa1725bb751968680a8bb36043f12",
+  "authority_duration_seconds": 3600,
+  "dilation": 4,
+  "runs": [
+    {
+      "seed": 20000,
+      "samples": 121,
+      "initial_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "report_sha256": "6328a80d2a8d432f2ab4cdf2bde52eebd6f1759e01cf3576aa9f58556640abef",
+      "authority_log_sha256": "de66709dd312a624f9ebd1d5b73d2277547e0c04a6a893c5ba0a701b8aef616d",
+      "same_initial_conditions": {
+        "matches": true,
+        "differences": [],
+        "changed_patches": [],
+        "agents_with_different_initial_position": []
+      },
+      "baseline": {
+        "1": {
+          "population": {
+            "Wolf": 16,
+            "Herbivore": 48,
+            "Buffalo": 4,
+            "Crow": 3,
+            "Horse": 5,
+            "Pig": 4,
+            "Fox": 2,
+            "Jackrabbit": 4,
+            "Leopard": 1,
+            "Rat": 6,
+            "Bighorn": 5,
+            "GoldenEagle": 2,
+            "AriakeCatfish": 3,
+            "CommonCarp": 6,
+            "Mink": 2,
+            "UnidentifiedFish": 7
+          },
+          "authored_stock": 215.00000023841858
+        },
+        "1800": {
+          "population": {
+            "Herbivore": 29,
+            "Pig": 1,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 121.39865443110466
+        },
+        "3600": {
+          "population": {
+            "Herbivore": 49,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 157.41675592958927
+        }
+      },
+      "trial": {
+        "1": {
+          "population": {
+            "Wolf": 16,
+            "Herbivore": 48,
+            "Buffalo": 4,
+            "Crow": 3,
+            "Horse": 5,
+            "Pig": 4,
+            "Fox": 2,
+            "Jackrabbit": 4,
+            "Leopard": 1,
+            "Rat": 6,
+            "Bighorn": 5,
+            "GoldenEagle": 2,
+            "AriakeCatfish": 3,
+            "CommonCarp": 6,
+            "Mink": 2,
+            "UnidentifiedFish": 7
+          },
+          "authored_stock": 215.00000023841858
+        },
+        "1800": {
+          "population": {
+            "Wolf": 1,
+            "Herbivore": 24,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 143.13137800991535
+        },
+        "3600": {
+          "population": {
+            "Herbivore": 38,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 158.06419979035854
+        }
+      },
+      "authority_log": {
+        "rows_by_region": {
+          "LowerRiver": 197
+        },
+        "max_printed_balance_residual": 1e-06,
+        "guard_intercepts": 0
+      },
+      "receipt_source_transitions": {
+        "AriakeCatfish": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 2
+        },
+        "Bighorn": {
+          "between_patches": 6,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Buffalo": {
+          "between_patches": 15,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "CommonCarp": {
+          "between_patches": 461,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Crow": {
+          "between_patches": 0,
+          "between_carcasses": 12,
+          "between_feeding_kinds": 0
+        },
+        "Fox": {
+          "between_patches": 0,
+          "between_carcasses": 11,
+          "between_feeding_kinds": 0
+        },
+        "GoldenEagle": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Herbivore": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Horse": {
+          "between_patches": 24,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Jackrabbit": {
+          "between_patches": 5,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Leopard": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Mink": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Pig": {
+          "between_patches": 0,
+          "between_carcasses": 37,
+          "between_feeding_kinds": 0
+        },
+        "Rat": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "UnidentifiedFish": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Wolf": {
+          "between_patches": 0,
+          "between_carcasses": 17,
+          "between_feeding_kinds": 0
+        }
+      },
+      "between_feeding_kind_receipts": [
+        {
+          "species": "AriakeCatfish",
+          "agent_id": "102",
+          "before": {
+            "kind": "PatchMeal",
+            "source_id": "IslandRiverRoots",
+            "authority_seconds": 1021.0,
+            "amount": 0.354,
+            "remaining": 0.0
+          },
+          "after": {
+            "kind": "Scavenge",
+            "source_id": "113",
+            "authority_seconds": 1024.0,
+            "amount": 1.5,
+            "remaining": 20.694
+          },
+          "kind_changed": true,
+          "seconds_between_receipts": 3.0
+        },
+        {
+          "species": "AriakeCatfish",
+          "agent_id": "102",
+          "before": {
+            "kind": "Scavenge",
+            "source_id": "113",
+            "authority_seconds": 1037.0,
+            "amount": 1.5,
+            "remaining": 1.194
+          },
+          "after": {
+            "kind": "PatchMeal",
+            "source_id": "IslandRiverRoots",
+            "authority_seconds": 1040.0,
+            "amount": 1.681,
+            "remaining": 0.0
+          },
+          "kind_changed": true,
+          "seconds_between_receipts": 3.0
+        }
+      ],
+      "carcass_balance_audit": {
+        "created": 142,
+        "closed": 142,
+        "payments": 391,
+        "max_payment_residual": 0.0,
+        "shared_across_species": {
+          "123": {
+            "species": "Horse",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 31.5,
+              "Pig": 68.0
+            },
+            "closure": {
+              "unused_stock": 20.5,
+              "authority_seconds": 216.203,
+              "reason": "Expired"
+            }
+          },
+          "128": {
+            "species": "Horse",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 56.0,
+              "Pig": 64.0
+            },
+            "closure": {
+              "unused_stock": 0.0,
+              "authority_seconds": 232.203,
+              "reason": "Depleted"
+            }
+          },
+          "68": {
+            "species": "Jackrabbit",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 35.573,
+            "energy_by_consumer_species": {
+              "Fox": 27.573,
+              "Wolf": 8.0
+            },
+            "closure": {
+              "unused_stock": 0.0,
+              "authority_seconds": 286.0,
+              "reason": "Depleted"
+            }
+          },
+          "41": {
+            "species": "Horse",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 21.0,
+              "Pig": 28.0
+            },
+            "closure": {
+              "unused_stock": 71.0,
+              "authority_seconds": 310.737,
+              "reason": "Expired"
+            }
+          },
+          "34": {
+            "species": "Buffalo",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 31.5,
+              "Pig": 56.0
+            },
+            "closure": {
+              "unused_stock": 32.5,
+              "authority_seconds": 343.737,
+              "reason": "Expired"
+            }
+          },
+          "33": {
+            "species": "Buffalo",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 10.5,
+              "Pig": 64.0,
+              "Wolf": 40.0
+            },
+            "closure": {
+              "unused_stock": 5.5,
+              "authority_seconds": 382.0,
+              "reason": "Expired"
+            }
+          },
+          "69": {
+            "species": "Jackrabbit",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 37.335,
+            "energy_by_consumer_species": {
+              "Fox": 21.0,
+              "Wolf": 16.335
+            },
+            "closure": {
+              "unused_stock": 0.0,
+              "authority_seconds": 373.0,
+              "reason": "Depleted"
+            }
+          },
+          "44": {
+            "species": "Horse",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 14.0,
+              "Pig": 104.0
+            },
+            "closure": {
+              "unused_stock": 2.0,
+              "authority_seconds": 433.0,
+              "reason": "Expired"
+            }
+          }
+        }
+      },
+      "three_species_carcass_example": {
+        "carcass_id": "33",
+        "payments_in_log_order": [
+          {
+            "agent_id": "131",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 116.0,
+            "authority_seconds": 353.737
+          },
+          {
+            "agent_id": "37",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 112.5,
+            "authority_seconds": 354.737
+          },
+          {
+            "agent_id": "46",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 108.5,
+            "authority_seconds": 354.737
+          },
+          {
+            "agent_id": "46",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 104.5,
+            "authority_seconds": 355.737
+          },
+          {
+            "agent_id": "131",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 100.5,
+            "authority_seconds": 359.737
+          },
+          {
+            "agent_id": "45",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 96.5,
+            "authority_seconds": 361.0
+          },
+          {
+            "agent_id": "37",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 93.0,
+            "authority_seconds": 363.0
+          },
+          {
+            "agent_id": "17",
+            "species": "Wolf",
+            "amount": 8.0,
+            "remaining": 85.0,
+            "authority_seconds": null
+          },
+          {
+            "agent_id": "20",
+            "species": "Wolf",
+            "amount": 8.0,
+            "remaining": 77.0,
+            "authority_seconds": null
+          },
+          {
+            "agent_id": "48",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 73.0,
+            "authority_seconds": 366.0
+          },
+          {
+            "agent_id": "20",
+            "species": "Wolf",
+            "amount": 8.0,
+            "remaining": 65.0,
+            "authority_seconds": null
+          },
+          {
+            "agent_id": "45",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 61.0,
+            "authority_seconds": 367.0
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 57.0,
+            "authority_seconds": 367.0
+          },
+          {
+            "agent_id": "48",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 53.0,
+            "authority_seconds": 367.0
+          },
+          {
+            "agent_id": "20",
+            "species": "Wolf",
+            "amount": 8.0,
+            "remaining": 45.0,
+            "authority_seconds": null
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 41.0,
+            "authority_seconds": 368.0
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 37.0,
+            "authority_seconds": 369.0
+          },
+          {
+            "agent_id": "17",
+            "species": "Wolf",
+            "amount": 8.0,
+            "remaining": 29.0,
+            "authority_seconds": null
+          },
+          {
+            "agent_id": "37",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 25.5,
+            "authority_seconds": 375.0
+          },
+          {
+            "agent_id": "131",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 21.5,
+            "authority_seconds": 376.0
+          },
+          {
+            "agent_id": "46",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 17.5,
+            "authority_seconds": 379.0
+          },
+          {
+            "agent_id": "46",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 13.5,
+            "authority_seconds": 380.0
+          },
+          {
+            "agent_id": "46",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 9.5,
+            "authority_seconds": 381.0
+          },
+          {
+            "agent_id": "143",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 5.5,
+            "authority_seconds": 381.0
+          }
+        ]
+      }
+    },
+    {
+      "seed": 20017,
+      "samples": 121,
+      "initial_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "report_sha256": "1b8eb7b08a68717e8644fb5750a6d2496235c86d865f43ce9aeb270a346afec9",
+      "authority_log_sha256": "362480990a5c735e384354bc90a2d651d8bbb47c38bc1d21578223d4af016d65",
+      "same_initial_conditions": {
+        "matches": true,
+        "differences": [],
+        "changed_patches": [],
+        "agents_with_different_initial_position": []
+      },
+      "baseline": {
+        "1": {
+          "population": {
+            "Wolf": 16,
+            "Herbivore": 48,
+            "Buffalo": 4,
+            "Crow": 3,
+            "Horse": 5,
+            "Pig": 4,
+            "Fox": 2,
+            "Jackrabbit": 4,
+            "Leopard": 1,
+            "Rat": 6,
+            "Bighorn": 5,
+            "GoldenEagle": 2,
+            "AriakeCatfish": 3,
+            "CommonCarp": 6,
+            "Mink": 2,
+            "UnidentifiedFish": 7
+          },
+          "authored_stock": 215.00000023841858
+        },
+        "1800": {
+          "population": {
+            "Herbivore": 27,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1,
+            "Pig": 1
+          },
+          "authored_stock": 130.8750963229686
+        },
+        "3600": {
+          "population": {
+            "Herbivore": 48,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 151.23541970737278
+        }
+      },
+      "trial": {
+        "1": {
+          "population": {
+            "Wolf": 16,
+            "Herbivore": 48,
+            "Buffalo": 4,
+            "Crow": 3,
+            "Horse": 5,
+            "Pig": 4,
+            "Fox": 2,
+            "Jackrabbit": 4,
+            "Leopard": 1,
+            "Rat": 6,
+            "Bighorn": 5,
+            "GoldenEagle": 2,
+            "AriakeCatfish": 3,
+            "CommonCarp": 6,
+            "Mink": 2,
+            "UnidentifiedFish": 7
+          },
+          "authored_stock": 215.00000023841858
+        },
+        "1800": {
+          "population": {
+            "Herbivore": 35,
+            "Pig": 1,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 113.43623617850244
+        },
+        "3600": {
+          "population": {
+            "Herbivore": 44,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 147.67398832924664
+        }
+      },
+      "authority_log": {
+        "rows_by_region": {
+          "LowerRiver": 196
+        },
+        "max_printed_balance_residual": 1e-06,
+        "guard_intercepts": 0
+      },
+      "receipt_source_transitions": {
+        "AriakeCatfish": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 4
+        },
+        "Bighorn": {
+          "between_patches": 10,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Buffalo": {
+          "between_patches": 20,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "CommonCarp": {
+          "between_patches": 698,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Crow": {
+          "between_patches": 0,
+          "between_carcasses": 13,
+          "between_feeding_kinds": 0
+        },
+        "Fox": {
+          "between_patches": 0,
+          "between_carcasses": 8,
+          "between_feeding_kinds": 0
+        },
+        "GoldenEagle": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Herbivore": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Horse": {
+          "between_patches": 26,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Jackrabbit": {
+          "between_patches": 3,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Leopard": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Mink": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Pig": {
+          "between_patches": 0,
+          "between_carcasses": 12,
+          "between_feeding_kinds": 0
+        },
+        "Rat": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "UnidentifiedFish": {
+          "between_patches": 0,
+          "between_carcasses": 0,
+          "between_feeding_kinds": 0
+        },
+        "Wolf": {
+          "between_patches": 0,
+          "between_carcasses": 13,
+          "between_feeding_kinds": 0
+        }
+      },
+      "between_feeding_kind_receipts": [
+        {
+          "species": "AriakeCatfish",
+          "agent_id": "102",
+          "before": {
+            "kind": "PatchMeal",
+            "source_id": "IslandRiverRoots",
+            "authority_seconds": 1021.0,
+            "amount": 0.619,
+            "remaining": 0.0
+          },
+          "after": {
+            "kind": "Scavenge",
+            "source_id": "114",
+            "authority_seconds": 1024.0,
+            "amount": 1.5,
+            "remaining": 20.699
+          },
+          "kind_changed": true,
+          "seconds_between_receipts": 3.0
+        },
+        {
+          "species": "AriakeCatfish",
+          "agent_id": "102",
+          "before": {
+            "kind": "Scavenge",
+            "source_id": "114",
+            "authority_seconds": 1034.0,
+            "amount": 1.5,
+            "remaining": 5.699
+          },
+          "after": {
+            "kind": "PatchMeal",
+            "source_id": "IslandRiverRoots",
+            "authority_seconds": 1036.0,
+            "amount": 1.327,
+            "remaining": 0.0
+          },
+          "kind_changed": true,
+          "seconds_between_receipts": 2.0
+        },
+        {
+          "species": "AriakeCatfish",
+          "agent_id": "102",
+          "before": {
+            "kind": "PatchMeal",
+            "source_id": "IslandRiverRoots",
+            "authority_seconds": 1036.0,
+            "amount": 1.327,
+            "remaining": 0.0
+          },
+          "after": {
+            "kind": "Scavenge",
+            "source_id": "114",
+            "authority_seconds": 1038.0,
+            "amount": 1.5,
+            "remaining": 4.199
+          },
+          "kind_changed": true,
+          "seconds_between_receipts": 2.0
+        },
+        {
+          "species": "AriakeCatfish",
+          "agent_id": "102",
+          "before": {
+            "kind": "Scavenge",
+            "source_id": "114",
+            "authority_seconds": 1040.0,
+            "amount": 1.5,
+            "remaining": 1.199
+          },
+          "after": {
+            "kind": "PatchMeal",
+            "source_id": "IslandRiverRoots",
+            "authority_seconds": 1047.0,
+            "amount": 0.973,
+            "remaining": 0.0
+          },
+          "kind_changed": true,
+          "seconds_between_receipts": 7.0
+        }
+      ],
+      "carcass_balance_audit": {
+        "created": 143,
+        "closed": 143,
+        "payments": 271,
+        "max_payment_residual": 0.0,
+        "shared_across_species": {
+          "122": {
+            "species": "Horse",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 59.5,
+              "Pig": 48.0
+            },
+            "closure": {
+              "unused_stock": 12.5,
+              "authority_seconds": 209.27,
+              "reason": "Expired"
+            }
+          },
+          "124": {
+            "species": "Buffalo",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 45.5,
+              "Pig": 56.0
+            },
+            "closure": {
+              "unused_stock": 18.5,
+              "authority_seconds": 225.27,
+              "reason": "Expired"
+            }
+          },
+          "130": {
+            "species": "Buffalo",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 42.0,
+              "Pig": 56.0,
+              "Wolf": 22.0
+            },
+            "closure": {
+              "unused_stock": 0.0,
+              "authority_seconds": 247.0,
+              "reason": "Depleted"
+            }
+          },
+          "36": {
+            "species": "Buffalo",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 91.0,
+              "Pig": 24.0
+            },
+            "closure": {
+              "unused_stock": 5.0,
+              "authority_seconds": 295.753,
+              "reason": "Expired"
+            }
+          },
+          "35": {
+            "species": "Buffalo",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 14.0,
+              "Pig": 4.0
+            },
+            "closure": {
+              "unused_stock": 102.0,
+              "authority_seconds": 323.0,
+              "reason": "Expired"
+            }
+          },
+          "33": {
+            "species": "Buffalo",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 21.0,
+              "Pig": 28.0
+            },
+            "closure": {
+              "unused_stock": 71.0,
+              "authority_seconds": 333.0,
+              "reason": "Expired"
+            }
+          },
+          "34": {
+            "species": "Buffalo",
+            "death_cause": "Starvation",
+            "initial_shared_stock": 120.0,
+            "energy_by_consumer_species": {
+              "Crow": 104.0,
+              "Pig": 16.0
+            },
+            "closure": {
+              "unused_stock": 0.0,
+              "authority_seconds": 349.0,
+              "reason": "Depleted"
+            }
+          }
+        }
+      },
+      "three_species_carcass_example": {
+        "carcass_id": "130",
+        "payments_in_log_order": [
+          {
+            "agent_id": "46",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 116.0,
+            "authority_seconds": 233.27
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 112.0,
+            "authority_seconds": 233.27
+          },
+          {
+            "agent_id": "46",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 108.0,
+            "authority_seconds": 234.27
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 104.0,
+            "authority_seconds": 234.27
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 100.0,
+            "authority_seconds": 235.27
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 96.0,
+            "authority_seconds": 236.27
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 92.0,
+            "authority_seconds": 237.27
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 88.0,
+            "authority_seconds": 238.27
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 84.0,
+            "authority_seconds": 239.27
+          },
+          {
+            "agent_id": "37",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 80.5,
+            "authority_seconds": 241.0
+          },
+          {
+            "agent_id": "46",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 76.5,
+            "authority_seconds": 241.0
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 72.5,
+            "authority_seconds": 241.0
+          },
+          {
+            "agent_id": "37",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 69.0,
+            "authority_seconds": 242.0
+          },
+          {
+            "agent_id": "39",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 65.5,
+            "authority_seconds": 242.0
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 61.5,
+            "authority_seconds": 242.0
+          },
+          {
+            "agent_id": "37",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 58.0,
+            "authority_seconds": 243.0
+          },
+          {
+            "agent_id": "38",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 54.5,
+            "authority_seconds": 243.0
+          },
+          {
+            "agent_id": "39",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 51.0,
+            "authority_seconds": 243.0
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 47.0,
+            "authority_seconds": 243.0
+          },
+          {
+            "agent_id": "37",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 43.5,
+            "authority_seconds": 244.0
+          },
+          {
+            "agent_id": "38",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 40.0,
+            "authority_seconds": 244.0
+          },
+          {
+            "agent_id": "39",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 36.5,
+            "authority_seconds": 244.0
+          },
+          {
+            "agent_id": "47",
+            "species": "Pig",
+            "amount": 4.0,
+            "remaining": 32.5,
+            "authority_seconds": 244.0
+          },
+          {
+            "agent_id": "19",
+            "species": "Wolf",
+            "amount": 8.0,
+            "remaining": 24.5,
+            "authority_seconds": null
+          },
+          {
+            "agent_id": "37",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 21.0,
+            "authority_seconds": 245.0
+          },
+          {
+            "agent_id": "38",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 17.5,
+            "authority_seconds": 245.0
+          },
+          {
+            "agent_id": "39",
+            "species": "Crow",
+            "amount": 3.5,
+            "remaining": 14.0,
+            "authority_seconds": 245.0
+          },
+          {
+            "agent_id": "17",
+            "species": "Wolf",
+            "amount": 8.0,
+            "remaining": 6.0,
+            "authority_seconds": null
+          },
+          {
+            "agent_id": "19",
+            "species": "Wolf",
+            "amount": 6.0,
+            "remaining": 0.0,
+            "authority_seconds": null
+          }
+        ]
+      }
+    }
+  ]
+}

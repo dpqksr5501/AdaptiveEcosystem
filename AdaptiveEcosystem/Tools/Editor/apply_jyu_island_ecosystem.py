@@ -5,7 +5,7 @@ from pathlib import Path
 import unreal
 
 SOURCE = '/Game/Map/LV_SHC_IslandEcosystem1_WP'
-TARGET = '/Game/JYU/Maps/LV_JYU_IslandEcosystem'
+TARGET = '/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed'
 OWNER = 'JYU.IslandEcology'
 levels = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -19,7 +19,8 @@ assert world.get_path_name().split('.')[0] == TARGET
 assert unreal.EcoCreatureAnimationBuilder.prepare_copied_world(world)
 existing = actors.get_all_level_actors()
 for actor in existing:
-    if OWNER in [str(tag) for tag in actor.tags]:
+    if OWNER in [str(tag) for tag in actor.tags] or actor.get_class().get_name() in (
+            'BP_SHC_RainRegionalWeather_C', 'BP_SHC_SnowRegionalWeather_C'):
         actors.destroy_actor(actor)
     elif isinstance(actor, (unreal.EcologyRegion, unreal.EcoCreatureIntegrationSpawner, unreal.EcoRegionEnvironmentAdapter)):
         raise RuntimeError('Unexpected existing ecology writer: ' + actor.get_actor_label())
@@ -79,7 +80,9 @@ if team_lights:
     if sun is None:
         sun = max(team_lights, key=lambda actor: actor.get_component_by_class(unreal.DirectionalLightComponent).intensity)
         mark_presentation(sun, sun_tag)
-    sun.get_component_by_class(unreal.DirectionalLightComponent).set_mobility(unreal.ComponentMobility.MOVABLE)
+    component = sun.get_component_by_class(unreal.DirectionalLightComponent)
+    component.set_mobility(unreal.ComponentMobility.MOVABLE)
+    component.set_editor_property('forward_shading_priority', 1)
 if not any(moon_tag in [str(value) for value in actor.tags] for actor in team_lights):
     moon = spawn(unreal.DirectionalLight, 'Moon', unreal.Vector())
     mark_presentation(moon, moon_tag)
@@ -129,22 +132,6 @@ for ordinal, (name, hint, profile, temp, humidity, rain, plant, drainage) in enu
     region_profiles[name] = profiles[profile]
     report.append(dict(region=name, center_cm=[point.x, point.y, point.z], profile=profile))
 
-# Trim the protruding waterfall lip on the copy while retaining its basin contact.
-# This is a presentation adjustment. The waterfall remains outside the ecology volumes.
-falls = [actor for actor in existing if actor.get_actor_label() == 'SM_Waterfall_Base']
-if len(falls) != 1:
-    raise RuntimeError('Expected one waterfall mesh in the copied level')
-fall = falls[0]
-center, extent = fall.get_actor_bounds(False)
-bottom, height = center.z - extent.z, 2 * extent.z
-target_top = 3100.
-if center.z + extent.z > target_top + 5:
-    scale = fall.get_actor_scale3d()
-    scale.z *= (target_top - bottom) / height
-    fall.set_actor_scale3d(scale)
-    center, extent = fall.get_actor_bounds(False)
-    fall.set_actor_location(fall.get_actor_location() + unreal.Vector(0, 0, bottom - center.z + extent.z), False, True)
-
 start = ground(89400, 58100, -4000)
 spawn(unreal.PlayerStart, 'PlayerStart', start + unreal.Vector(0, 0, 120))
 runtime = spawn(unreal.EcoCreatureIntegrationSpawner, 'Runtime', start,
@@ -152,7 +139,7 @@ runtime = spawn(unreal.EcoCreatureIntegrationSpawner, 'Runtime', start,
                 enable_ecosystem_life=True, enable_vegetation=True, use_habitat_streaming=True,
                 habitat_streaming_radius=16000., global_population_limit=96,
                 herbivore_config=asset('Config/EC_JYU_V3_Deer'), wolf_config=asset('Config/EC_JYU_V3_Wolf'),
-                herbivore_actor_class=bp('Creatures/BP_JYU_Deer'), wolf_actor_class=bp('Creatures/BP_JYU_Wolf'),
+                herbivore_actor_class=bp('Ecosystem/Natural/BP_EcoNaturalDeer'), wolf_actor_class=bp('Creatures/BP_JYU_Wolf'),
                 footstep_audio_set=asset('Audio/DA_JYU_Footsteps'), vegetation_field_class=bp('Ecosystem/BP_JYU_VegetationField'),
                 natural_habitat_profile=profiles['TemperateMosaic'], region_habitat_profiles=region_profiles)
 world.get_world_settings().set_editor_property('default_game_mode', bp('Config/BP_JYU_IntegrationGameMode'))

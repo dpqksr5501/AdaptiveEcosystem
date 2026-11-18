@@ -28,7 +28,7 @@ bool AEcoRegionEnvironmentAdapter::EvaluateCycleRainfall(double SimulationSecond
 	return true;
 }
 
-bool AEcoRegionEnvironmentAdapter::ResolveAuthorityRegions(TArray<AEcologyRegion*>& Targets) const
+bool AEcoRegionEnvironmentAdapter::ResolveAuthorityRegions(TArray<AEcologyRegion*>& Targets, bool bRequireAll) const
 {
 	Targets.Reset();
 	if (!GetWorld() || !GetWorld()->IsGameWorld() || GetNetMode() == NM_Client) return false;
@@ -37,32 +37,41 @@ bool AEcoRegionEnvironmentAdapter::ResolveAuthorityRegions(TArray<AEcologyRegion
 	if (!Ecology || !WorldInputs) return false;
 	TArray<FName> Ids = RegionIds;
 	if (Ids.IsEmpty()) Ecology->GetRegionIds(Ids);
-	// Validate the whole batch before changing any Region actor.
 	for (const FName Id : Ids)
 	{
-		auto* Region = WorldInputs->GetRegion(Id); if (!Region) return false;
-		Targets.AddUnique(Region);
+		if (auto* Region = WorldInputs->GetRegion(Id)) Targets.AddUnique(Region);
+		else if (bRequireAll) return false;
 	}
 	return !Targets.IsEmpty();
 }
 
 bool AEcoRegionEnvironmentAdapter::ApplyWeather(const FRegionEnvironmentState& Weather)
 {
+	return ApplyWeatherToRegions(Weather, true);
+}
+
+bool AEcoRegionEnvironmentAdapter::ApplyWeatherToRegions(const FRegionEnvironmentState& Weather, bool bRequireAll)
+{
 	if (!FMath::IsFinite(Weather.Temperature) || !FMath::IsFinite(Weather.Humidity)
 		|| !FMath::IsFinite(Weather.Rainfall) || Weather.Humidity < 0 || Weather.Humidity > 1
 		|| Weather.Rainfall < 0 || Weather.Rainfall > 1
 		|| uint8(Weather.WeatherState) > uint8(EEcoWeatherState::Drought)) return false;
 	TArray<AEcologyRegion*> Targets;
-	if (!ResolveAuthorityRegions(Targets)) return false;
+	if (!ResolveAuthorityRegions(Targets, bRequireAll)) return false;
 	for (auto* Region : Targets) Region->SetEnvironmentState(Weather);
 	return true;
 }
 
 bool AEcoRegionEnvironmentAdapter::ApplyRainfall(float Rainfall, EEcoWeatherState WeatherState)
 {
+	return ApplyRainfallToRegions(Rainfall, WeatherState, true);
+}
+
+bool AEcoRegionEnvironmentAdapter::ApplyRainfallToRegions(float Rainfall, EEcoWeatherState WeatherState, bool bRequireAll)
+{
 	if (!FMath::IsFinite(Rainfall) || Rainfall < 0 || Rainfall > 1 || uint8(WeatherState) > uint8(EEcoWeatherState::Drought)) return false;
 	TArray<AEcologyRegion*> Targets;
-	if (!ResolveAuthorityRegions(Targets)) return false;
+	if (!ResolveAuthorityRegions(Targets, bRequireAll)) return false;
 	for (auto* Region : Targets)
 	{
 		auto Weather = Region->GetEnvironmentState();
@@ -82,14 +91,14 @@ void AEcoRegionEnvironmentAdapter::Tick(float DeltaSeconds)
 	FEcoServerTimeSnapshot Time;
 	if (bAuthorityWorld)
 	{
-		if (bApplyAuthoredWeather && !bCycleRainfall) ApplyWeather(AuthoredWeather);
+		if (bApplyAuthoredWeather && !bCycleRainfall) ApplyWeatherToRegions(AuthoredWeather, false);
 		const auto* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
 		if (Clock && Clock->IsClockRunning()) Time = Clock->GetServerTime();
 		if (bCycleRainfall && Time.WorldEpoch > 0)
 		{
 			float Rain = 0;
 			const bool bValid = EvaluateCycleRainfall(Time.ServerTimeSeconds, Rain);
-			if (bValid) { ApplyRainfall(Rain, Rain > 0 ? EEcoWeatherState::Rain : EEcoWeatherState::Clear); bCycleRejected = false; }
+			if (bValid) { ApplyRainfallToRegions(Rain, Rain > 0 ? EEcoWeatherState::Rain : EEcoWeatherState::Clear, false); bCycleRejected = false; }
 			else if (!bCycleRejected) { UE_LOG(LogTemp, Error, TEXT("[Eco Environment] Rejected climate cycle on %s"), *GetPathName()); bCycleRejected = true; }
 		}
 	}

@@ -33,6 +33,7 @@ void FEcoMassClientBubbleHandler::PostReplicatedAdd(const TArrayView<int32> Adde
 			if (PendingAddReplicationIDs.IsEmpty())
 			{
 				PendingAddsStartTime = GetWorld()->GetRealTimeSeconds();
+				NextPendingAddRetry = PendingAddsStartTime;
 				bReportedMissingTemplates = false;
 			}
 			PendingAddReplicationIDs.Add(Item.ReplicationID);
@@ -208,7 +209,12 @@ void FEcoMassClientBubbleHandler::Tick(const float DeltaTime)
 	{
 		if (!PendingAddReplicationIDs.IsEmpty())
 		{
-			RetryPendingAdds();
+			const double Now = GetWorld()->GetRealTimeSeconds();
+			if (Now >= NextPendingAddRetry)
+			{
+				RetryPendingAdds();
+				NextPendingAddRetry = Now + (bReportedMissingTemplates ? 1.0 : .1);
+			}
 		}
 		if (!PendingAddReplicationIDs.IsEmpty())
 		{
@@ -235,6 +241,7 @@ void FEcoMassClientBubbleHandler::Reset()
 	PendingAddReplicationIDs.Reset();
 	WaitingTemplateIDs.Reset();
 	PendingAddsStartTime = 0.0;
+	NextPendingAddRetry = 0.0;
 	bReportedMissingTemplates = false;
 	IdentityFragments = {};
 	RegionFragments = {};

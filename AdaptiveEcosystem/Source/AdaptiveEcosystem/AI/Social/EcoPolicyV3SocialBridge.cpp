@@ -235,7 +235,7 @@ void UEcoPolicyV3SocialSenseProcessor::Execute(FMassEntityManager&, FMassExecuti
             const int64 Watermark=Sense.LastProcessedNoiseId;
             for(const auto& Noise:Noises) {
                 Sense.LastProcessedNoiseId=FMath::Max(Sense.LastProcessedNoiseId,Noise.Id);
-                if(Noise.Id<=Watermark||Noise.Tag!=TEXT("Player.Footstep")||Noise.ThreatStrength<=0)continue;
+                if(Noise.Id<=Watermark||!EcoNoise::IsPlayerThreat(Noise.Tag)||Noise.ThreatStrength<=0)continue;
                 const float Range=FMath::Min(Config.Senses.HearingRange,Noise.MaxRange)*Noise.Loudness;
                 const double Distance=FVector::Distance(Position,Noise.Position);
                 if(Distance>=Range||Range<=0)continue;

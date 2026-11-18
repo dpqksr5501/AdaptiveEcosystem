@@ -24,7 +24,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if(const auto* B=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E))return B->Body.Pos;
         const auto& W=EM.GetFragmentDataChecked<FEcoThreatStateFragment>(E).Agent.State;return EcoWorldV3::FVec2{W.PosX,W.PosY};
     };
-    auto Eligible=[&](int64 Id,FName Region,bool Predator)->FMassEntityHandle {
+    auto Eligible=[&](int64 Id,FName Region,bool Predator,int32* EnergyOnly=nullptr)->FMassEntityHandle {
         const auto* E=AgentLookup.Find(Id);if(!E||!EM.IsEntityValid(*E))return {};
         const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(*E);
         const auto* Body=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(*E);
@@ -38,15 +38,30 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if(!Link||Link->bDead||!Link->bAdopted||(Predator?(!Wolf||Wolf->Agent.bDead):(!Body||Body->Body.DeathCause!=0))
             ||EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).HP<=0
             ||EM.GetFragmentDataChecked<FEcoRegionFragment>(*E).CurrentRegionId!=Region
-            ||Link->Individual.Generation>=64||!Link->Individual.CanParent(Now,Predator?Link->Individual.Nutrition:Body->Body.Energy,!(J&&(J->bActive||J->bStranded)),
-                Link->Individual.bNaturalPopulation?EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).HP/FMath::Max(1.f,EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).MaxHP):1.))return {};
+            ||Link->Individual.Generation==MAX_uint32)return {};
+        const auto& Vitals=EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E);
+        const bool bResident=!(J&&(J->bActive||J->bStranded));
+        const double Health=Link->Individual.bNaturalPopulation?Vitals.HP/FMath::Max(1.f,Vitals.MaxHP):1.;
+        const double Energy=Predator?Link->Individual.Nutrition:Body->Body.Energy;
+        if(!Link->Individual.CanParent(Now,Energy,bResident,Health))
+        {
+            if(EnergyOnly&&Link->Individual.CanParent(Now,1.,bResident,Health))++*EnergyOnly;
+            return {};
+        }
         return *E;
     };
     // At most one incubation per region and one scan/5s. Reservation is acquired
     // only at delivery; every terminal outcome completes/releases it this boundary.
     for(int32 I=PendingBirths.Num()-1;I>=0;--I){
-        const auto P=PendingBirths[I];const auto A=Eligible(P.ParentA,P.Region,P.bPredator),B=Eligible(P.ParentB,P.Region,P.bPredator);
-        if(!A.IsSet()||!B.IsSet()){PendingBirths.RemoveAtSwap(I);continue;}
+        const auto P=PendingBirths[I];
+        int32 EnergyOnly=0;
+        const auto A=Eligible(P.ParentA,P.Region,P.bPredator,&EnergyOnly),B=Eligible(P.ParentB,P.Region,P.bPredator,&EnergyOnly);
+        if(!A.IsSet()||!B.IsSet()){
+            RecordGameplayReason(P.ParentA, P.Region, Now, EnergyOnly ? TEXT("BirthParentEnergy") : TEXT("BirthParentUnavailable"), P.ParentB);
+            if(bAuditFaunaBirths)UE_LOG(LogTemp,Log,TEXT("[Eco Birth Audit] Region=%s Predator=%d Event=Cancelled EnergyOnly=%d"),
+                *P.Region.ToString(),P.bPredator,EnergyOnly);
+            PendingBirths.RemoveAtSwap(I);continue;
+        }
         if(Now<P.Due)continue;
         PendingBirths.RemoveAtSwap(I);
         auto& LA=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(A).Individual;
@@ -68,7 +83,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
                 &&FVector::DistSquared2D(Ground,EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation())<10000){Clear=false;break;}
             if(Clear){Positions.Add(Ground);break;}
         }
-        if(Positions.IsEmpty())continue;
+        if(Positions.IsEmpty()){
+            RecordGameplayReason(P.ParentA, P.Region, Now, TEXT("BirthNoGround"), P.ParentB);
+            continue;
+        }
         // Copy before spawning: entity creation may move/reallocate fragment storage.
         const auto Genome=EcoLifeV3::Inherit(LA.Genome,LB.Genome,uint64(P.ParentA)^EcoLifeV3::Mix(P.ParentB)^uint64(LA.Offspring));
         const bool NaturalPopulation=LA.bNaturalPopulation&&!P.bPredator;
@@ -80,10 +98,12 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if (!Ecology->RequestNaturalBirth(P.Region, Time, Reservation, P.bPredator,
                 P.bPredator ? CountFaunaDiets(P.Region) : FIntPoint::ZeroValue,
                 FaunaSpecies.IsEmpty() ? 1. : EcoFaunaNutrition::MinimumMeal * 6.)) return false;
-        const int32 Actual=Reservation.Count?Spawn(P.Region,1,P.bPredator,&Positions):0;
+        const int32 Actual=Reservation.Count?Spawn(P.Region,1,P.bPredator,Time,&Positions):0;
         if(!ReconcilePopulation()||!Ecology->CompleteSpawnRequest(Reservation.RequestId,Actual))return false;
         if(!Actual)
         {
+            RecordGameplayReason(P.ParentA, P.Region, Now,
+                Reservation.DiagnosticReason.IsNone() ? FName(TEXT("BirthSpawnFailed")) : Reservation.DiagnosticReason, P.ParentB);
             FRegionEcologyState State;
             if (Ecology->GetRegionState(P.Region, State))
                 UE_LOG(LogTemp, Log, TEXT("[EcoLife][BirthDeferred] Region=%s Predator=%d Food=%.3f Consumers=%d Population=%d"),
@@ -91,6 +111,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
             continue;
         }
         const auto Child=Owned.Last();auto& ChildLife=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Child).Individual;
+        RecordGameplayReason(P.ParentA, P.Region, Now, TEXT("BirthCommitted"),
+            EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId);
         ChildLife={};ChildLife.bInitialized=true;ChildLife.Genome=Genome;ChildLife.Born=Now;
         ChildLife.ParentA=P.ParentA;ChildLife.ParentB=P.ParentB;ChildLife.Generation=Generation;ChildLife.Origin=EcoLifeV3::EOrigin::NaturalBirth;
         if(NaturalPopulation){
@@ -113,7 +135,11 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
     for(const auto& G:Groups)for(const bool Predator:{false,true}){
         if(PendingBirths.ContainsByPredicate([&](const FPendingBirth& P){return P.Region==G.RegionId&&P.bPredator==Predator;}))continue;
         TArray<int64> Candidates;
-        for(const auto& E:AgentLookup)if(Eligible(E.Key,G.RegionId,Predator).IsSet())Candidates.Add(E.Key);
+        int32 EnergyOnly=0;
+        auto* Audit=bAuditFaunaBirths?&EnergyOnly:nullptr;
+        for(const auto& E:AgentLookup)if(Eligible(E.Key,G.RegionId,Predator,Audit).IsSet())Candidates.Add(E.Key);
+        if(Audit)UE_LOG(LogTemp,Log,TEXT("[Eco Birth Audit] Region=%s Predator=%d Event=Scan Eligible=%d EnergyOnly=%d"),
+            *G.RegionId.ToString(),Predator,Candidates.Num(),EnergyOnly);
         Candidates.Sort();bool Found=false;
         for(int32 I=0;I<Candidates.Num()&&!Found;++I)for(int32 J=I+1;J<Candidates.Num()&&!Found;++J){
             const auto A=AgentLookup.FindChecked(Candidates[I]),B=AgentLookup.FindChecked(Candidates[J]);

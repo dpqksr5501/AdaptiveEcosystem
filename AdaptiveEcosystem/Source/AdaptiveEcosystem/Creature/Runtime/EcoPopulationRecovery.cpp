@@ -55,7 +55,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessPopulationRecovery(const FEcoServerT
             for(const auto& Other:Positions)if(FVector::DistSquared2D(Ground,Other)<40000){Clear=false;break;}
             if(Clear)Positions.Add(Ground);
         }
-        const int32 Before=Owned.Num(),Actual=Positions.IsEmpty()?0:Spawn(P.Region,Positions.Num(),P.bPredator,&Positions);
+        const int32 Before=Owned.Num(),Actual=Positions.IsEmpty()?0:Spawn(P.Region,Positions.Num(),P.bPredator,Time,&Positions);
         if(!ReconcilePopulation()||!Ecology->CompleteSpawnRequest(Request.RequestId,Actual))return false;
         for(int32 K=Before;K<Owned.Num();++K){auto& Life=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Owned[K]).Individual;
             Life.Origin=EcoLifeV3::EOrigin::Recovery;Life.NextBirth=Time.ServerTimeSeconds+180;

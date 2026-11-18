@@ -1,0 +1,178 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "partial": true,
+  "training_ready": false,
+  "restorable_world": false,
+  "golden_vector": false,
+  "units": {
+    "food": "native plant grid units, distinct from energy",
+    "distance": "cm",
+    "time": "PIE samples and completed authority meal windows are separate"
+  },
+  "comparison_contract": "Keep initial plants, capacity, regrowth, positions and brain fixed. Change only the movement boundary in the geometry comparison. Evaluate geometry, observed crossing and actual consumption as distinct results.",
+  "scope": "Non-overlap checks the cell footprint against the region's world XY bounding box. The fixed ground query tests one pair of coordinates. Tracked founder samples do not count independent transactions or cover all other animals.",
+  "runs": [
+    {
+      "seed": 20000,
+      "region_initial_native_food": {
+        "Snowfield": {
+          "initial_food_units": 115.937924381,
+          "non_overlapping_food_units": 67.020955643,
+          "positive_capacity_cells": 393,
+          "non_overlapping_cells": 175
+        },
+        "Grassland": {
+          "initial_food_units": 47.758518886,
+          "non_overlapping_food_units": 9.451077643,
+          "positive_capacity_cells": 199,
+          "non_overlapping_cells": 50
+        },
+        "Riverbank": {
+          "initial_food_units": 46.079348243,
+          "non_overlapping_food_units": 31.96667933,
+          "positive_capacity_cells": 154,
+          "non_overlapping_cells": 90
+        },
+        "Highland": {
+          "initial_food_units": 150.252042111,
+          "non_overlapping_food_units": 97.812396105,
+          "positive_capacity_cells": 508,
+          "non_overlapping_cells": 275
+        }
+      },
+      "temporary_snowfield_boundary": {
+        "pie_seconds": 15.26666746288538,
+        "before_east_cm": 24200.0,
+        "after_east_cm": 24650.0
+      },
+      "comparison": {
+        "unchanged": {
+          "fixed_geometry": {
+            "cell": 176,
+            "stock": 0.33503833153762436,
+            "distance_cm": 446.51145293261914,
+            "straight_ground": false,
+            "one_waypoint_ground": false,
+            "start_in_region": true,
+            "target_in_region": false,
+            "first_rejected_piece": 1,
+            "rejected_point": "V(X=24226.42, Y=-13984.71, Z=3094.22)",
+            "inside_before_projection": false,
+            "ground_without_region_gate": true,
+            "inside_after_projection": false
+          },
+          "fixed_geometry_sample_count": 411,
+          "snowfield_food_units_consumed_in_210_authority_seconds": 48.93
+        },
+        "extended": {
+          "fixed_geometry": {
+            "cell": 176,
+            "stock": 0.33359236259956204,
+            "distance_cm": 446.51145293261914,
+            "straight_ground": true,
+            "clear_world_static": true,
+            "start_in_region": true,
+            "target_in_region": true
+          },
+          "fixed_geometry_sample_count": 252,
+          "snowfield_food_units_consumed_in_210_authority_seconds": 49.51
+        }
+      },
+      "trial_founders_sampled_beyond_original_east_boundary": {
+        "6": {
+          "first_pie_seconds": 17.633,
+          "positive_intake_samples": 0
+        },
+        "15": {
+          "first_pie_seconds": 17.9,
+          "positive_intake_samples": 24,
+          "first_intake_world_position": "V(X=24570.06, Y=-11253.60, Z=3094.22)"
+        }
+      },
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_food_boundary_cells/IslandFaunaPIE.json": "3f9d5ae4b38ac45493b7d91004a9c1962b4ca21066e71e95721b5a8ae31ceb73",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_food_boundary_cells.log": "ce0f702393628a6d0930e53c089d9e74ec93820c207dac5d784552d08dcf3b57",
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_snow_food_gate/IslandFaunaPIE.json": "681f600cf7e36d35e35d822586f02129520378a6f7a630be1f083dc01b0452f6",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_snow_food_gate.log": "7878f81042e991704316febd36dde91de0a33b70614541f70c33e21efd533175",
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_snow_east_boundary/IslandFaunaPIE.json": "a692b04085d87f0ba93386c5d63e45581496fffd9c3d81ded2a1cfe21a5fd2fc",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_snow_east_boundary.log": "48623924eecfec98d1dde57ee50461845a63653a9822a0c8909d35e8c2f08011"
+      }
+    },
+    {
+      "seed": 20017,
+      "region_initial_native_food": {
+        "Snowfield": {
+          "initial_food_units": 18.70855876,
+          "non_overlapping_food_units": 17.075931238,
+          "positive_capacity_cells": 62,
+          "non_overlapping_cells": 47
+        },
+        "Grassland": {
+          "initial_food_units": 60.746373351,
+          "non_overlapping_food_units": 39.758695104,
+          "positive_capacity_cells": 274,
+          "non_overlapping_cells": 136
+        },
+        "Riverbank": {
+          "initial_food_units": 50.767864651,
+          "non_overlapping_food_units": 22.859613816,
+          "positive_capacity_cells": 310,
+          "non_overlapping_cells": 117
+        },
+        "Highland": {
+          "initial_food_units": 175.714553878,
+          "non_overlapping_food_units": 70.604025029,
+          "positive_capacity_cells": 483,
+          "non_overlapping_cells": 187
+        }
+      },
+      "temporary_snowfield_boundary": {
+        "pie_seconds": 15.26666746288538,
+        "before_east_cm": 24200.0,
+        "after_east_cm": 24650.0
+      },
+      "comparison": {
+        "unchanged": {
+          "fixed_geometry": {
+            "cell": 176,
+            "stock": 0,
+            "distance_cm": 446.51145293261914,
+            "straight_ground": false,
+            "one_waypoint_ground": false,
+            "start_in_region": true,
+            "target_in_region": false,
+            "first_rejected_piece": 1,
+            "rejected_point": "V(X=24226.42, Y=-13984.71, Z=3094.22)",
+            "inside_before_projection": false,
+            "ground_without_region_gate": true,
+            "inside_after_projection": false
+          },
+          "fixed_geometry_sample_count": 784,
+          "snowfield_food_units_consumed_in_210_authority_seconds": 0.85
+        },
+        "extended": {
+          "fixed_geometry": {
+            "cell": 176,
+            "stock": 0,
+            "distance_cm": 446.51145293261914,
+            "straight_ground": true,
+            "clear_world_static": true,
+            "start_in_region": true,
+            "target_in_region": true
+          },
+          "fixed_geometry_sample_count": 187,
+          "snowfield_food_units_consumed_in_210_authority_seconds": 2.13
+        }
+      },
+      "trial_founders_sampled_beyond_original_east_boundary": {},
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_food_boundary_cells/IslandFaunaPIE.json": "d89545c0e6f9f1ba31f3317cb58807c9bbe5f532cfedababbad5f80d537673d9",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_food_boundary_cells.log": "85bcd55cbda3e13cb05faa9594d780e6077b714d1c546b211d9ae7458e3e7ddd",
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_snow_food_gate/IslandFaunaPIE.json": "2456beda9f646ea2f416d31bc68b8873bfbdcbc5c429c4a4f85aadaab28c1ab6",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_snow_food_gate.log": "e5b19fb1dcc5d3628399df90e63f263ba88ebb6c5093ddc42b36fdf7d8e1917d",
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_snow_east_boundary/IslandFaunaPIE.json": "68b1c3cbf5b11cebcb88125e8e8de05ef96cb190b5b588cd009fab8386ed63dd",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_snow_east_boundary.log": "33dc9a5e7e568d98aac5acc9a36679b9aea09d7e56c647cd5d01dad585983f9a"
+      }
+    }
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "training_ready": false,
+  "scope": "Python R9 Fauna R2 natural-world diagnostic. Logged biter action is the current decision; contact outcome is resolved by the runtime. Target HP is the event value after damage.",
+  "config": "configs/v3_r9_fauna.yaml",
+  "inference_mode": "greedy",
+  "archived_aggregate": {
+    "repository_path": "herbivore_rl/results/v3/r9/packs/fauna_r2/reports/eval/fc_r2.json",
+    "sha256": "9f7ce6ebd51338ce5cf21a911587b17fb1363ed63f0011f032f21a4a7be46b01"
+  },
+  "local_trace": {
+    "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/r9_wolf_leopard_trace.json",
+    "sha256": "b2e62ccb7430840c92b8f20a9dc3046188818336e6b45c188e4eecfb9ee10dcd"
+  },
+  "brains": {
+    "deer": {
+      "repository_path": "herbivore_rl/results/v3/r9/packs/fauna_r2/deer/deer_r2_20931456.npz",
+      "sha256": "20e9a74c917b4a8f2c1f3bcd37182342910a80683bedb3712e09f2b8038fb2e9"
+    },
+    "wolf": {
+      "repository_path": "herbivore_rl/results/v3/r9/packs/fauna_r2/wolf/wolf_r2_6989248.npz",
+      "sha256": "e4e23b3fc77a3f3f6dc6017741ef305057297a70e33d2fb3233e4f16ee988a46"
+    },
+    "boar": {
+      "repository_path": "herbivore_rl/results/v3/r9/packs/fauna_r2/boar/boar_r2_7154688.npz",
+      "sha256": "c092e86b6ffb74223ce3c4f9f4ece5d68b7f9f5df47c4b818ce15c0ea9e0eaea"
+    },
+    "buffalo": {
+      "repository_path": "herbivore_rl/results/v3/r9/packs/fauna_r2/buffalo/buffalo_r2_7490688.npz",
+      "sha256": "e788c47817e83c2bbc844679243454fe611c36794983a40aadf6b3838e281cd4"
+    },
+    "leopard": {
+      "repository_path": "herbivore_rl/results/v3/r9/packs/fauna_r2/leopard/leopard_r2_5633280.npz",
+      "sha256": "0500317089e8d55891494e271f83849bb79f91b250212e9c43817a64f187beeb"
+    },
+    "fox": {
+      "repository_path": "herbivore_rl/results/v3/r9/packs/fauna_r2/fox/fox_r2_5597568.npz",
+      "sha256": "40e35e2aa6042c97edc504ca0f61eec8bae4413325cdfb1d9d04b01ed835ecd0"
+    }
+  },
+  "cases": {
+    "learned": {
+      "N_base": {
+        "worlds": 10,
+        "decisions": 1350,
+        "bite_counts_by_outcome": {
+          "wound": 2
+        },
+        "near_carcass_count": 2,
+        "events": [
+          {
+            "seed": 46680,
+            "t": 296,
+            "biter": "leopard",
+            "target": "wolf",
+            "wolf_uid": 48,
+            "prey_uid": 35,
+            "biter_action": "RUN_0",
+            "outcome": "wound",
+            "dist": 0.9767892664105133,
+            "biter_energy": 0.4059580843042584,
+            "biter_health": 1.0,
+            "prey_hp": 0.34604148125843437,
+            "near_carcass": true
+          },
+          {
+            "seed": 46680,
+            "t": 299,
+            "biter": "wolf",
+            "target": "leopard",
+            "wolf_uid": 33,
+            "prey_uid": 48,
+            "biter_action": "WALK_180",
+            "outcome": "wound",
+            "dist": 0.3667892807332791,
+            "biter_energy": 0.9996183779009686,
+            "biter_health": 1.0,
+            "prey_hp": 0.4816664297237676,
+            "near_carcass": true
+          }
+        ]
+      },
+      "N_buffalo_land": {
+        "worlds": 10,
+        "decisions": 1350,
+        "bite_counts_by_outcome": {
+          "wound": 2
+        },
+        "near_carcass_count": 1,
+        "events": [
+          {
+            "seed": 46687,
+            "t": 580,
+            "biter": "wolf",
+            "target": "leopard",
+            "wolf_uid": 3,
+            "prey_uid": 25,
+            "biter_action": "RUN_225",
+            "outcome": "wound",
+            "dist": 0.560510646801354,
+            "biter_energy": 0.9999322299203072,
+            "biter_health": 1.0,
+            "prey_hp": 0.44471294464585065,
+            "near_carcass": true
+          },
+          {
+            "seed": 46687,
+            "t": 2575,
+            "biter": "wolf",
+            "target": "leopard",
+            "wolf_uid": 3,
+            "prey_uid": 25,
+            "biter_action": "RUN_45",
+            "outcome": "wound",
+            "dist": 0.8537147732038832,
+            "biter_energy": 0.4119852153427722,
+            "biter_health": 1.0,
+            "prey_hp": 0.5108600270895935,
+            "near_carcass": false
+          }
+        ]
+      }
+    },
+    "rules": {
+      "N_base": {
+        "worlds": 10,
+        "decisions": 1350,
+        "bite_counts_by_outcome": {
+          "wound": 11,
+          "kill": 8
+        },
+        "near_carcass_count": 12
+      },
+      "N_buffalo_land": {
+        "worlds": 10,
+        "decisions": 1350,
+        "bite_counts_by_outcome": {
+          "wound": 17,
+          "kill": 16
+        },
+        "near_carcass_count": 18
+      }
+    }
+  }
+}

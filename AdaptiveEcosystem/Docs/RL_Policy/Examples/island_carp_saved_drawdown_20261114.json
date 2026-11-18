@@ -1,0 +1,370 @@
+{
+  "schema_version": 1,
+  "training_ready": false,
+  "saved_drawdown": [
+    {
+      "seed": 20000,
+      "source_sha256": {
+        "report": "49d8d28cc74bccf2cfe6265a03c68deb658ce63a8647e288cf63c8ab6e0a8baa",
+        "authority_log": "3bfc6fac4eaf4cf01e65508df4181b2981598ba720dd31c0f6bdd04b0589464a"
+      },
+      "fry_id": 135,
+      "hatch_at": 196,
+      "drawdown_at": 196.0,
+      "restored_at": 204.0,
+      "clearance_cm": 3.5546875,
+      "columns_cm": {
+        "normal": [
+          -4394.5226290330575,
+          -4244.05810546875
+        ],
+        "drawdown": [
+          -4394.5226290330575,
+          -4346.5224609375
+        ],
+        "restored": [
+          -4394.5226290330575,
+          -4244.05810546875
+        ]
+      },
+      "patches": {
+        "IslandRiverSlowShelf": {
+          "z_cm": -4370.5226290330575,
+          "capacity": 16.0,
+          "meal_cap": 2.799999952316284
+        },
+        "IslandRiverInletPlants": {
+          "z_cm": -4338.5226290330575,
+          "capacity": 16.0,
+          "meal_cap": 2.799999952316284
+        }
+      },
+      "drawdown_receipts": [
+        {
+          "patch": "IslandRiverSlowShelf",
+          "amount": 2.8,
+          "remaining": 13.2,
+          "at": 198.0
+        },
+        {
+          "patch": "IslandRiverSlowShelf",
+          "amount": 2.8,
+          "remaining": 10.625,
+          "at": 199.0
+        },
+        {
+          "patch": "IslandRiverSlowShelf",
+          "amount": 2.8,
+          "remaining": 8.05,
+          "at": 200.0
+        },
+        {
+          "patch": "IslandRiverSlowShelf",
+          "amount": 2.8,
+          "remaining": 2.675,
+          "at": 201.0
+        }
+      ],
+      "first_restored_inlet_receipt": {
+        "patch": "IslandRiverInletPlants",
+        "amount": 0.805,
+        "remaining": 0.0,
+        "at": 206.0
+      },
+      "wet_shelf_ledger": {
+        "initial_stock": 16.0,
+        "authored_regrowth_per_second": 0.18000000715255737,
+        "rainfall": 1.0,
+        "receipts": [
+          {
+            "species": "CommonCarp",
+            "agent_id": 135,
+            "at": 198.0,
+            "amount": 2.8,
+            "remaining": 13.2
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 135,
+            "at": 199.0,
+            "amount": 2.8,
+            "remaining": 10.625
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 135,
+            "at": 200.0,
+            "amount": 2.8,
+            "remaining": 8.05
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 201.0,
+            "amount": 2.8,
+            "remaining": 5.475
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 135,
+            "at": 201.0,
+            "amount": 2.8,
+            "remaining": 2.675
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 202.0,
+            "amount": 2.8,
+            "remaining": 0.1
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 208.0,
+            "amount": 1.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 212.0,
+            "amount": 0.9,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 216.103,
+            "amount": 0.923,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 220.103,
+            "amount": 0.9,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 224.103,
+            "amount": 0.9,
+            "remaining": 0.0
+          }
+        ]
+      }
+    },
+    {
+      "seed": 20017,
+      "source_sha256": {
+        "report": "14a329e21ffde6a0a2f0dac83c487608d3b1a6015b0adfc28b43aaea9e33071d",
+        "authority_log": "85e4f2bd83ed917f447ca64fe1b0239a57d461b088c19e86103ddb46017a871a"
+      },
+      "fry_id": 134,
+      "hatch_at": 193.12,
+      "drawdown_at": 193.12,
+      "restored_at": 201.12,
+      "clearance_cm": 3.62578125,
+      "columns_cm": {
+        "normal": [
+          -4394.5226290330575,
+          -4244.05810546875
+        ],
+        "drawdown": [
+          -4394.5226290330575,
+          -4346.5224609375
+        ],
+        "restored": [
+          -4394.5226290330575,
+          -4244.05810546875
+        ]
+      },
+      "patches": {
+        "IslandRiverSlowShelf": {
+          "z_cm": -4370.5226290330575,
+          "capacity": 16.0,
+          "meal_cap": 2.799999952316284
+        },
+        "IslandRiverInletPlants": {
+          "z_cm": -4338.5226290330575,
+          "capacity": 16.0,
+          "meal_cap": 2.799999952316284
+        }
+      },
+      "drawdown_receipts": [
+        {
+          "patch": "IslandRiverSlowShelf",
+          "amount": 2.8,
+          "remaining": 13.2,
+          "at": 194.12
+        },
+        {
+          "patch": "IslandRiverSlowShelf",
+          "amount": 2.8,
+          "remaining": 7.825,
+          "at": 195.12
+        },
+        {
+          "patch": "IslandRiverSlowShelf",
+          "amount": 2.8,
+          "remaining": 2.45,
+          "at": 196.12
+        },
+        {
+          "patch": "IslandRiverSlowShelf",
+          "amount": 0.675,
+          "remaining": 0.0,
+          "at": 200.12
+        }
+      ],
+      "first_restored_inlet_receipt": {
+        "patch": "IslandRiverInletPlants",
+        "amount": 2.8,
+        "remaining": 2.909,
+        "at": 203.12
+      },
+      "wet_shelf_ledger": {
+        "initial_stock": 16.0,
+        "authored_regrowth_per_second": 0.18000000715255737,
+        "rainfall": 1.0,
+        "receipts": [
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 194.12,
+            "amount": 2.8,
+            "remaining": 13.2
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 195.12,
+            "amount": 2.8,
+            "remaining": 10.625
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 195.12,
+            "amount": 2.8,
+            "remaining": 7.825
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 196.12,
+            "amount": 2.8,
+            "remaining": 5.25
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 196.12,
+            "amount": 2.8,
+            "remaining": 2.45
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 104,
+            "at": 197.12,
+            "amount": 2.675,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 200.12,
+            "amount": 0.675,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 205.12,
+            "amount": 1.125,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 106,
+            "at": 207.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 106,
+            "at": 209.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 211.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 213.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 215.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 106,
+            "at": 217.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 219.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 221.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 223.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 106,
+            "at": 225.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          },
+          {
+            "species": "CommonCarp",
+            "agent_id": 134,
+            "at": 227.12,
+            "amount": 0.45,
+            "remaining": 0.0
+          }
+        ]
+      }
+    }
+  ]
+}

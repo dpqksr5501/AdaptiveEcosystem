@@ -31,12 +31,7 @@
 
 double EcoV3WeatherFx::ClockDarkness(const FEcoServerTimeSnapshot& Time)
 {
-    const auto& Phase=Time.DayCycle;const double Duration=Phase.PhaseEndSeconds-Phase.PhaseStartSeconds;
-    if(Time.WorldEpoch<=0||!FMath::IsFinite(Time.ServerTimeSeconds)||Duration<=0
-        ||Time.ServerTimeSeconds<Phase.PhaseStartSeconds||Time.ServerTimeSeconds>Phase.PhaseEndSeconds
-        ||(Phase.Phase!=EEcoDayPhase::Day&&Phase.Phase!=EEcoDayPhase::Night))return -1;
-    const double Edge=FMath::Min(Time.ServerTimeSeconds-Phase.PhaseStartSeconds,Phase.PhaseEndSeconds-Time.ServerTimeSeconds);
-    return FMath::Clamp(.5+(Phase.Phase==EEcoDayPhase::Night?1.:-1.)*Edge/(Duration*.2),0.,1.);
+    return EcoClock::Darkness(Time);
 }
 
 double EcoV3WeatherFx::Approach(double Alpha, double Target, double DeltaSeconds, double FadeInSeconds, double FadeOutSeconds)

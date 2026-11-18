@@ -323,6 +323,7 @@ bool UEcologySimulationSubsystem::ReserveSpawn(FName RegionId, FEcoSpawnRequest&
 	}
 	Request.RegionId = RegionId;
 	const int32 RegionalLoad = Request.bInitial ? State->Population : FMath::Max(State->Population, State->ProjectedPopulation);
+    const int32 RequestedCount = Request.Count;
 	Request.Count = EcoSpawn::AllowedCount(Request.Count, RegionalLoad, GlobalAlive,
 		RegionalReserved, GlobalReserved, Settings->RegionPopulationLimit, GlobalPopulationLimit,
         bAllowsZeroPlantFood ? FMath::Max(State->FoodAmount, 1.f) : State->FoodAmount, Request.bInitial);
@@ -331,8 +332,18 @@ bool UEcologySimulationSubsystem::ReserveSpawn(FName RegionId, FEcoSpawnRequest&
 		const double Demand = (State->ProjectedFoodConsumers + RegionalReserved + Request.Count) * PerAgentConsumptionRate * PressureSettings.ForecastSeconds;
 		if (State->bPressureActive || State->ProjectedPopulation + RegionalReserved + Request.Count
 			> State->EcologicalComfortPopulation * PressureSettings.EnterCrowdingRatio
-			|| (Demand > 0 && State->FoodAmount / Demand < PressureSettings.EnterFoodSatisfaction)) Request.Count = 0;
+			|| (Demand > 0 && State->FoodAmount / Demand < PressureSettings.EnterFoodSatisfaction))
+        {
+            if (Request.Count > 0) Request.DiagnosticReason = TEXT("BirthEcologicalPressure");
+            Request.Count = 0;
+        }
 	}
+    if (RequestedCount > 0 && Request.Count == 0 && Request.DiagnosticReason.IsNone())
+    {
+        if (RegionalLoad + RegionalReserved >= Settings->RegionPopulationLimit) Request.DiagnosticReason = TEXT("BirthRegionalLimit");
+        else if (GlobalAlive + GlobalReserved >= GlobalPopulationLimit) Request.DiagnosticReason = TEXT("BirthGlobalLimit");
+        else Request.DiagnosticReason = TEXT("BirthFoodBudget");
+    }
 	Request.RequestId = NextSpawnRequestId++;
 	PendingSpawns.Add(Request.RequestId, Request);
 	return true;
@@ -378,13 +389,16 @@ bool UEcologySimulationSubsystem::RequestNaturalBirth(FName RegionId,const FEcoS
 bool UEcologySimulationSubsystem::RequestFaunaBirth(FName RegionId, const FEcoServerTimeSnapshot& Time,
     FEcoSpawnRequest& Out, double RequiredPlantReserve)
 {
-    const auto* Spatial = SpatialFood.Find(RegionId);
-    if (!CanMutateAuthoritativeState(TEXT("RequestFaunaBirth")) || Time.WorldEpoch != ResourceEpoch
-        || !Spatial || !FMath::IsFinite(Time.ServerTimeSeconds) || Time.ServerTimeSeconds < 0.
+    const auto* State = RegionalStates.Find(RegionId);
+    if (!CanMutateAuthoritativeState(TEXT("RequestFaunaBirth")) || ResourceEpoch <= 0 || Time.WorldEpoch != ResourceEpoch
+        || !State || !FMath::IsFinite(Time.ServerTimeSeconds) || Time.ServerTimeSeconds < 0.
         || !FMath::IsFinite(RequiredPlantReserve) || RequiredPlantReserve < 0.) return false;
+    const auto* Spatial = SpatialFood.Find(RegionId);
+    const double AvailablePlantFood = Spatial ? Spatial->Amount : State->FoodAmount;
     Out = {};
     Out.WorldEpoch = Time.WorldEpoch;
-    Out.Count = Spatial->Amount >= RequiredPlantReserve ? 1 : 0;
+    Out.Count = AvailablePlantFood >= RequiredPlantReserve ? 1 : 0;
+    if (Out.Count == 0) Out.DiagnosticReason = TEXT("BirthFoodBudget");
     Out.ScheduledTime = Time.ServerTimeSeconds;
     Out.Origin = EEcoSpawnOrigin::NaturalBirth;
     return ReserveSpawn(RegionId, Out, true, RequiredPlantReserve == 0.);
@@ -404,6 +418,7 @@ bool UEcologySimulationSubsystem::RequestLifeSpawn(FName RegionId,const FEcoServ
     const bool Budget=bPredator?Predators+Count<=6&&Prey>=8*(Predators+Count)
         :Spatial->Amount>=PlantReservePerConsumer*FMath::Max(1,PlantBudgetCount+Count);
     Out={};Out.WorldEpoch=Time.WorldEpoch;Out.Count=Budget?Count:0;
+    if (!Budget) Out.DiagnosticReason = bPredator ? TEXT("BirthPredatorPreyBudget") : TEXT("BirthFoodBudget");
     Out.ScheduledTime=Time.ServerTimeSeconds;Out.Origin=Origin;
     return ReserveSpawn(RegionId,Out,true);
 }

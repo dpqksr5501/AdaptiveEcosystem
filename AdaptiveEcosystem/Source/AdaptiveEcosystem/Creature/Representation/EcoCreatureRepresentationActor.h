@@ -68,6 +68,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0")) float TurnInterpolationSpeed = 8.0f;
 	/** Bound visual lag even after a reversal. Zero aligns immediately to actual velocity. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0", ClampMax="45", Units="deg")) float MaxFacingLagDegrees = 10.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0", ClampMax="70", Units="deg"))
+    float FlightPitchLimit = 0.f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0", ClampMax="40", Units="deg"))
+    float FlightBankLimit = 0.f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0", ClampMax="60", Units="deg"))
+    float SwimPitchLimit = 0.f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual") bool bAlwaysSwimming = false;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual") bool bSoftenAbruptFacing = false;
 	/** Speed x signed turning, not strafing direction. Positive UE yaw is a right turn. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation", meta=(ClampMin="1")) float FullTurnRateDegrees = 180.0f;
@@ -84,13 +91,34 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category="Creature|Visual") void OnVisualStateUpdated();
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	void RefreshAppearance();
     void ApplyAppearance(uint8 Variant);
     uint8 AppliedAppearance=255;
+	float VisualYawRateDegrees = 0.f;
+	float VisualPitchRateDegrees = 0.f;
+	float VisualRollRateDegrees = 0.f;
+	float ReversalDirection = 0.f;
+	bool bHasMotionHeading = false;
 	double LastFacingAuditTime = -1.0;
 	FTimerHandle AlarmTimer;
 	double LastAlarmTime = -10;
 	void PlayAlarmCue();
+private:
+    void UpdateGroundSupport(float DeltaSeconds, bool bSnap);
+    void ApplyGroundSupport(USkeletalMeshComponent& Mesh, float Lift) const;
+    void FitGroundSupport(USkeletalMeshComponent* Mesh);
+    void ResetGroundSupport();
+    FDelegateHandle MainPoseFinalized;
+    FDelegateHandle ImmaturePoseFinalized;
+    FQuat GroundSupportRotation = FQuat::Identity;
+    FVector GroundSupportPoint = FVector::ZeroVector;
+    FVector GroundSupportNormal = FVector::UpVector;
+    float GroundSupportBlend = 0.f;
+    float MainGroundLift = 0.f;
+    float ImmatureGroundLift = 0.f;
+    bool bGroundSupportEvidence = false;
+    bool bGroundSupportSnap = false;
 };
 
 UCLASS(Blueprintable)

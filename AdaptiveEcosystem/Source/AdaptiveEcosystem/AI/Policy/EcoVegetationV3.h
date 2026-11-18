@@ -106,6 +106,17 @@ namespace EcoVegetationV3
         return 20 + 70 * Cell.BrowsePressure;
     }
 
+    inline double AdvanceMoisture(const FConfig& C, const FWeather& W, const FHabitat& H,
+        double Moisture, double Density, double SurfaceWater, double Dt)
+    {
+        const double Heat = std::clamp((W.Temperature + 5) / 25, 0.0, 2.0);
+        const double Rate = C.Infiltration * W.Rain * (1 - 0.5 * H.Drainage)
+            + 0.01 * H.WaterSupply + 0.03 * H.Flood + .006 * SurfaceWater
+            - C.Evaporation * Heat * (0.25 + 0.75 * W.Light) * (1 - 0.5 * H.Shade)
+            - C.Drainage * H.Drainage * Moisture - C.Uptake * Density;
+        return Unit(Moisture + Rate * Dt);
+    }
+
     // Caller owns sequence/dedup and supplies a bounded dt, never wall-clock catch-up.
     inline FOutcome Advance(const FConfig& C, const FWeather& W, const FHabitat& H,
         FCell& S, double Food, double Capacity, double RegenPerStep, double Dt)
@@ -128,13 +139,8 @@ namespace EcoVegetationV3
             const double PoolRate = .028 * W.Rain * Retention - (.005 + .025 * H.Drainage) * S.SurfaceWater;
             S.SurfaceWater = Unit(S.SurfaceWater + PoolRate * Dt);
         }
-        const double Heat = std::clamp((W.Temperature + 5) / 25, 0.0, 2.0);
         const double Density = Capacity > 0 ? Food / Capacity : 0;
-        const double Rate = C.Infiltration * W.Rain * (1 - 0.5 * H.Drainage)
-            + 0.01 * H.WaterSupply + 0.03 * H.Flood + (Dynamics ? .006 * S.SurfaceWater : 0)
-            - C.Evaporation * Heat * (0.25 + 0.75 * W.Light) * (1 - 0.5 * H.Shade)
-            - C.Drainage * H.Drainage * S.Moisture - C.Uptake * Density;
-        S.Moisture = Unit(S.Moisture + Rate * Dt);
+        S.Moisture = AdvanceMoisture(C, W, H, S.Moisture, Density, Dynamics ? S.SurfaceWater : 0., Dt);
         const double Lo = H.bNatural ? H.MoistureMin : H.Plant == EPlant::Riparian ? 0.45 : (H.Plant == EPlant::Shrub ? 0.18 : 0.30);
         const double Hi = H.bNatural ? H.MoistureMax : H.Plant == EPlant::Riparian ? 0.95 : (H.Plant == EPlant::Shrub ? 0.65 : 0.75);
         const double Dry = Unit((Lo - S.Moisture) / Lo);

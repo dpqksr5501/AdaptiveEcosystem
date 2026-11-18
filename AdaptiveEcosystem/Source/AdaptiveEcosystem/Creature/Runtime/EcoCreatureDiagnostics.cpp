@@ -1,4 +1,5 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
+#include "Creature/Runtime/EcoFaunaMotionClock.h"
 #include "Core/EcoRuntimeSettings.h"
 #include "Mass/EcoMassFragments.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
@@ -15,6 +16,33 @@
 #include "AI/Policy/EcoBehaviorFragments.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "Ecology/EcologySimulationSubsystem.h"
+
+static TAutoConsoleVariable<int32> CVarEcoGameplayReasons(TEXT("eco.Inspection.GameplayReasons"), 0,
+    TEXT("Keep a bounded authority history of ecological outcome changes for the creature inspector."));
+
+void AEcoCreatureIntegrationSpawner::RecordGameplayReason(int64 Agent, FName Region, double At, FName Reason,
+    int64 RelatedAgent, double Amount, FName ResourceId)
+{
+    if (!CVarEcoGameplayReasons.GetValueOnGameThread() || Agent <= 0 || Reason.IsNone()) return;
+    constexpr int32 MaxTrackedAgents = 512;
+    if (!GameplayReasons.Contains(Agent) && GameplayReasons.Num() >= MaxTrackedAgents)
+    {
+        int64 Oldest = 0;
+        double OldestAt = MAX_dbl;
+        for (const auto& Entry : GameplayReasons)
+        {
+            const double Time = Entry.Value.Last().Time;
+            if (Time < OldestAt || (Time == OldestAt && Entry.Key < Oldest))
+            {
+                Oldest = Entry.Key;
+                OldestAt = Time;
+            }
+        }
+        GameplayReasons.Remove(Oldest);
+    }
+    auto& History = GameplayReasons.FindOrAdd(Agent);
+    History.Append({At, Reason, Region, 0, RelatedAgent, Amount, ResourceId});
+}
 
 void AEcoCreatureIntegrationSpawner::DumpRuntime(bool bDetails) const
 {
@@ -52,10 +80,12 @@ void AEcoCreatureIntegrationSpawner::DumpRuntime(bool bDetails) const
 	}
 	const auto* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
 	const double Debt = Clock ? FMath::Max(0.0, Clock->GetServerTime().ServerTimeSeconds - LastResourceTime) : 0;
+    const double MotionDebt = Clock && FaunaMotionTime >= 0.
+        ? FMath::Max(0., EcoFaunaMotionClock::CompletedTimeAt(Clock->GetServerTime().ServerTimeSeconds) - FaunaMotionTime) : 0.;
 	const auto& Budget = GetDefault<UEcoRuntimeSettings>()->ConnectionBudget;
-	UE_LOG(LogTemp, Log, TEXT("[Eco Integration Audit] World=%s Mode=%d Ready=%d Step=%lld Alive=%d Dead=%d Births=%lld Deaths=%lld ResourceDebt=%.3f PolicyDebt=%.3f FarPolicy=%d Actors=%d Pool=%d ActorBudget=%d AddBudget=%d"),
+	UE_LOG(LogTemp, Log, TEXT("[Eco Integration Audit] World=%s Mode=%d Ready=%d Step=%lld Alive=%d Dead=%d Births=%lld Deaths=%lld ResourceDebt=%.3f PolicyDebt=%.3f FarPolicy=%d Actors=%d Pool=%d ActorBudget=%d AddBudget=%d MotionDebt=%.3f"),
 		*GetWorld()->GetName(), int32(GetNetMode()), bReady, Step, Alive, Dead, SuccessfulBirths, CommittedDeaths,
-		Debt, MaxPolicyDebt, Far, Visuals.Num(), VisualPool.Num(), Budget.MaxActorRepresentations, Budget.MaxAddsPerUpdate);
+		Debt, MaxPolicyDebt, Far, Visuals.Num(), VisualPool.Num(), Budget.MaxActorRepresentations, Budget.MaxAddsPerUpdate, MotionDebt);
 	UE_LOG(LogTemp, Log, TEXT("[Eco Policy Audit] Decisions=%llu AgentSeconds=%.3f DecisionsPerAgentSecond=%.3f Fallbacks=%lld ParallelDecisions=%llu"),
 		Decisions, PolicySeconds, PolicySeconds > 0 ? Decisions / PolicySeconds : 0, Fallbacks, ParallelDecisions);
 	if (!bDetails) return;

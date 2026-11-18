@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-06",
+  "base_commit": "395992ab",
+  "branch": "jwj-1024",
+  "ubt": "Succeeded",
+  "automation": {
+    "filter": "AdaptiveEcosystem.Policy.V3",
+    "success": 128,
+    "warning": 0,
+    "failed": 0
+  },
+  "standalone": {
+    "parity_steps": 3600,
+    "scenario_count": 4,
+    "result": "PASS"
+  },
+  "sha256": {
+    "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoSpatialIndexV3.h": "f5ed143502a1624ea4cea325a74dbca05871ef25d1feb6cff7e5a6baed19902f",
+    "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h": "8b669b6d71e943a39ee3b4210981aa31b854bb1e2e6bcb75199d0e95a8d82e34",
+    "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h": "f7aef46146eed6cb3f0d7cef6793fd0999b1a9542217d168b900da7a44c6bc70",
+    "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoWorldV3.h": "069b8ab88389a6bc7ec8170725c621a08ad0e304e310b111b54d4d69705cbf34",
+    "AdaptiveEcosystem/Tools/EcoSpatialBenchmark/EcoSpatialBenchmark.cpp": "59ec55775c1f7c2d58eb281c23ad11866b8ebf6b6e5c22f775ed1373e7ab729c",
+    "AdaptiveEcosystem/Docs/Performance/SPATIAL_SEARCH_20261106.csv": "123259667db13685b1ecb82ac95dd9e991240b4d12ad41adbc4b0a88e6b3c0bd"
+  }
+}

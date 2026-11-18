@@ -696,6 +696,13 @@ FEcoV3BrainLoad EcoV3BrainImpl::ParseBrain(const FString& JsonText, const FStrin
 	{
 		return Fail(EReject::Format, FString::Printf(TEXT("형식 판 %d — 이 빌드는 %d 만 읽는다"), Version, kFormatVersion));
 	}
+	// Older exports omit species_id and already use the deer contract hashes below.
+	if (R.HasField(TEXT("species_id")))
+	{
+		FString SpeciesId;
+		if (!R.TryGetStringField(TEXT("species_id"), SpeciesId) || SpeciesId != TEXT("Herbivore"))
+			return Fail(EReject::Contract, TEXT("Native v3 deer loader requires species_id=Herbivore when supplied"));
+	}
 	const FJsonObject* Model = ObjectField(R, TEXT("model"));
 	const FString ModelName = StringField(Model, TEXT("name"));
 	if (ModelName.IsEmpty())

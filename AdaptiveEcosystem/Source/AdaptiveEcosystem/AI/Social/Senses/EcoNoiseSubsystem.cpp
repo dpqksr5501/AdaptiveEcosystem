@@ -68,7 +68,7 @@ int64 UEcoNoiseSubsystem::Accept(FEcoNoiseEvent Event, bool bProfiledCreature)
 	Event.EmittedAt = Now;
     if (bProfiledCreature) ProfiledFootsteps.Add(Event.SourceAgentId, Event);
     else Events.Add(Event);
-    if(CVarEcoNoiseLog.GetValueOnGameThread()&&(Tag==TEXT("Player.Footstep")||Tag==TEXT("Herd.Alarm")))
+    if(CVarEcoNoiseLog.GetValueOnGameThread()&&(EcoNoise::IsPlayerThreat(Tag)||Tag==TEXT("Herd.Alarm")))
         UE_LOG(LogTemp,Log,TEXT("[Eco GameplayNoise] Tag=%s Mode=%d Loudness=%.2f Range=%.0f Position=%s"),
             *Tag.ToString(),int32(World->GetNetMode()),Loudness,MaxRange,*Position.ToCompactString());
 

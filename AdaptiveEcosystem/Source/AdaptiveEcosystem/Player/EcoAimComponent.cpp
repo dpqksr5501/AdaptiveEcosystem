@@ -33,6 +33,14 @@ void UEcoAimComponent::TickComponent(float Delta,ELevelTick Type,FActorComponent
         bOldOrient=C->GetCharacterMovement()->bOrientRotationToMovement; bCaptured=true;
     }
     if (!bCaptured) return;
+    if (bAiming)
+    {
+        BlendSeconds=D->BlendSeconds;
+        const float ProfileSpeed=1.f/FMath::Max(.01f,BlendSeconds);
+        AimOffset=FMath::VInterpTo(AimOffset,D->AimOffset,Delta,ProfileSpeed);
+        AimLength=FMath::FInterpTo(AimLength,D->AimArmLength,Delta,ProfileSpeed);
+        AimFOV=FMath::FInterpTo(AimFOV,D->AimFOV,Delta,ProfileSpeed);
+    }
     C->bUseControllerRotationYaw=bAiming?true:bOldYaw;
     C->GetCharacterMovement()->bOrientRotationToMovement=bAiming?false:bOldOrient;
     Alpha=FMath::FInterpConstantTo(Alpha,bAiming?1.f:0.f,Delta,1.f/FMath::Max(.01f,BlendSeconds));

@@ -9,6 +9,8 @@ namespace EcoClock
 {
 	ADAPTIVEECOSYSTEM_API bool EvaluateFixedCycle(double Time, double DaySeconds, double NightSeconds, FEcoDayCycleState& Out);
 	ADAPTIVEECOSYSTEM_API bool IsValidPhase(double Time, const FEcoDayCycleState& Phase);
+	/** Symmetric twilight on the shared clock. Returns -1 when the snapshot has no valid phase. */
+	ADAPTIVEECOSYSTEM_API double Darkness(const FEcoServerTimeSnapshot& Time);
 }
 
 /** Server-only elapsed clock facade. Advanced exactly once by the Mass lifecycle coordinator.

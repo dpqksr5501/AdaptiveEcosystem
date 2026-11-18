@@ -440,6 +440,7 @@ bool FEcoV3BrainLoadObs21Test::RunTest(const FString& Parameters)
 		TFunction<void(const TSharedPtr<FJsonObject>&)> Edit;
 	};
 	const TArray<FBad> Cases = {
+		{TEXT("사슴 계약 해시를 가진 다른 종 모델"), EReject::Contract, [](const TSharedPtr<FJsonObject>& R) { R->SetStringField(TEXT("species_id"), TEXT("Fox")); }},
 		{TEXT("관측 21 파일에 관측 18 계약 해시"), EReject::Dims, [](const TSharedPtr<FJsonObject>& R) { R->SetStringField(TEXT("contract_hash"), TEXT("0x7eea0107339be4ce")); }},
 		{TEXT("관측 21 계약에 obs_dim 18"), EReject::Dims, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("obs_dim"), 18); }},
 		{TEXT("관측 21 계약에 obs_dim 19"), EReject::Dims, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("obs_dim"), 19); }},

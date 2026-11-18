@@ -1,0 +1,3325 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "current_map_package": {
+    "repository_path": "AdaptiveEcosystem/Content/JYU/Maps/LV_JYU_IslandEcosystemRefreshed.umap",
+    "sha256": "20c2f5e313693cb8b90ed6cb9606ec30839352150f7f4f6998164c5832768206"
+  },
+  "training_ready": false,
+  "scope": "Partial Unreal runtime comparison. These observations are not Python reset state or policy inputs.",
+  "stages": {
+    "final_presentation_pop": "Before Snowfield and Grassland region bounds changes",
+    "saved_snow_population": "Saved Snowfield bounds change",
+    "saved_grass_population": "Current saved Snowfield and Grassland bounds, with changed Grassland founder placement"
+  },
+  "sampling": "Authority seconds 1, 1800 and 3600 from runs with 121 samples. Population is the sampled live roster. Log-derived birth, death and food events depend on logger coverage. Switches count successive logged sources for the same animal, without attributing cause.",
+  "runs": [
+    {
+      "stage": "final_presentation_pop",
+      "seed": 20000,
+      "initial_policy_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "samples": 121,
+      "authored_food_capacity": 215.0,
+      "report": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_final_presentation_pop/IslandFaunaPIE.json",
+        "sha256": "601832a9e3d9cefbb3077e69f562c022499edf83d4a09b1ae86915f584a25168"
+      },
+      "log": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_final_presentation_pop.log",
+        "sha256": "92c864036086ef5c4262aa9b27e04487fbcd903290d590d337c4aae44019cabb"
+      },
+      "unmatched_logged_death_causes": {},
+      "species": {
+        "AriakeCatfish": {
+          "founders": 3,
+          "live_at_1800": 2,
+          "live_at_3600": 2,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 2,
+          "distinct_logged_source_switches": 2
+        },
+        "Bighorn": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 6,
+          "distinct_logged_source_switches": 2
+        },
+        "Buffalo": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 19,
+          "distinct_logged_source_switches": 8
+        },
+        "CommonCarp": {
+          "founders": 6,
+          "live_at_1800": 3,
+          "live_at_3600": 3,
+          "logged_natural_births": 4,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 505,
+          "distinct_logged_source_switches": 2
+        },
+        "Crow": {
+          "founders": 3,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 4
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Fox": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 3
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "GoldenEagle": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Herbivore": {
+          "founders": 48,
+          "live_at_1800": 13,
+          "live_at_3600": 18,
+          "logged_natural_births": 24,
+          "logged_death_causes": {
+            "Predation": 17,
+            "Starvation": 37
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Horse": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 37,
+          "distinct_logged_source_switches": 8
+        },
+        "Jackrabbit": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 4,
+            "Predation": 1
+          },
+          "logged_source_switches": 5,
+          "distinct_logged_source_switches": 2
+        },
+        "Leopard": {
+          "founders": 1,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Mink": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Pig": {
+          "founders": 4,
+          "live_at_1800": 1,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Rat": {
+          "founders": 6,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Predation": 9
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "UnidentifiedFish": {
+          "founders": 7,
+          "live_at_1800": 1,
+          "live_at_3600": 1,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Wolf": {
+          "founders": 16,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 16
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        }
+      }
+    },
+    {
+      "stage": "final_presentation_pop",
+      "seed": 20017,
+      "initial_policy_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "samples": 121,
+      "authored_food_capacity": 215.0,
+      "report": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_final_presentation_pop/IslandFaunaPIE.json",
+        "sha256": "5bbfbbc7771405c1c36e1a8d5922c88ea3ee62b8be740b22df3f1afadc31a50d"
+      },
+      "log": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_final_presentation_pop.log",
+        "sha256": "b6c07b0bcbbe71f8edc65e0bb65d67dd9ba8431ee155e85ddd803618b9620896"
+      },
+      "unmatched_logged_death_causes": {},
+      "species": {
+        "AriakeCatfish": {
+          "founders": 3,
+          "live_at_1800": 2,
+          "live_at_3600": 2,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 4,
+          "distinct_logged_source_switches": 2
+        },
+        "Bighorn": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 9,
+          "distinct_logged_source_switches": 2
+        },
+        "Buffalo": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 8,
+          "distinct_logged_source_switches": 6
+        },
+        "CommonCarp": {
+          "founders": 6,
+          "live_at_1800": 3,
+          "live_at_3600": 3,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 377,
+          "distinct_logged_source_switches": 2
+        },
+        "Crow": {
+          "founders": 3,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 4
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Fox": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "GoldenEagle": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Herbivore": {
+          "founders": 48,
+          "live_at_1800": 7,
+          "live_at_3600": 10,
+          "logged_natural_births": 12,
+          "logged_death_causes": {
+            "Predation": 17,
+            "Starvation": 33
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Horse": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 41,
+          "distinct_logged_source_switches": 10
+        },
+        "Jackrabbit": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 5
+          },
+          "logged_source_switches": 3,
+          "distinct_logged_source_switches": 2
+        },
+        "Leopard": {
+          "founders": 1,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Mink": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Pig": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Rat": {
+          "founders": 6,
+          "live_at_1800": 1,
+          "live_at_3600": 1,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Predation": 8
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "UnidentifiedFish": {
+          "founders": 7,
+          "live_at_1800": 1,
+          "live_at_3600": 1,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Wolf": {
+          "founders": 16,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 16
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        }
+      }
+    },
+    {
+      "stage": "saved_snow_population",
+      "seed": 20000,
+      "initial_policy_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "samples": 121,
+      "authored_food_capacity": 215.0,
+      "report": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_saved_snow_population/IslandFaunaPIE.json",
+        "sha256": "7b0de63d563ef01655cf65d996139ab18afbe7d82fa379ee4af56f2babb1b8c1"
+      },
+      "log": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_saved_snow_population.log",
+        "sha256": "2d3358f7e95092b1fdb03f20f26973bcce5811a9ee020a83aad53abbb4570a59"
+      },
+      "unmatched_logged_death_causes": {},
+      "species": {
+        "AriakeCatfish": {
+          "founders": 3,
+          "live_at_1800": 2,
+          "live_at_3600": 2,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 4,
+          "distinct_logged_source_switches": 2
+        },
+        "Bighorn": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 7,
+          "distinct_logged_source_switches": 2
+        },
+        "Buffalo": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 15,
+          "distinct_logged_source_switches": 8
+        },
+        "CommonCarp": {
+          "founders": 6,
+          "live_at_1800": 3,
+          "live_at_3600": 3,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 5
+          },
+          "logged_source_switches": 319,
+          "distinct_logged_source_switches": 2
+        },
+        "Crow": {
+          "founders": 3,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 4
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Fox": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 3
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "GoldenEagle": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Herbivore": {
+          "founders": 48,
+          "live_at_1800": 32,
+          "live_at_3600": 41,
+          "logged_natural_births": 71,
+          "logged_death_causes": {
+            "Predation": 20,
+            "Starvation": 58
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Horse": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 40,
+          "distinct_logged_source_switches": 9
+        },
+        "Jackrabbit": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 5
+          },
+          "logged_source_switches": 5,
+          "distinct_logged_source_switches": 2
+        },
+        "Leopard": {
+          "founders": 1,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Mink": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Pig": {
+          "founders": 4,
+          "live_at_1800": 1,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Rat": {
+          "founders": 6,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Predation": 9
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "UnidentifiedFish": {
+          "founders": 7,
+          "live_at_1800": 1,
+          "live_at_3600": 1,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Wolf": {
+          "founders": 16,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 16
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        }
+      }
+    },
+    {
+      "stage": "saved_snow_population",
+      "seed": 20017,
+      "initial_policy_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "samples": 121,
+      "authored_food_capacity": 215.0,
+      "report": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_saved_snow_population/IslandFaunaPIE.json",
+        "sha256": "b1574140fc880ad0181be0f1cc9fd256eab310fbcb2bf5e170658a38637b50cf"
+      },
+      "log": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_saved_snow_population.log",
+        "sha256": "cd9775858fe3eea3b8f270c37456125bbd88ba9cf4031154823122cb12533aa0"
+      },
+      "unmatched_logged_death_causes": {},
+      "species": {
+        "AriakeCatfish": {
+          "founders": 3,
+          "live_at_1800": 2,
+          "live_at_3600": 2,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 4,
+          "distinct_logged_source_switches": 2
+        },
+        "Bighorn": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 7,
+          "distinct_logged_source_switches": 2
+        },
+        "Buffalo": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 14,
+          "distinct_logged_source_switches": 9
+        },
+        "CommonCarp": {
+          "founders": 6,
+          "live_at_1800": 3,
+          "live_at_3600": 3,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 5
+          },
+          "logged_source_switches": 705,
+          "distinct_logged_source_switches": 2
+        },
+        "Crow": {
+          "founders": 3,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 4
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Fox": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 3
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "GoldenEagle": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Herbivore": {
+          "founders": 48,
+          "live_at_1800": 15,
+          "live_at_3600": 20,
+          "logged_natural_births": 23,
+          "logged_death_causes": {
+            "Predation": 16,
+            "Starvation": 35
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Horse": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 32,
+          "distinct_logged_source_switches": 10
+        },
+        "Jackrabbit": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 5
+          },
+          "logged_source_switches": 3,
+          "distinct_logged_source_switches": 2
+        },
+        "Leopard": {
+          "founders": 1,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Mink": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Pig": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Rat": {
+          "founders": 6,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Predation": 9
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "UnidentifiedFish": {
+          "founders": 7,
+          "live_at_1800": 1,
+          "live_at_3600": 1,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        },
+        "Wolf": {
+          "founders": 16,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 16
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0
+        }
+      }
+    },
+    {
+      "stage": "saved_grass_population",
+      "seed": 20000,
+      "initial_policy_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "samples": 121,
+      "authored_food_capacity": 215.0,
+      "report": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_saved_grass_population/IslandFaunaPIE.json",
+        "sha256": "efbc06ac13eaf9705a8c4e171138f63526d27cfde6545d3cdc90357e8d836924"
+      },
+      "log": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_saved_grass_population.log",
+        "sha256": "9e905dbf0b84fca39623e3883c0b2db10e0221f978d4faad9f671c0fa832dbe8"
+      },
+      "unmatched_logged_death_causes": {},
+      "species": {
+        "AriakeCatfish": {
+          "founders": 3,
+          "live_at_1800": 2,
+          "live_at_3600": 2,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 4,
+          "distinct_logged_source_switches": 2,
+          "logged_meals": {
+            "timed_agents": 3,
+            "untimed_agents": 0,
+            "agents_with_either": 3,
+            "first_timed_payment": {
+              "agent_id": "101",
+              "authority_seconds": 153.303,
+              "meal": "PatchMeal",
+              "source": "IslandRiverGravelInsects",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Bighorn": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 7,
+          "distinct_logged_source_switches": 2,
+          "logged_meals": {
+            "timed_agents": 5,
+            "untimed_agents": 0,
+            "agents_with_either": 5,
+            "first_timed_payment": {
+              "agent_id": "94",
+              "authority_seconds": 31.0,
+              "meal": "PatchMeal",
+              "source": "IslandForageUplandForbs",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Buffalo": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 11,
+          "distinct_logged_source_switches": 6,
+          "logged_meals": {
+            "timed_agents": 6,
+            "untimed_agents": 0,
+            "agents_with_either": 6,
+            "first_timed_payment": {
+              "agent_id": "35",
+              "authority_seconds": 34.0,
+              "meal": "PatchMeal",
+              "source": "IslandForageApproachForbs",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "CommonCarp": {
+          "founders": 6,
+          "live_at_1800": 3,
+          "live_at_3600": 3,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 5
+          },
+          "logged_source_switches": 627,
+          "distinct_logged_source_switches": 2,
+          "logged_meals": {
+            "timed_agents": 8,
+            "untimed_agents": 0,
+            "agents_with_either": 8,
+            "first_timed_payment": {
+              "agent_id": "109",
+              "authority_seconds": 153.303,
+              "meal": "PatchMeal",
+              "source": "IslandRiverQuietMargin",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Crow": {
+          "founders": 3,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 4
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 3,
+            "untimed_agents": 0,
+            "agents_with_either": 3,
+            "first_timed_payment": {
+              "agent_id": "124",
+              "authority_seconds": 195.0,
+              "meal": "Scavenge",
+              "source": "123",
+              "amount": 3.5,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Fox": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 3
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 3,
+            "untimed_agents": 0,
+            "agents_with_either": 3,
+            "first_timed_payment": {
+              "agent_id": "66",
+              "authority_seconds": 79.303,
+              "meal": "Scavenge",
+              "source": "77",
+              "amount": 7.0,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "GoldenEagle": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 0,
+            "agents_with_either": 0,
+            "first_timed_payment": null
+          }
+        },
+        "Herbivore": {
+          "founders": 48,
+          "live_at_1800": 25,
+          "live_at_3600": 38,
+          "logged_natural_births": 58,
+          "logged_death_causes": {
+            "Predation": 20,
+            "Starvation": 48
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 0,
+            "agents_with_either": 0,
+            "first_timed_payment": null
+          }
+        },
+        "Horse": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 18,
+          "distinct_logged_source_switches": 9,
+          "logged_meals": {
+            "timed_agents": 7,
+            "untimed_agents": 0,
+            "agents_with_either": 7,
+            "first_timed_payment": {
+              "agent_id": "43",
+              "authority_seconds": 33.0,
+              "meal": "PatchMeal",
+              "source": "IslandForageWestMeadow",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Jackrabbit": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 3,
+            "Predation": 2
+          },
+          "logged_source_switches": 4,
+          "distinct_logged_source_switches": 2,
+          "logged_meals": {
+            "timed_agents": 5,
+            "untimed_agents": 0,
+            "agents_with_either": 5,
+            "first_timed_payment": {
+              "agent_id": "67",
+              "authority_seconds": 36.0,
+              "meal": "PatchMeal",
+              "source": "IslandForageWestBrowse",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Leopard": {
+          "founders": 1,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 0,
+            "agents_with_either": 0,
+            "first_timed_payment": null
+          }
+        },
+        "Mink": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 2,
+            "untimed_agents": 0,
+            "agents_with_either": 2,
+            "first_timed_payment": {
+              "agent_id": "111",
+              "authority_seconds": 67.0,
+              "meal": "PatchMeal",
+              "source": "IslandRiverSecondMinkShore",
+              "amount": 1.5,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Pig": {
+          "founders": 4,
+          "live_at_1800": 1,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 5,
+            "untimed_agents": 0,
+            "agents_with_either": 5,
+            "first_timed_payment": {
+              "agent_id": "46",
+              "authority_seconds": 198.0,
+              "meal": "Scavenge",
+              "source": "123",
+              "amount": 4.0,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Rat": {
+          "founders": 6,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Predation": 9
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 0,
+            "agents_with_either": 0,
+            "first_timed_payment": null
+          }
+        },
+        "UnidentifiedFish": {
+          "founders": 7,
+          "live_at_1800": 1,
+          "live_at_3600": 1,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 4,
+            "untimed_agents": 0,
+            "agents_with_either": 4,
+            "first_timed_payment": {
+              "agent_id": "117",
+              "authority_seconds": 183.0,
+              "meal": "PatchMeal",
+              "source": "IslandRiverDrift",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Wolf": {
+          "founders": 16,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 16
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 14,
+            "agents_with_either": 14,
+            "first_timed_payment": null
+          }
+        }
+      },
+      "native_food_evidence": {
+        "deer_region_intake_sum": 3336.91,
+        "deer_intake_source": "rounded_native_intervals",
+        "wolf_native_carcass_reserved_nutrition": 7.70664
+      },
+      "sampled_golden_eagle_prey_proximity": {
+        "Rat": {
+          "species": [
+            "GoldenEagle",
+            "Rat"
+          ],
+          "radius_cm": 3200.0,
+          "comparable_samples": 9,
+          "samples_with_pair_inside_radius": 0,
+          "pairs_inside_radius": [],
+          "samples_with_pair_in_same_region": 0,
+          "samples_with_pair_in_same_region_inside_radius": 0,
+          "closest": {
+            "game_seconds": 30.300001580268145,
+            "distance_cm": 17610.515113471272,
+            "agent_ids": [
+              "99",
+              "76"
+            ],
+            "regions": [
+              "Highland",
+              "Riverbank"
+            ],
+            "authority_seconds": 30.0
+          },
+          "closest_same_region": null,
+          "logged_rule_predation_by_species": {
+            "Fox": 9
+          }
+        },
+        "Jackrabbit": {
+          "species": [
+            "GoldenEagle",
+            "Jackrabbit"
+          ],
+          "radius_cm": 3200.0,
+          "comparable_samples": 11,
+          "samples_with_pair_inside_radius": 0,
+          "pairs_inside_radius": [],
+          "samples_with_pair_in_same_region": 0,
+          "samples_with_pair_in_same_region_inside_radius": 0,
+          "closest": {
+            "game_seconds": 180.30000940337777,
+            "distance_cm": 12743.276852226823,
+            "agent_ids": [
+              "99",
+              "70"
+            ],
+            "regions": [
+              "Highland",
+              "ZHighlandRiverTransition"
+            ],
+            "authority_seconds": 180.0
+          },
+          "closest_same_region": null,
+          "logged_rule_predation_by_species": {
+            "Fox": 2
+          }
+        }
+      },
+      "logged_shared_patch_payments": {
+        "scope": "Successes with identical printed patch ID and timestamp, in log order. Runtime birth does not imply the individual was still juvenile. No unsuccessful attempts or same-step causal ordering are inferred from this summary.",
+        "events": [
+          {
+            "patch": "IslandForageUplandForbs",
+            "authority_seconds": 31.0,
+            "reported_remainder": 3.4,
+            "payments_in_log_order": [
+              {
+                "species": "Bighorn",
+                "agent_id": "94",
+                "paid": 2.8,
+                "remaining": 6.2,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Bighorn",
+                "agent_id": "95",
+                "paid": 2.8,
+                "remaining": 3.4,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandForageWestMeadow",
+            "authority_seconds": 33.0,
+            "reported_remainder": 6.4,
+            "payments_in_log_order": [
+              {
+                "species": "Horse",
+                "agent_id": "43",
+                "paid": 2.8,
+                "remaining": 9.2,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Horse",
+                "agent_id": "44",
+                "paid": 2.8,
+                "remaining": 6.4,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandForageUplandForbs",
+            "authority_seconds": 33.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "Bighorn",
+                "agent_id": "96",
+                "paid": 2.8,
+                "remaining": 0.63,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Bighorn",
+                "agent_id": "98",
+                "paid": 0.63,
+                "remaining": 0.0,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandForageScrubBrowse",
+            "authority_seconds": 40.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "Bighorn",
+                "agent_id": "97",
+                "paid": 2.8,
+                "remaining": 1.775,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Bighorn",
+                "agent_id": "98",
+                "paid": 1.775,
+                "remaining": 0.0,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandForageApproachForbs",
+            "authority_seconds": 47.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "Buffalo",
+                "agent_id": "35",
+                "paid": 2.8,
+                "remaining": 0.413,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Buffalo",
+                "agent_id": "36",
+                "paid": 0.413,
+                "remaining": 0.0,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverQuietMargin",
+            "authority_seconds": 178.303,
+            "reported_remainder": 3.363,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "107",
+                "paid": 2.8,
+                "remaining": 6.163,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "108",
+                "paid": 2.8,
+                "remaining": 3.363,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverQuietMargin",
+            "authority_seconds": 192.0,
+            "reported_remainder": 0.043,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "108",
+                "paid": 2.8,
+                "remaining": 2.843,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "135",
+                "paid": 2.8,
+                "remaining": 0.043,
+                "runtime_birth_logged": true
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverDrift",
+            "authority_seconds": 214.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "UnidentifiedFish",
+                "agent_id": "117",
+                "paid": 2.8,
+                "remaining": 0.728,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "UnidentifiedFish",
+                "agent_id": "118",
+                "paid": 0.728,
+                "remaining": 0.0,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverSlowShelf",
+            "authority_seconds": 227.0,
+            "reported_remainder": 5.799,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "105",
+                "paid": 2.8,
+                "remaining": 8.599,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "137",
+                "paid": 2.8,
+                "remaining": 5.799,
+                "runtime_birth_logged": true
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverSlowShelf",
+            "authority_seconds": 228.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "104",
+                "paid": 2.8,
+                "remaining": 3.165,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "105",
+                "paid": 2.8,
+                "remaining": 0.365,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "137",
+                "paid": 0.365,
+                "remaining": 0.0,
+                "runtime_birth_logged": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "stage": "saved_grass_population",
+      "seed": 20017,
+      "initial_policy_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "samples": 121,
+      "authored_food_capacity": 215.0,
+      "report": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_saved_grass_population/IslandFaunaPIE.json",
+        "sha256": "25a97ecd01c6d7c481eb8c4bc55d855eed7a853123c73b604697efc05ea94bc6"
+      },
+      "log": {
+        "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_saved_grass_population.log",
+        "sha256": "a071acf303827f02c4d776e4e3a9b21dd99945e073121b2aa8ab9dca09b5e205"
+      },
+      "unmatched_logged_death_causes": {},
+      "species": {
+        "AriakeCatfish": {
+          "founders": 3,
+          "live_at_1800": 2,
+          "live_at_3600": 2,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 4,
+          "distinct_logged_source_switches": 2,
+          "logged_meals": {
+            "timed_agents": 3,
+            "untimed_agents": 0,
+            "agents_with_either": 3,
+            "first_timed_payment": {
+              "agent_id": "101",
+              "authority_seconds": 153.67,
+              "meal": "PatchMeal",
+              "source": "IslandRiverGravelInsects",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Bighorn": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 9,
+          "distinct_logged_source_switches": 2,
+          "logged_meals": {
+            "timed_agents": 7,
+            "untimed_agents": 0,
+            "agents_with_either": 7,
+            "first_timed_payment": {
+              "agent_id": "98",
+              "authority_seconds": 33.0,
+              "meal": "PatchMeal",
+              "source": "IslandForageUplandForbs",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Buffalo": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 17,
+          "distinct_logged_source_switches": 8,
+          "logged_meals": {
+            "timed_agents": 5,
+            "untimed_agents": 0,
+            "agents_with_either": 5,
+            "first_timed_payment": {
+              "agent_id": "35",
+              "authority_seconds": 34.0,
+              "meal": "PatchMeal",
+              "source": "IslandForageApproachForbs",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "CommonCarp": {
+          "founders": 6,
+          "live_at_1800": 3,
+          "live_at_3600": 3,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 5
+          },
+          "logged_source_switches": 296,
+          "distinct_logged_source_switches": 2,
+          "logged_meals": {
+            "timed_agents": 8,
+            "untimed_agents": 0,
+            "agents_with_either": 8,
+            "first_timed_payment": {
+              "agent_id": "109",
+              "authority_seconds": 152.67,
+              "meal": "PatchMeal",
+              "source": "IslandRiverQuietMargin",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Crow": {
+          "founders": 3,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 3
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 2,
+            "untimed_agents": 0,
+            "agents_with_either": 2,
+            "first_timed_payment": {
+              "agent_id": "38",
+              "authority_seconds": 243.0,
+              "meal": "Scavenge",
+              "source": "130",
+              "amount": 3.5,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Fox": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 3
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 3,
+            "untimed_agents": 0,
+            "agents_with_either": 3,
+            "first_timed_payment": {
+              "agent_id": "65",
+              "authority_seconds": 85.603,
+              "meal": "Scavenge",
+              "source": "75",
+              "amount": 7.0,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "GoldenEagle": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 0,
+            "agents_with_either": 0,
+            "first_timed_payment": null
+          }
+        },
+        "Herbivore": {
+          "founders": 48,
+          "live_at_1800": 31,
+          "live_at_3600": 44,
+          "logged_natural_births": 47,
+          "logged_death_causes": {
+            "Predation": 18,
+            "Starvation": 33
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 0,
+            "agents_with_either": 0,
+            "first_timed_payment": null
+          }
+        },
+        "Horse": {
+          "founders": 5,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 2,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 14,
+          "distinct_logged_source_switches": 6,
+          "logged_meals": {
+            "timed_agents": 5,
+            "untimed_agents": 0,
+            "agents_with_either": 5,
+            "first_timed_payment": {
+              "agent_id": "42",
+              "authority_seconds": 32.0,
+              "meal": "PatchMeal",
+              "source": "IslandForageOpenMeadow",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Jackrabbit": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 1,
+          "logged_death_causes": {
+            "Starvation": 5
+          },
+          "logged_source_switches": 3,
+          "distinct_logged_source_switches": 2,
+          "logged_meals": {
+            "timed_agents": 5,
+            "untimed_agents": 0,
+            "agents_with_either": 5,
+            "first_timed_payment": {
+              "agent_id": "67",
+              "authority_seconds": 41.0,
+              "meal": "PatchMeal",
+              "source": "IslandForageWestBrowse",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Leopard": {
+          "founders": 1,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 1
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 1,
+            "untimed_agents": 0,
+            "agents_with_either": 1,
+            "first_timed_payment": {
+              "agent_id": "71",
+              "authority_seconds": 87.603,
+              "meal": "Scavenge",
+              "source": "56",
+              "amount": 9.0,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Mink": {
+          "founders": 2,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 2
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 2,
+            "untimed_agents": 0,
+            "agents_with_either": 2,
+            "first_timed_payment": {
+              "agent_id": "111",
+              "authority_seconds": 66.0,
+              "meal": "PatchMeal",
+              "source": "IslandRiverSecondMinkShore",
+              "amount": 1.5,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Pig": {
+          "founders": 4,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Starvation": 7
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 7,
+            "untimed_agents": 0,
+            "agents_with_either": 7,
+            "first_timed_payment": {
+              "agent_id": "121",
+              "authority_seconds": 138.92,
+              "meal": "Scavenge",
+              "source": "29",
+              "amount": 4.0,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Rat": {
+          "founders": 6,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 3,
+          "logged_death_causes": {
+            "Predation": 9
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 0,
+            "agents_with_either": 0,
+            "first_timed_payment": null
+          }
+        },
+        "UnidentifiedFish": {
+          "founders": 7,
+          "live_at_1800": 1,
+          "live_at_3600": 1,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 6
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 4,
+            "untimed_agents": 0,
+            "agents_with_either": 4,
+            "first_timed_payment": {
+              "agent_id": "117",
+              "authority_seconds": 183.0,
+              "meal": "PatchMeal",
+              "source": "IslandRiverDrift",
+              "amount": 2.8,
+              "has_untimed_payment": false
+            }
+          }
+        },
+        "Wolf": {
+          "founders": 16,
+          "live_at_1800": 0,
+          "live_at_3600": 0,
+          "logged_natural_births": 0,
+          "logged_death_causes": {
+            "Starvation": 16
+          },
+          "logged_source_switches": 0,
+          "distinct_logged_source_switches": 0,
+          "logged_meals": {
+            "timed_agents": 0,
+            "untimed_agents": 11,
+            "agents_with_either": 11,
+            "first_timed_payment": null
+          }
+        }
+      },
+      "native_food_evidence": {
+        "deer_region_intake_sum": 3538.12,
+        "deer_intake_source": "rounded_native_intervals",
+        "wolf_native_carcass_reserved_nutrition": 5.00614
+      },
+      "sampled_golden_eagle_prey_proximity": {
+        "Rat": {
+          "species": [
+            "GoldenEagle",
+            "Rat"
+          ],
+          "radius_cm": 3200.0,
+          "comparable_samples": 10,
+          "samples_with_pair_inside_radius": 0,
+          "pairs_inside_radius": [],
+          "samples_with_pair_in_same_region": 0,
+          "samples_with_pair_in_same_region_inside_radius": 0,
+          "closest": {
+            "game_seconds": 180.30000940337777,
+            "distance_cm": 14509.113634860678,
+            "agent_ids": [
+              "99",
+              "119"
+            ],
+            "regions": [
+              "Highland",
+              "Riverbank"
+            ],
+            "authority_seconds": 180.0
+          },
+          "closest_same_region": null,
+          "logged_rule_predation_by_species": {
+            "Fox": 9
+          }
+        },
+        "Jackrabbit": {
+          "species": [
+            "GoldenEagle",
+            "Jackrabbit"
+          ],
+          "radius_cm": 3200.0,
+          "comparable_samples": 11,
+          "samples_with_pair_inside_radius": 0,
+          "pairs_inside_radius": [],
+          "samples_with_pair_in_same_region": 0,
+          "samples_with_pair_in_same_region_inside_radius": 0,
+          "closest": {
+            "game_seconds": 210.3000109679997,
+            "distance_cm": 12506.480015531955,
+            "agent_ids": [
+              "99",
+              "70"
+            ],
+            "regions": [
+              "Highland",
+              "ZHighlandRiverTransition"
+            ],
+            "authority_seconds": 210.0
+          },
+          "closest_same_region": null,
+          "logged_rule_predation_by_species": {}
+        }
+      },
+      "logged_shared_patch_payments": {
+        "scope": "Successes with identical printed patch ID and timestamp, in log order. Runtime birth does not imply the individual was still juvenile. No unsuccessful attempts or same-step causal ordering are inferred from this summary.",
+        "events": [
+          {
+            "patch": "IslandForageWestMeadow",
+            "authority_seconds": 33.0,
+            "reported_remainder": 3.677,
+            "payments_in_log_order": [
+              {
+                "species": "Horse",
+                "agent_id": "41",
+                "paid": 2.8,
+                "remaining": 6.477,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Horse",
+                "agent_id": "43",
+                "paid": 2.8,
+                "remaining": 3.677,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandForageScrubBrowse",
+            "authority_seconds": 41.0,
+            "reported_remainder": 4.4,
+            "payments_in_log_order": [
+              {
+                "species": "Bighorn",
+                "agent_id": "95",
+                "paid": 2.8,
+                "remaining": 7.2,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Bighorn",
+                "agent_id": "97",
+                "paid": 2.8,
+                "remaining": 4.4,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandForageApproachForbs",
+            "authority_seconds": 47.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "Buffalo",
+                "agent_id": "35",
+                "paid": 2.8,
+                "remaining": 0.377,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Buffalo",
+                "agent_id": "36",
+                "paid": 0.377,
+                "remaining": 0.0,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandForageWestBrowse",
+            "authority_seconds": 90.603,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "Jackrabbit",
+                "agent_id": "67",
+                "paid": 2.8,
+                "remaining": 0.669,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Jackrabbit",
+                "agent_id": "68",
+                "paid": 0.669,
+                "remaining": 0.0,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverSlowShelf",
+            "authority_seconds": 198.0,
+            "reported_remainder": 10.4,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "104",
+                "paid": 2.8,
+                "remaining": 13.2,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "134",
+                "paid": 2.8,
+                "remaining": 10.4,
+                "runtime_birth_logged": true
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverSlowShelf",
+            "authority_seconds": 199.0,
+            "reported_remainder": 4.966,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "104",
+                "paid": 2.8,
+                "remaining": 7.766,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "134",
+                "paid": 2.8,
+                "remaining": 4.966,
+                "runtime_birth_logged": true
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverSlowShelf",
+            "authority_seconds": 200.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "104",
+                "paid": 2.8,
+                "remaining": 2.333,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "134",
+                "paid": 2.333,
+                "remaining": 0.0,
+                "runtime_birth_logged": true
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverDrift",
+            "authority_seconds": 214.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "UnidentifiedFish",
+                "agent_id": "117",
+                "paid": 2.8,
+                "remaining": 0.728,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "UnidentifiedFish",
+                "agent_id": "118",
+                "paid": 0.728,
+                "remaining": 0.0,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandForageApproachForbs",
+            "authority_seconds": 309.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "Buffalo",
+                "agent_id": "33",
+                "paid": 2.8,
+                "remaining": 1.475,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "Buffalo",
+                "agent_id": "34",
+                "paid": 1.475,
+                "remaining": 0.0,
+                "runtime_birth_logged": false
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverInletPlants",
+            "authority_seconds": 2503.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "104",
+                "paid": 2.8,
+                "remaining": 2.163,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "134",
+                "paid": 2.163,
+                "remaining": 0.0,
+                "runtime_birth_logged": true
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverInletPlants",
+            "authority_seconds": 2824.0,
+            "reported_remainder": 0.985,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "104",
+                "paid": 2.8,
+                "remaining": 3.785,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "134",
+                "paid": 2.8,
+                "remaining": 0.985,
+                "runtime_birth_logged": true
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverInletPlants",
+            "authority_seconds": 3079.0,
+            "reported_remainder": 0.0,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "104",
+                "paid": 2.8,
+                "remaining": 2.059,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "134",
+                "paid": 2.059,
+                "remaining": 0.0,
+                "runtime_birth_logged": true
+              }
+            ]
+          },
+          {
+            "patch": "IslandRiverInletPlants",
+            "authority_seconds": 3589.0,
+            "reported_remainder": 1.079,
+            "payments_in_log_order": [
+              {
+                "species": "CommonCarp",
+                "agent_id": "104",
+                "paid": 2.8,
+                "remaining": 3.879,
+                "runtime_birth_logged": false
+              },
+              {
+                "species": "CommonCarp",
+                "agent_id": "134",
+                "paid": 2.8,
+                "remaining": 1.079,
+                "runtime_birth_logged": true
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "current_region_actor_packages": {
+    "Snowfield": {
+      "repository_path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystemRefreshed/9/4N/XJ68MBGNVBAFIG0M84NUVJ.uasset",
+      "sha256": "94a7f6d80be225fc3397146d7b01e4647d37cfcbb33f9a07d469aff0c5be957b"
+    },
+    "Grassland": {
+      "repository_path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystemRefreshed/A/WU/H403BIOH4ZJ4EK3C03ORCM.uasset",
+      "sha256": "440a3c61544196418fb21bfd55e91449e276a8a3ca65f72d2b8290de1c88fd71"
+    }
+  },
+  "meal_scope": "The current stage includes positive Eco Fauna meal lines. First timed is the earliest explicitly timestamped line. Untimed payments can predate it. Native deer region intake and wolf carcass reservations are separate sources and do not give per-agent first meal timestamps.",
+  "golden_eagle_hunt_audit": {
+    "scope": "Current saved baseline with hunt audit enabled. Rejections count checks; diagnostic and long-run trajectories may differ.",
+    "runs": [
+      {
+        "seed": 20000,
+        "samples": 17,
+        "end_authority_seconds": 480,
+        "initial_sample_matches_saved_grass_population": true,
+        "scan_count": 100,
+        "first_scan_authority_seconds": 59.317,
+        "last_scan_authority_seconds": 204.867,
+        "rejection_counts": {
+          "HuntTargetOutsideRegion": 1066,
+          "HuntTargetUnavailable": 46
+        },
+        "candidate_count": 0,
+        "logged_deaths": {
+          "99": {
+            "cause": "Starvation",
+            "authority_seconds": 305.715
+          },
+          "100": {
+            "cause": "Starvation",
+            "authority_seconds": 305.715
+          }
+        },
+        "golden_eagle_meals": {},
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_hunt_baseline.log",
+          "sha256": "f034c62e8045716f4b5a73b39526b4af62a961524c33fa239cbe3b3fd606d593"
+        },
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_eagle_hunt_baseline/IslandFaunaPIE.json",
+          "sha256": "5b454d339d1756c3b79efdfd855a9c42d15cabd46894f104887acd41d73a9bde"
+        }
+      },
+      {
+        "seed": 20017,
+        "samples": 17,
+        "end_authority_seconds": 480,
+        "initial_sample_matches_saved_grass_population": true,
+        "scan_count": 136,
+        "first_scan_authority_seconds": 59.633,
+        "last_scan_authority_seconds": 374.567,
+        "rejection_counts": {
+          "HuntTargetOutsideRegion": 1151,
+          "HuntTargetUnavailable": 82
+        },
+        "candidate_count": 0,
+        "logged_deaths": {
+          "100": {
+            "cause": "Starvation",
+            "authority_seconds": 305.715
+          },
+          "99": {
+            "cause": "Starvation",
+            "authority_seconds": 457.826
+          }
+        },
+        "golden_eagle_meals": {
+          "Scavenge": 53.239
+        },
+        "golden_eagle_carcass_payment": {
+          "carcass_id": "120",
+          "summary": {
+            "species": "Bighorn",
+            "medium": "Ground",
+            "total": 101.239,
+            "native_reserved": 0.0,
+            "immediate_killer_payment": 0.0,
+            "initial_shared_stock": 101.239,
+            "death_cause": "Starvation",
+            "primary_hunter_id": null,
+            "primary_hunter_received_shared_payment": null,
+            "shared_payments": 17,
+            "consumer_count": 3,
+            "energy_by_consumer_species": {
+              "GoldenEagle": 53.239,
+              "Wolf": 48.0
+            },
+            "first_shared_payment": {
+              "agent_id": "78",
+              "species": "Wolf",
+              "amount": 8.0,
+              "remaining": 93.239,
+              "authority_seconds": null
+            },
+            "last_logged_shared_stock": 0.0,
+            "logged_stock_minus_payments_and_remaining": 0.0,
+            "closure": {
+              "unused_stock": 0.0,
+              "authority_seconds": 266.453,
+              "reason": "Depleted"
+            },
+            "logged_stock_minus_payments_and_unused_at_closure": 0.0,
+            "release_events": [
+              {
+                "agent_id": "99",
+                "species": "GoldenEagle",
+                "reason": "RescanNoCandidate",
+                "authority_seconds": 266.467,
+                "remaining": 0.0
+              }
+            ]
+          }
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_hunt_baseline.log",
+          "sha256": "75595c05096066adfd939c738e3e96def405abf4edaf02af2de3e4d0ed5862e9"
+        },
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_eagle_hunt_baseline/IslandFaunaPIE.json",
+          "sha256": "519f5e9d63228cc0be03cc2335ea885284b05ab28ec85d36bb2e06a26185cf97"
+        }
+      }
+    ]
+  },
+  "highland_rat_cover_trial": {
+    "scope": "PIE-only relocated rats and temporary boulder sight setting. Tracked rays exclude heading, hunger and decision timing. Plant payments are a sampled lower bound.",
+    "runs": [
+      {
+        "seed": 20000,
+        "cover": "control",
+        "initial_pair_matches": true,
+        "samples": 43,
+        "end_world_seconds": 210.2666776329279,
+        "moved_rat_ids": [
+          76,
+          77
+        ],
+        "static_screened_ground_route_cm": [
+          null,
+          null
+        ],
+        "eagle_captured_rat_ids": [
+          "119",
+          "77"
+        ],
+        "eagle_logged_energy": {
+          "Scavenge": 25.064
+        },
+        "founder_rat_sampled_plant_energy": {
+          "76": 6.0,
+          "77": 2.683
+        },
+        "founder_first_sampled_flee": {
+          "76": {
+            "world_seconds": 46.13333573937416,
+            "distance_from_start_cm": 738.29
+          },
+          "77": {
+            "world_seconds": 125.33333986997604,
+            "distance_from_start_cm": 1978.99
+          }
+        },
+        "tracked_air_sight_rays": 59,
+        "tracked_air_sight_blocked": 0,
+        "logged_air_reject_occluded": 0,
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_latest_eagle_cover_control.log",
+          "sha256": "51b8d8af5191bce77aaa793016f939860730ccd1036c8f4c024cd5e1e8650bfa"
+        },
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_latest_eagle_cover_control/IslandFaunaPIE.json",
+          "sha256": "bba2df82fb7596980103191c6d9048f66b945c1a72aa15786e40b211baa23d2c"
+        }
+      },
+      {
+        "seed": 20000,
+        "cover": "sight",
+        "initial_pair_matches": true,
+        "samples": 43,
+        "end_world_seconds": 210.2666776329279,
+        "moved_rat_ids": [
+          76,
+          77
+        ],
+        "static_screened_ground_route_cm": [
+          0.00034465316058632933,
+          0.0007162871480674252
+        ],
+        "eagle_captured_rat_ids": [
+          "76",
+          "77"
+        ],
+        "eagle_logged_energy": {
+          "Scavenge": 26.312
+        },
+        "founder_rat_sampled_plant_energy": {
+          "76": 1.2,
+          "77": 0.4
+        },
+        "founder_first_sampled_flee": {
+          "76": null,
+          "77": {
+            "world_seconds": 46.13333573937416,
+            "distance_from_start_cm": 379.81
+          }
+        },
+        "tracked_air_sight_rays": 55,
+        "tracked_air_sight_blocked": 9,
+        "logged_air_reject_occluded": 0,
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_latest_eagle_cover_sight.log",
+          "sha256": "c57fb24585cdf2f5a3b2bacb254620d719d2a086a1cc70db4c0fd4cc701bfe2a"
+        },
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_latest_eagle_cover_sight/IslandFaunaPIE.json",
+          "sha256": "98481a000b1a08fbeab741daecff0cc018b7b92fec8d89fcab1813ddff7fff9c"
+        }
+      },
+      {
+        "seed": 20017,
+        "cover": "control",
+        "initial_pair_matches": true,
+        "samples": 43,
+        "end_world_seconds": 210.2666776329279,
+        "moved_rat_ids": [
+          76,
+          77
+        ],
+        "static_screened_ground_route_cm": [
+          null,
+          null
+        ],
+        "eagle_captured_rat_ids": [
+          "77",
+          "119"
+        ],
+        "eagle_logged_energy": {
+          "Scavenge": 28.224
+        },
+        "founder_rat_sampled_plant_energy": {
+          "76": 10.209,
+          "77": 9.2
+        },
+        "founder_first_sampled_flee": {
+          "76": {
+            "world_seconds": 40.00000208616257,
+            "distance_from_start_cm": 465.78
+          },
+          "77": {
+            "world_seconds": 40.00000208616257,
+            "distance_from_start_cm": 924.45
+          }
+        },
+        "tracked_air_sight_rays": 76,
+        "tracked_air_sight_blocked": 0,
+        "logged_air_reject_occluded": 0,
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_latest_eagle_cover_control.log",
+          "sha256": "de0d24fb55cb5d4fa6e4d660a59999270b59ddc321c7d3cfcd5227e1325d054a"
+        },
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_latest_eagle_cover_control/IslandFaunaPIE.json",
+          "sha256": "29cbfd1ad6c1d9a2891a4c3d0675f0a8121678ea64facbc90eef360f82a3947f"
+        }
+      },
+      {
+        "seed": 20017,
+        "cover": "sight",
+        "initial_pair_matches": true,
+        "samples": 43,
+        "end_world_seconds": 210.2666776329279,
+        "moved_rat_ids": [
+          76,
+          77
+        ],
+        "static_screened_ground_route_cm": [
+          0.00034465316058632933,
+          0.0007162871480674252
+        ],
+        "eagle_captured_rat_ids": [
+          "119"
+        ],
+        "eagle_logged_energy": {
+          "Scavenge": 13.561
+        },
+        "founder_rat_sampled_plant_energy": {
+          "76": 10.83,
+          "77": 9.817
+        },
+        "founder_first_sampled_flee": {
+          "76": {
+            "world_seconds": 40.00000208616257,
+            "distance_from_start_cm": 562.44
+          },
+          "77": {
+            "world_seconds": 41.86666885018349,
+            "distance_from_start_cm": 157.66
+          }
+        },
+        "tracked_air_sight_rays": 48,
+        "tracked_air_sight_blocked": 9,
+        "logged_air_reject_occluded": 0,
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_latest_eagle_cover_sight.log",
+          "sha256": "37e17f48d80436cdb8854f67a4705563ea22daddc5ef3c31cc7db43e74411c4e"
+        },
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_latest_eagle_cover_sight/IslandFaunaPIE.json",
+          "sha256": "bec5d2f2cc75b44d4c0fbd720735758553b0b2b28332878c474237909e0f83e7"
+        }
+      }
+    ]
+  },
+  "rule_fauna_shelter_inventory": {
+    "seed": 20000,
+    "active_patch_count": 22,
+    "scope": "Positive shelter radius is required for a rule-fauna shelter target. Rock occlusion and native deer refuges have separate runtime paths.",
+    "sheltered_patches_by_species": {},
+    "relocated_rat_tracks": {
+      "20000_control": {
+        "76": {
+          "golden_eagle_visual_threat_events": 6,
+          "first_eagle_threat": {
+            "hunter_id": "100",
+            "authority_seconds": 62.2,
+            "distance_cm": 232.7
+          },
+          "flee_samples": 41,
+          "flee_samples_with_habitat_target": 0
+        },
+        "77": {
+          "golden_eagle_visual_threat_events": 2,
+          "first_eagle_threat": {
+            "hunter_id": "99",
+            "authority_seconds": 142.017,
+            "distance_cm": 631.3
+          },
+          "flee_samples": 15,
+          "flee_samples_with_habitat_target": 0
+        }
+      },
+      "20000_sight": {
+        "76": {
+          "golden_eagle_visual_threat_events": 1,
+          "first_eagle_threat": {
+            "hunter_id": "100",
+            "authority_seconds": 101.75,
+            "distance_cm": 91.3
+          },
+          "flee_samples": 0,
+          "flee_samples_with_habitat_target": 0
+        },
+        "77": {
+          "golden_eagle_visual_threat_events": 2,
+          "first_eagle_threat": {
+            "hunter_id": "100",
+            "authority_seconds": 61.7,
+            "distance_cm": 534.8
+          },
+          "flee_samples": 10,
+          "flee_samples_with_habitat_target": 0
+        }
+      },
+      "20017_control": {
+        "76": {
+          "golden_eagle_visual_threat_events": 6,
+          "first_eagle_threat": {
+            "hunter_id": "100",
+            "authority_seconds": 61.283,
+            "distance_cm": 390.2
+          },
+          "flee_samples": 52,
+          "flee_samples_with_habitat_target": 0
+        },
+        "77": {
+          "golden_eagle_visual_threat_events": 6,
+          "first_eagle_threat": {
+            "hunter_id": "100",
+            "authority_seconds": 60.783,
+            "distance_cm": 419.2
+          },
+          "flee_samples": 51,
+          "flee_samples_with_habitat_target": 0
+        }
+      },
+      "20017_sight": {
+        "76": {
+          "golden_eagle_visual_threat_events": 2,
+          "first_eagle_threat": {
+            "hunter_id": "99",
+            "authority_seconds": 69.917,
+            "distance_cm": 542.7
+          },
+          "flee_samples": 23,
+          "flee_samples_with_habitat_target": 0
+        },
+        "77": {
+          "golden_eagle_visual_threat_events": 0,
+          "first_eagle_threat": null,
+          "flee_samples": 13,
+          "flee_samples_with_habitat_target": 0
+        }
+      }
+    },
+    "log": {
+      "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_latest_shelter_inventory.log",
+      "sha256": "d01761ba41dafd376c6fe7bae887c855e615ba0ca64728c0873b78ce9984eaf1"
+    },
+    "report": {
+      "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_latest_shelter_inventory/IslandFaunaPIE.json",
+      "sha256": "3e81f90d3290e123a63e1370976e91750bf0e5ddd3df59c9737d5200fa466884"
+    }
+  },
+  "rat_refuge_destination_trial": {
+    "scope": "PIE-only. Both arms debit 0.125 authored capacity from UplandForbs and apply identical site geometry. The target uses a deliberately oversized entrance to retain normal capture checks; it is a means to test target selection.",
+    "runs": [
+      {
+        "seed": 20000,
+        "mode": "Control",
+        "patch_index": 22,
+        "center_cm": [
+          52812.127,
+          48524.082,
+          3137.057148974578
+        ],
+        "radius_cm": 65.0,
+        "capacity_debited": 0.125,
+        "rats": {
+          "76": {
+            "flee_samples": 0,
+            "refuge_goal_samples": 0,
+            "refuge_goal_samples_inside_radius": 0,
+            "nearest_flee_distance_cm": null,
+            "eagle_threat_seen": 0
+          },
+          "77": {
+            "flee_samples": 11,
+            "refuge_goal_samples": 0,
+            "refuge_goal_samples_inside_radius": 0,
+            "nearest_flee_distance_cm": 266.91816372084554,
+            "eagle_threat_seen": 2
+          }
+        },
+        "eagle_captured_rat_ids": [
+          "76",
+          "77"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_refuge_control/IslandFaunaPIE.json",
+          "sha256": "da08304aa39a6f3a2c6f59e6f9abcdf985dca894f4e091d7f05e5de84b1a1ad6"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_refuge_control.log",
+          "sha256": "bb79948cd4e1c81567be1c92e14d4ffe54d7ce7270a566cb8fb6596eb20dfae8"
+        }
+      },
+      {
+        "seed": 20000,
+        "mode": "Target",
+        "patch_index": 22,
+        "center_cm": [
+          52812.127,
+          48524.082,
+          3137.057148974578
+        ],
+        "radius_cm": 65.0,
+        "capacity_debited": 0.125,
+        "rats": {
+          "76": {
+            "flee_samples": 0,
+            "refuge_goal_samples": 0,
+            "refuge_goal_samples_inside_radius": 0,
+            "nearest_flee_distance_cm": null,
+            "eagle_threat_seen": 0
+          },
+          "77": {
+            "flee_samples": 11,
+            "refuge_goal_samples": 0,
+            "refuge_goal_samples_inside_radius": 0,
+            "nearest_flee_distance_cm": 266.91816372084554,
+            "eagle_threat_seen": 2
+          }
+        },
+        "eagle_captured_rat_ids": [
+          "76",
+          "77"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_refuge_target/IslandFaunaPIE.json",
+          "sha256": "4a6131215f0f39bcf18a550bf068b3fd57653a18f6abd0023b8f62f0fcd34001"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_refuge_target.log",
+          "sha256": "8091b8616071296f2fa3159609104d977dca1f1e485c6ef426288f676ff4a888"
+        }
+      },
+      {
+        "seed": 20017,
+        "mode": "Control",
+        "patch_index": 22,
+        "center_cm": [
+          52812.127,
+          48524.082,
+          3137.057148974578
+        ],
+        "radius_cm": 65.0,
+        "capacity_debited": 0.125,
+        "rats": {
+          "76": {
+            "flee_samples": 23,
+            "refuge_goal_samples": 0,
+            "refuge_goal_samples_inside_radius": 0,
+            "nearest_flee_distance_cm": 544.1729215774591,
+            "eagle_threat_seen": 2
+          },
+          "77": {
+            "flee_samples": 12,
+            "refuge_goal_samples": 0,
+            "refuge_goal_samples_inside_radius": 0,
+            "nearest_flee_distance_cm": 211.1660899857281,
+            "eagle_threat_seen": 0
+          }
+        },
+        "eagle_captured_rat_ids": [
+          "119"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_rat_refuge_control/IslandFaunaPIE.json",
+          "sha256": "6a2f3bf61cd097e7832f9cc698c3251b20cd1ba2ccca5d6ba08cc74683cfeb40"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_refuge_control.log",
+          "sha256": "d2c16c31d760c5e47d61ff3fc41a393c6503305e27072f1833848889e12000e5"
+        }
+      },
+      {
+        "seed": 20017,
+        "mode": "Target",
+        "patch_index": 22,
+        "center_cm": [
+          52812.127,
+          48524.082,
+          3137.057148974578
+        ],
+        "radius_cm": 65.0,
+        "capacity_debited": 0.125,
+        "rats": {
+          "76": {
+            "flee_samples": 23,
+            "refuge_goal_samples": 0,
+            "refuge_goal_samples_inside_radius": 0,
+            "nearest_flee_distance_cm": 544.1729215774591,
+            "eagle_threat_seen": 2
+          },
+          "77": {
+            "flee_samples": 12,
+            "refuge_goal_samples": 0,
+            "refuge_goal_samples_inside_radius": 0,
+            "nearest_flee_distance_cm": 211.1660899857281,
+            "eagle_threat_seen": 0
+          }
+        },
+        "eagle_captured_rat_ids": [
+          "119"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_rat_refuge_target/IslandFaunaPIE.json",
+          "sha256": "aea84a5018e6bbc116c9007b29f68beb1cf1fb38d931a2964b6ed0860648c014"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_refuge_target.log",
+          "sha256": "4db588a874ee36ae10004eafe117b375150b7a532270d272ad629627bc31effa"
+        }
+      }
+    ]
+  },
+  "rat_refuge_approach_trial": {
+    "scope": "PIE-only. Same refuge geometry and stock. Static approach enables existing ShelterApproach only, via mask 16. Query positions are sampled after the decision, so they are not individual decision receipts.",
+    "runs": [
+      {
+        "seed": 20000,
+        "mode": "flee_sight",
+        "flee_samples": 11,
+        "inside_search_radius": 6,
+        "blocked_fauna_vision_clear_world_static": 6,
+        "selected": 0,
+        "sampled_arrival": 0,
+        "arrived_rat_ids": [],
+        "nearest_selected_distance_cm": null,
+        "eagle_captured_rat_ids": [
+          "76",
+          "77"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_refuge_flee_sight/IslandFaunaPIE.json",
+          "sha256": "ca7151b4879ddcf07621e473d30337a3ebf440804da460be19d79bac1552cebc"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_refuge_flee_sight.log",
+          "sha256": "ae6280888be3eaa41813b84a531cd23f1ce7b3d5cd74a60fbd26f33f3e9a0d51"
+        }
+      },
+      {
+        "seed": 20000,
+        "mode": "static_approach",
+        "flee_samples": 22,
+        "inside_search_radius": 6,
+        "blocked_fauna_vision_clear_world_static": 6,
+        "selected": 6,
+        "sampled_arrival": 1,
+        "arrived_rat_ids": [
+          77
+        ],
+        "nearest_selected_distance_cm": 15.763093195411452,
+        "eagle_captured_rat_ids": [
+          "76"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_refuge_static_approach/IslandFaunaPIE.json",
+          "sha256": "6ab18b252ed9745dbcbd6579e28cc5601fbb8be74cd8858c85ffddbb01ed959c"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_refuge_static_approach.log",
+          "sha256": "6403e2e383af6a005124f8174e729c32a5d0180fcd8b169ddfc65cb9b2257f1e"
+        }
+      },
+      {
+        "seed": 20017,
+        "mode": "flee_sight",
+        "flee_samples": 35,
+        "inside_search_radius": 25,
+        "blocked_fauna_vision_clear_world_static": 25,
+        "selected": 0,
+        "sampled_arrival": 0,
+        "arrived_rat_ids": [],
+        "nearest_selected_distance_cm": null,
+        "eagle_captured_rat_ids": [
+          "119"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_rat_refuge_flee_sight/IslandFaunaPIE.json",
+          "sha256": "878c97edc811116e7f907e5b927d1a1f8c76b5f78b66d9a2d61846fd11f26070"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_refuge_flee_sight.log",
+          "sha256": "7f53956b22a31dfa57e78d659b25d2a640babf6192b79a4bd9af0536f342f781"
+        }
+      },
+      {
+        "seed": 20017,
+        "mode": "static_approach",
+        "flee_samples": 88,
+        "inside_search_radius": 42,
+        "blocked_fauna_vision_clear_world_static": 42,
+        "selected": 42,
+        "sampled_arrival": 24,
+        "arrived_rat_ids": [
+          76,
+          77
+        ],
+        "nearest_selected_distance_cm": 1.0101985588663538,
+        "eagle_captured_rat_ids": [
+          "119",
+          "76"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_rat_refuge_static_approach/IslandFaunaPIE.json",
+          "sha256": "acb05860919aedaa25ed801d671b0485f43057b4e12c38f3225b901adc57c8a2"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_refuge_static_approach.log",
+          "sha256": "1fdf7123869aff412ad79ac2798c7235f6914c6f86cb454534291778864d8acd"
+        }
+      }
+    ]
+  },
+  "rat_refuge_entrance_trial": {
+    "scope": "PIE-only same approach rule. EntranceRadius is a predator eligibility threshold for the refuge area. There is no physical entrance collision or prey body-fit check on traversal.",
+    "runs": [
+      {
+        "seed": 20000,
+        "mode": "static_approach",
+        "entrance_radius_cm": 100.0,
+        "arrivals_and_exits": {
+          "77": {
+            "first_sampled_arrival_world_seconds": 47.23333579674363,
+            "first_sampled_exit": {
+              "world_seconds": 48.833335880190134,
+              "distance_cm": 75.09,
+              "activity": "EEcoSpeciesActivity::Wander"
+            }
+          }
+        },
+        "logged_refuge_rejections": 0,
+        "eagle_captured_rat_ids": [
+          "76"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_refuge_static_approach/IslandFaunaPIE.json",
+          "sha256": "6ab18b252ed9745dbcbd6579e28cc5601fbb8be74cd8858c85ffddbb01ed959c"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_refuge_static_approach.log",
+          "sha256": "6403e2e383af6a005124f8174e729c32a5d0180fcd8b169ddfc65cb9b2257f1e"
+        },
+        "founder_rat_capture_context": {
+          "76": {
+            "hunter_id": "99",
+            "death_authority_seconds": 127.517,
+            "last_live_sample_world_seconds": 127.50000664964318,
+            "last_live_sample_completed_authority_seconds": 127.0,
+            "distance_to_refuge_in_last_live_sample_cm": 1815.62,
+            "sampled_exit_before_capture": false
+          }
+        }
+      },
+      {
+        "seed": 20000,
+        "mode": "narrow_entrance",
+        "entrance_radius_cm": 7.0,
+        "arrivals_and_exits": {
+          "77": {
+            "first_sampled_arrival_world_seconds": 47.23333579674363,
+            "first_sampled_exit": {
+              "world_seconds": 48.833335880190134,
+              "distance_cm": 75.09,
+              "activity": "EEcoSpeciesActivity::Wander"
+            }
+          }
+        },
+        "logged_refuge_rejections": 0,
+        "eagle_captured_rat_ids": [
+          "76"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_refuge_narrow_entrance/IslandFaunaPIE.json",
+          "sha256": "26fc2a544cc7ca29ffde09cb986d8b7d6ab073a9dae8ef1d00aadc585e497a9b"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_refuge_narrow_entrance.log",
+          "sha256": "88de7cc34163300289fd809596dfb30182a6afee85073639c578334f9d729790"
+        },
+        "founder_rat_capture_context": {
+          "76": {
+            "hunter_id": "99",
+            "death_authority_seconds": 127.517,
+            "last_live_sample_world_seconds": 127.50000664964318,
+            "last_live_sample_completed_authority_seconds": 127.0,
+            "distance_to_refuge_in_last_live_sample_cm": 1815.62,
+            "sampled_exit_before_capture": false
+          }
+        }
+      },
+      {
+        "seed": 20017,
+        "mode": "static_approach",
+        "entrance_radius_cm": 100.0,
+        "arrivals_and_exits": {
+          "76": {
+            "first_sampled_arrival_world_seconds": 42.70000222697854,
+            "first_sampled_exit": {
+              "world_seconds": 46.7000024355948,
+              "distance_cm": 122.37,
+              "activity": "EEcoSpeciesActivity::Wander"
+            }
+          },
+          "77": {
+            "first_sampled_arrival_world_seconds": 42.70000222697854,
+            "first_sampled_exit": {
+              "world_seconds": 47.23333579674363,
+              "distance_cm": 66.46,
+              "activity": "EEcoSpeciesActivity::Wander"
+            }
+          }
+        },
+        "logged_refuge_rejections": 0,
+        "eagle_captured_rat_ids": [
+          "119",
+          "76"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_rat_refuge_static_approach/IslandFaunaPIE.json",
+          "sha256": "acb05860919aedaa25ed801d671b0485f43057b4e12c38f3225b901adc57c8a2"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_refuge_static_approach.log",
+          "sha256": "1fdf7123869aff412ad79ac2798c7235f6914c6f86cb454534291778864d8acd"
+        },
+        "founder_rat_capture_context": {
+          "76": {
+            "hunter_id": "100",
+            "death_authority_seconds": 209.517,
+            "last_live_sample_world_seconds": 209.63334426656365,
+            "last_live_sample_completed_authority_seconds": 209.0,
+            "distance_to_refuge_in_last_live_sample_cm": 1377.37,
+            "sampled_exit_before_capture": true
+          }
+        }
+      },
+      {
+        "seed": 20017,
+        "mode": "narrow_entrance",
+        "entrance_radius_cm": 7.0,
+        "arrivals_and_exits": {
+          "76": {
+            "first_sampled_arrival_world_seconds": 42.70000222697854,
+            "first_sampled_exit": {
+              "world_seconds": 45.63333571329713,
+              "distance_cm": 85.28,
+              "activity": "EEcoSpeciesActivity::Wander"
+            }
+          },
+          "77": {
+            "first_sampled_arrival_world_seconds": 42.70000222697854,
+            "first_sampled_exit": {
+              "world_seconds": 46.43333575502038,
+              "distance_cm": 71.58,
+              "activity": "EEcoSpeciesActivity::Wander"
+            }
+          }
+        },
+        "logged_refuge_rejections": 0,
+        "eagle_captured_rat_ids": [
+          "119",
+          "76",
+          "77"
+        ],
+        "report": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_rat_refuge_narrow_entrance/IslandFaunaPIE.json",
+          "sha256": "edf5e9aedf1d800c40894de7ebfa5adb93e628b9654e19204ea2325d073a422f"
+        },
+        "log": {
+          "repository_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_refuge_narrow_entrance.log",
+          "sha256": "5ee477e4416e656114c6207e8d6bc3ea4b0151a716cb43373a0ed3e56add3c79"
+        },
+        "founder_rat_capture_context": {
+          "76": {
+            "hunter_id": "99",
+            "death_authority_seconds": 158.25,
+            "last_live_sample_world_seconds": 158.43334159627557,
+            "last_live_sample_completed_authority_seconds": 157.81666666815678,
+            "distance_to_refuge_in_last_live_sample_cm": 1079.0,
+            "sampled_exit_before_capture": true
+          },
+          "77": {
+            "hunter_id": "99",
+            "death_authority_seconds": 166.667,
+            "last_live_sample_world_seconds": 166.7000086940825,
+            "last_live_sample_completed_authority_seconds": 166.25000000149012,
+            "distance_to_refuge_in_last_live_sample_cm": 1277.93,
+            "sampled_exit_before_capture": true
+          }
+        }
+      }
+    ],
+    "capture_context_scope": "Last sampled live position is paired with the authority death log. The sample is an observation and does not give the coordinates at final contact."
+  }
+}

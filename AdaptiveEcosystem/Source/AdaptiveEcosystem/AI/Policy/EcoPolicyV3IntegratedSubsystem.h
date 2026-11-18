@@ -211,6 +211,7 @@
 #include "EcoV3WatchLauncher.h"
 #include "EcoWorldV3.h"
 #include "TreeLayoutV3.h"
+#include "Core/EcoFoodPatchLayout.h"
 
 #include "EcoPolicyV3IntegratedSubsystem.generated.h"
 
@@ -819,7 +820,7 @@ private:
 };
 
 /** One-frame authority sound snapshot, with native evidence time. Not persistent. */
-struct FEcoLifeNoiseSample { uint64 Id=0;double X=0,Y=0,Z=0,Time=0,Range=0,Confidence=0; };
+struct FEcoLifeNoiseSample { uint64 Id=0;double X=0,Y=0,Z=0,Time=0,Range=0,Confidence=0;bool bShot=false; };
 /** 한 지역의 v3 세계 (무대 하나 = 학습 세계 하나). */
 struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 {
@@ -827,6 +828,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 RegionRuntimeIndex = INDEX_NONE;
 	int32 Index = INDEX_NONE;                 // 컨텍스트 색인 (FEcoIntegratedV3Fragment::ContextIndex)
 	EcoWorldV3::FWorldState Sim;
+    /** Authority layout/ground snapshot; survives visual hiding. S1 only, no food writer. */
+    FEcoFoodPatchCache FoodPatchCache;
     /** GT gathered authority pawn samples; never implicitly included in policy threat inputs in life-v1. */
     std::vector<EcoObservationV3::FThreatInput> PlayerSamples;
     TArray<double> PlayerEyeZ;
@@ -1250,6 +1253,8 @@ public:
 	int32 AdvanceClock(float DeltaSeconds);
 	float GetVisualAlpha() const;
 	int64 GetGlobalStep() const { return GlobalT; }
+	bool UsesAuthorityBoundaries() const { return bAuthorityBoundaries; }
+	void SetAuthorityBoundaries(bool bEnabled) { bAuthorityBoundaries = bEnabled; }
 	/** 모든 컨텍스트가 결정 스텝 하나를 마쳤다 → 전역 t + 1. */
 	void FinishGlobalStep() { ++GlobalT; }
 	/** 컨텍스트의 t 를 전역 t 에 맞춘다 (어둠 다시 계산). */
@@ -1261,6 +1266,7 @@ public:
 	FEcoV3RegionContext* GetContext(int32 Index) { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	const FEcoV3RegionContext* GetContext(int32 Index) const { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	FEcoV3RegionContext* FindContext(FName RegionId);
+    FEcoFoodPatchTraceBudget FoodPatchGroundBudget;
     const FEcoV3RegionContext* FindContext(FName RegionId) const;
 
 	/** 처리기가 한 컨텍스트의 결정 스텝 하나를 마칠 때마다 부른다 (포획 표시·기록). */
@@ -1489,7 +1495,8 @@ public:
 	 */
 	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false, float BodyRadiusCm=30.f) const;
     /** Serialized M4 boundary for opt-in fauna sharing the Native spatial food ledger. */
-    bool ConsumeFaunaFood(FName RegionId, const FVector& Position, double Requested, double& OutNutrition);
+    bool ConsumeFaunaFood(FName RegionId, const FVector& Position, double Requested, double NutritionHeadroom,
+        double& OutNutrition);
 
 	// ---- 시험·조정자 없이 쓰는 길 ----
 
@@ -1634,6 +1641,7 @@ private:
 	int32 ValidationPasses = 0;       // 시작 직전 지면 검사 횟수 (많아야 kMaxValidationPasses)
 
 	int64 GlobalT = 0;
+	bool bAuthorityBoundaries = false;
 	EcoPolicy::FStepClock Clock;
 	int32 ClockPhase = 0;
 	int32 LogEverySteps = 75;

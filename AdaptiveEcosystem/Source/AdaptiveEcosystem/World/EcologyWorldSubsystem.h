@@ -34,12 +34,15 @@ public:
 	/** Finds an ecology region actor by RegionId */
 	UFUNCTION(BlueprintPure, Category = "Ecology|World")
 	AEcologyRegion* GetRegion(FName InRegionId) const;
+	/** Uses region ID order where authored volumes overlap. */
+	AEcologyRegion* FindRegionAtPosition(const FVector& Position) const;
 
 	/** Queries environment state by RegionId. Returns true if region was found. */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|World")
 	bool GetEnvironmentState(FName InRegionId, FRegionEnvironmentState& OutState) const;
 	/** Caller supplies the Ecology runtime-index order. Geometry and adjacency remain World responsibilities. */
-	bool BuildSpatialSnapshots(TConstArrayView<FName> RegionOrder, TArray<FEcoRegionSpatialSnapshot>& Out) const;
+	bool BuildSpatialSnapshots(TConstArrayView<FName> RegionOrder, TArray<FEcoRegionSpatialSnapshot>& Out,
+		bool bAllowUnavailableRegions = false) const;
 
 private:
 	/** Map of registered regions keyed by RegionId */

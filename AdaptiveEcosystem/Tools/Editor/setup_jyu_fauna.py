@@ -37,6 +37,10 @@ def set_props(obj, **values):
     return obj
 
 
+def configure_crow_orientation(blueprint):
+    set_props(unreal.get_default_object(generated(blueprint)), flight_pitch_limit=22., flight_bank_limit=18.)
+
+
 def require(path):
     asset = unreal.load_asset(path)
     if not asset:
@@ -122,6 +126,29 @@ def import_fbx(folder, name, source, skeleton=None):
     return asset
 
 
+def configure_fab_body_material(material):
+    edit = unreal.MaterialEditingLibrary
+    changed = False
+    if material.get_editor_property("blend_mode") != unreal.BlendMode.BLEND_OPAQUE:
+        # The FBX opacity texture imports as translucent on the solid body.
+        set_props(material, blend_mode=unreal.BlendMode.BLEND_OPAQUE)
+        changed = True
+    emissive = unreal.MaterialProperty.MP_EMISSIVE_COLOR
+    base = edit.get_material_property_input_node(material, unreal.MaterialProperty.MP_BASE_COLOR)
+    glow = edit.get_material_property_input_node(material, emissive)
+    if isinstance(base, unreal.MaterialExpressionTextureSample) and isinstance(glow, unreal.MaterialExpressionTextureSample):
+        if base.get_editor_property("texture") == glow.get_editor_property("texture"):
+            # FBX wired the same diffuse map to both inputs. Keep it only as reflected color.
+            zero = edit.create_material_expression(material, unreal.MaterialExpressionConstant, -240, 420)
+            set_props(zero, r=0.)
+            if not edit.connect_material_property(zero, "", emissive):
+                raise RuntimeError(f"Could not clear the imported emissive on {material.get_path_name()}")
+            changed = True
+    if changed:
+        edit.recompile_material(material)
+        save(material)
+
+
 def import_fab(kind):
     if kind == "Buffalo":
         listing, prefix = "Buffalo_A2-3ae82f01", "Buffalo_A2"
@@ -136,11 +163,7 @@ def import_fab(kind):
     for slot in mesh.get_editor_property("materials"):
         material = slot.get_editor_property("material_interface")
         if isinstance(material, unreal.Material) and material.get_path_name().startswith(folder + "/"):
-            # The FBX opacity texture imports as translucent on the solid body.
-            if material.get_editor_property("blend_mode") != unreal.BlendMode.BLEND_OPAQUE:
-                set_props(material, blend_mode=unreal.BlendMode.BLEND_OPAQUE)
-                unreal.MaterialEditingLibrary.recompile_material(material)
-                save(material)
+            configure_fab_body_material(material)
     clips = {}
     for suffix in suffixes:
         clip = import_fbx(folder, f"ANIM_{kind}_{suffix}", source / f"{prefix}_{suffix}_Motion.Fbx", skeleton)
@@ -560,6 +583,8 @@ def build_representation(kind, mesh, clips, keys, speeds, b_turning=False):
     set_props(unreal.get_default_object(generated(bp)), visual_species_id=kind, visual_mesh=mesh, death_animation=death,
               idle_speed=8., run_speed=speeds[1] * .8, mesh_offset=mesh_offset, visual_mesh_scale=mesh_scale,
               soften_abrupt_facing=True)
+    if kind == "Crow":
+        configure_crow_orientation(bp)
     if not unreal.EcoCreatureBlendSpaceLibrary.configure_representation(bp, blend, unreal.Rotator(yaw=-yaw), forward):
         raise RuntimeError(f"Representation facing setup failed {kind}")
     if not unreal.EcoCreatureAnimationBuilder.configure_behavior_representation(bp, profile, generated(abp)):
@@ -774,6 +799,12 @@ def make_map(species):
 
 
 if __name__ == "__main__":
-    editor_world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
-    unreal.SystemLibrary.execute_console_command(editor_world, "Interchange.FeatureFlags.Import.FBX 0")
-    make_map(configure_species())
+    if "-EcoFaunaCrowOrientation" in unreal.SystemLibrary.get_command_line():
+        crow = require(ROOT + "/Crow/BP_Crow")
+        configure_crow_orientation(crow)
+        save(crow)
+        unreal.log("ECO_FAUNA_CROW_ORIENTATION_READY")
+    else:
+        editor_world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+        unreal.SystemLibrary.execute_console_command(editor_world, "Interchange.FeatureFlags.Import.FBX 0")
+        make_map(configure_species())

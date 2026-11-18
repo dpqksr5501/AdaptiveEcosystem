@@ -24,12 +24,16 @@ while($true){
 $healthClientOptions=if($RenderedClients){@('-d3d11','-windowed','-ResX=1280','-ResY=720','-HealthBarRender')}else{@('-NullRHI')}
 $healthA=Start-HealthPeer 'UnrealEditor.exe' '127.0.0.1:7795?EcoProtocol=1?Name=HealthA' 'A' (@('-game','-HealthBarClient=A')+$healthClientOptions)
 $healthB=Start-HealthPeer 'UnrealEditor.exe' '127.0.0.1:7795?EcoProtocol=1?Name=HealthB' 'B' (@('-game','-HealthBarClient=B')+$healthClientOptions)
+$healthFailures=[System.Collections.Generic.List[string]]::new()
 foreach($healthPeer in @(@{Name='A';P=$healthA},@{Name='B';P=$healthB},@{Name='Server';P=$healthServer})){
     while(-not $healthPeer.P.WaitForExit(1000)){}
-    if($healthPeer.P.ExitCode -ne 0){throw "Peer failed: $($healthPeer.Name)"}
-    $healthReport=Join-Path $healthOut ($healthPeer.Name+'.json')
-    if(-not(Test-Path $healthReport) -or (Get-Item $healthReport).LastWriteTime -lt $healthRunStarted){throw 'Fresh report missing'}
-    $healthResult=Get-Content -Raw $healthReport|ConvertFrom-Json
-    if($healthResult.run_id -ne $healthRunId -or $healthResult.result -ne 'PASS'){throw "$($healthPeer.Name): $($healthResult.error)"}
-    Write-Output "HEALTH_BAR_NETWORK_PASS $($healthPeer.Name)"
+    try{
+        if($healthPeer.P.ExitCode -ne 0){throw "Peer failed: $($healthPeer.Name)"}
+        $healthReport=Join-Path $healthOut ($healthPeer.Name+'.json')
+        if(-not(Test-Path $healthReport) -or (Get-Item $healthReport).LastWriteTime -lt $healthRunStarted){throw 'Fresh report missing'}
+        $healthResult=Get-Content -Raw $healthReport|ConvertFrom-Json
+        if($healthResult.run_id -ne $healthRunId -or $healthResult.result -ne 'PASS'){throw "$($healthPeer.Name): $($healthResult.error)"}
+        Write-Output "HEALTH_BAR_NETWORK_PASS $($healthPeer.Name)"
+    }catch{$healthFailures.Add($_.Exception.Message)}
 }
+if($healthFailures.Count){throw ($healthFailures -join [Environment]::NewLine)}

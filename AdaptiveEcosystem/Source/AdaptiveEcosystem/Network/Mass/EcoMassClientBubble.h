@@ -85,6 +85,7 @@ private:
 	TSet<int32> PendingAddReplicationIDs;
 	TSet<FMassEntityTemplateID> WaitingTemplateIDs;
 	double PendingAddsStartTime = 0.0;
+	double NextPendingAddRetry = 0.0;
 	bool bReportedMissingTemplates = false;
 
 	TArrayView<struct FEcoIdentityFragment> IdentityFragments;

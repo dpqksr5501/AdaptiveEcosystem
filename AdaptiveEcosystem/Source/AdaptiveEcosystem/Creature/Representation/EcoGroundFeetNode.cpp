@@ -23,6 +23,9 @@ void FAnimNode_EcoGroundFeet::EvaluateSkeletalControl_AnyThread(FComponentSpaceP
     const float Valid[]={GroundValid0,GroundValid1,GroundValid2,GroundValid3};
     const FVector Up=GroundUp.GetSafeNormal();if(Up.IsNearlyZero())return;
     float Corrections[4]={};float RequiredLifts[4]={};float Stances[4]={};float DesiredBodyDrop=0;
+    float GroundGaps[4]={};
+    FVector GroundGradients[4]={Up,Up,Up,Up};
+    const float MaximumLift=MaximumCorrection*GroundWorldToComponent;
     for(int32 Index=0;Index<Legs.Num();++Index) {
         if(Valid[Index]<=0||!FMath::IsFinite(Valid[Index])||Points[Index].ContainsNaN()){Offsets[Index]=0;continue;}
         const FVector Contact=Output.Pose.GetComponentSpaceTransform(Legs[Index].Contact.GetCompactPoseIndex(Bones)).GetLocation();
@@ -38,7 +41,9 @@ void FAnimNode_EcoGroundFeet::EvaluateSkeletalControl_AnyThread(FComponentSpaceP
         if(VerticalNormal>=.65f && PlanarDelta.SizeSquared()<=FMath::Square(40.f*GroundWorldToComponent)) {
             DistanceAboveGround+=FMath::Clamp(FVector::DotProduct(PlanarDelta,Normals[Index])/VerticalNormal,
                 -10.f*GroundWorldToComponent,10.f*GroundWorldToComponent);
+            GroundGradients[Index]=Normals[Index]/VerticalNormal;
         }
+        GroundGaps[Index]=DistanceAboveGround;
         const float Height=DistanceAboveGround-Legs[Index].ContactHeight;
         const float Desired=FMath::Clamp(Clearance*GroundWorldToComponent-Height,-MaximumCorrection*GroundWorldToComponent,MaximumCorrection*GroundWorldToComponent)*Stances[Index];
         Offsets[Index]=Stances[Index]<=0?0:FMath::FInterpTo(Offsets[Index],Desired,UpdateSeconds,12.f);
@@ -56,8 +61,8 @@ void FAnimNode_EcoGroundFeet::EvaluateSkeletalControl_AnyThread(FComponentSpaceP
     }
     BodyDrop=FMath::FInterpTo(BodyDrop,FMath::Clamp(DesiredBodyDrop,-MaximumBodyDrop*GroundWorldToComponent,0.f),UpdateSeconds,8.f);
     const FVector BodyOffset=Up*BodyDrop;
+    const auto BodyIndex=Body.GetCompactPoseIndex(Bones);
     if(!BodyOffset.IsNearlyZero()) {
-        const auto BodyIndex=Body.GetCompactPoseIndex(Bones);
         FTransform T=Output.Pose.GetComponentSpaceTransform(BodyIndex);T.AddToTranslation(BodyOffset);Out.Add(FBoneTransform(BodyIndex,T));
     }
     for(int32 Index=0;Index<Legs.Num();++Index) {
@@ -69,8 +74,16 @@ void FAnimNode_EcoGroundFeet::EvaluateSkeletalControl_AnyThread(FComponentSpaceP
         FTransform Joint=Output.Pose.GetComponentSpaceTransform(JointIndex);
         FTransform End=Output.Pose.GetComponentSpaceTransform(EndIndex);
         const float Correction=Corrections[Index];
-        if(Stances[Index]<=0)continue;
         const FVector AnimatedEnd=End.GetLocation();
+        if(Stances[Index]<=0) {
+            const bool bBodyMovesFoot=EndIndex==BodyIndex||Bones.BoneIsChildOf(EndIndex,BodyIndex);
+            const float InheritedDrop=bBodyMovesFoot?BodyDrop:0.f;
+            if(GroundGaps[Index]+InheritedDrop>=0.f)continue;
+            const float Lift=FMath::Min(-GroundGaps[Index]+.25f*GroundWorldToComponent,MaximumLift);
+            End.AddToTranslation(Up*Lift);
+            Out.Add(FBoneTransform(EndIndex,End));
+            continue;
+        }
         const FVector Desired=AnimatedEnd+Up*Correction;
         Root.AddToTranslation(BodyOffset);Joint.AddToTranslation(BodyOffset);End.AddToTranslation(BodyOffset);
         const FVector Axis=(End.GetLocation()-Root.GetLocation()).GetSafeNormal();
@@ -89,16 +102,21 @@ void FAnimNode_EcoGroundFeet::EvaluateSkeletalControl_AnyThread(FComponentSpaceP
             End.SetRotation(OriginalEndRotation); // Keep the animated hoof and descendant contact orientation.
             if(Root.ContainsNaN()||Joint.ContainsNaN()||End.ContainsNaN())continue;
             Out.Add(FBoneTransform(RootIndex,Root));Out.Add(FBoneTransform(JointIndex,Joint));
-        } else if(RequiredLifts[Index]<=0.f) {
-            continue;
+        } else if(EndIndex!=BodyIndex&&!Bones.BoneIsChildOf(EndIndex,BodyIndex)) {
+            End.AddToTranslation(-BodyOffset);
         }
-        // A straight or reach-limited leg can leave its contact underground.
-        // Apply the remaining vertical correction at the end without inventing a knee direction.
-        if(RequiredLifts[Index]>0.f) {
-            const float Lift=FVector::DotProduct(End.GetLocation()-AnimatedEnd,Up);
-            const float Residual=FMath::Clamp(RequiredLifts[Index]-Lift,0.f,MaximumCorrection*GroundWorldToComponent);
+        // Preserve the animated end rotation, so translating the end also translates its contact marker.
+        // Check the solved position, including body drop and horizontal shortening at full reach.
+        const FVector EndDelta=End.GetLocation()-AnimatedEnd;
+        const float VerticalLift=FVector::DotProduct(EndDelta,Up);
+        const float SolvedGap=GroundGaps[Index]+FVector::DotProduct(EndDelta,GroundGradients[Index]);
+        const float ContactLift=SolvedGap<0.f?-SolvedGap+.25f*GroundWorldToComponent:0.f;
+        const float Residual=FMath::Clamp(FMath::Max(ContactLift,RequiredLifts[Index]-VerticalLift),
+            0.f,FMath::Max(0.f,MaximumLift-VerticalLift));
+        if(Residual>0.f) {
             End.AddToTranslation(Up*Residual);
         }
+        if(!HasBendPlane&&Residual<=0.f)continue;
         Out.Add(FBoneTransform(EndIndex,End));
     }
     Out.Sort([](const FBoneTransform& A,const FBoneTransform& B){return A.BoneIndex<B.BoneIndex;});

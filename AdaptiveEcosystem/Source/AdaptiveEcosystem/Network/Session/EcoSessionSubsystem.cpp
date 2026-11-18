@@ -80,11 +80,10 @@ void UEcoSessionSubsystem::ClearOperationDelegates()
         Sessions->ClearOnCreateSessionCompleteDelegate_Handle(CreateHandle);
         Sessions->ClearOnStartSessionCompleteDelegate_Handle(StartHandle);
         Sessions->ClearOnFindSessionsCompleteDelegate_Handle(FindHandle);
-        Sessions->ClearOnCancelFindSessionsCompleteDelegate_Handle(CancelFindHandle);
         Sessions->ClearOnJoinSessionCompleteDelegate_Handle(JoinHandle);
         Sessions->ClearOnDestroySessionCompleteDelegate_Handle(DestroyHandle);
     }
-    CreateHandle.Reset(); StartHandle.Reset(); FindHandle.Reset(); CancelFindHandle.Reset();
+    CreateHandle.Reset(); StartHandle.Reset(); FindHandle.Reset();
     JoinHandle.Reset(); DestroyHandle.Reset();
     Deadline=0;
 }
@@ -132,7 +131,7 @@ void UEcoSessionSubsystem::SetState(EEcoSessionState Next, const FString& Messag
 void UEcoSessionSubsystem::BeginOperation(EEcoSessionState Next, const FString& Message)
 {
     ClearOperationDelegates();
-    ++OperationGeneration; bTimedOut=false;
+    ++OperationGeneration;
     Deadline=FPlatformTime::Seconds()+FMath::Clamp(GetDefault<UEcoSessionSettings>()->OperationTimeoutSeconds, 10.f, 180.f);
     SetState(Next, Message);
 }
@@ -204,7 +203,7 @@ bool UEcoSessionSubsystem::HostSession(FString RoomName, bool bLAN)
 void UEcoSessionSubsystem::Created(FName Name, bool bSuccess)
 {
     if (Name!=NAME_GameSession || State!=EEcoSessionState::Creating) return;
-    if (!bSuccess || bTimedOut) { Fail(bTimedOut?TEXT("방 생성 시간이 초과됐습니다."):TEXT("방 생성에 실패했습니다."), true); return; }
+    if (!bSuccess) { Fail(TEXT("방 생성에 실패했습니다."), true); return; }
     BeginOperation(EEcoSessionState::Starting, TEXT("방을 열고 있습니다."));
     const int32 Generation=OperationGeneration;
     StartHandle=Sessions->AddOnStartSessionCompleteDelegate_Handle(FOnStartSessionCompleteDelegate::CreateWeakLambda(this,
@@ -215,7 +214,7 @@ void UEcoSessionSubsystem::Created(FName Name, bool bSuccess)
 void UEcoSessionSubsystem::Started(FName Name, bool bSuccess)
 {
     if (Name!=NAME_GameSession || State!=EEcoSessionState::Starting) return;
-    if (!bSuccess || bTimedOut) { Fail(TEXT("방 시작에 실패했거나 시간이 초과됐습니다."), true); return; }
+    if (!bSuccess) { Fail(TEXT("방 시작에 실패했습니다."), true); return; }
     const auto* Settings=GetDefault<UEcoSessionSettings>();
     BeginOperation(EEcoSessionState::Travelling, TEXT("JWJ 레벨로 이동 중입니다."));
     CloseSessionMenu();
@@ -246,7 +245,9 @@ bool UEcoSessionSubsystem::FindSessions(bool bLAN)
 void UEcoSessionSubsystem::Found(bool bSuccess)
 {
     if (State!=EEcoSessionState::Searching) return;
-    if (!bSuccess || bTimedOut || !Search.IsValid()) { Fail(TEXT("검색에 실패했거나 시간이 초과됐습니다.")); return; }
+    // A cancelled provider search can report completion during a later search.
+    if (Search.IsValid() && Search->SearchState==EOnlineAsyncTaskState::InProgress) return;
+    if (!bSuccess || !Search.IsValid()) { Fail(TEXT("방 검색에 실패했습니다.")); return; }
     const auto* Settings=GetDefault<UEcoSessionSettings>();
     for (const auto& Candidate:Search->SearchResults)
     {
@@ -306,7 +307,7 @@ void UEcoSessionSubsystem::Joined(FName Name,EOnJoinSessionCompleteResult::Type 
 {
     if (Name!=NAME_GameSession || State!=EEcoSessionState::Joining) return;
     FString Address;
-    if (Result!=EOnJoinSessionCompleteResult::Success || bTimedOut || !Sessions->GetResolvedConnectString(Name,Address))
+    if (Result!=EOnJoinSessionCompleteResult::Success || !Sessions->GetResolvedConnectString(Name,Address))
     { Fail(FString::Printf(TEXT("방 참가 실패: %s"),LexToString(Result)),true); return; }
     APlayerController* PC=GetWorld()?GetWorld()->GetFirstPlayerController():nullptr;
     if (!PC) { Fail(TEXT("참가할 플레이어가 없습니다."),true); return; }
@@ -399,21 +400,25 @@ bool UEcoSessionSubsystem::Tick(float)
     UWorld* World=GetWorld();
     if (!World || !World->IsGameWorld() || World->GetNetMode()==NM_DedicatedServer) return true;
     const double Now=FPlatformTime::Seconds();
-    if (Deadline>0 && Now>=Deadline && !bTimedOut)
+    if (Deadline>0 && Now>=Deadline)
     {
-        bTimedOut=true; Deadline=0;
-        Status=TEXT("응답 시간이 초과됐습니다. 중복 요청 없이 기존 요청의 정리를 기다립니다.");
-        OnUpdated.Broadcast();
         UE_LOG(LogEcoSession,Warning,TEXT("[EcoSession] OperationTimeout State=%d"),int32(State));
-        if (State==EEcoSessionState::Searching && Sessions.IsValid())
+        const EEcoSessionState TimedOutState=State;
+        ClearOperationDelegates();
+        ++OperationGeneration;
+        if (TimedOutState==EEcoSessionState::Searching)
         {
-            const int32 Generation=OperationGeneration;
-            CancelFindHandle=Sessions->AddOnCancelFindSessionsCompleteDelegate_Handle(
-                FOnCancelFindSessionsCompleteDelegate::CreateWeakLambda(this,[this,Generation](bool bSuccess)
-                { if (Generation==OperationGeneration && State==EEcoSessionState::Searching && bSuccess) Fail(TEXT("검색 시간이 초과되어 취소했습니다.")); }));
-            Sessions->CancelFindSessions();
+            if (Sessions.IsValid()) Sessions->CancelFindSessions();
+            Search.Reset();
+            Fail(TEXT("방 검색 시간이 초과됐습니다. 다시 검색할 수 있습니다."));
         }
-        else if (State==EEcoSessionState::Travelling) { ClearOperationDelegates(); DestroyLocalSession(true,TEXT("서버 접속 시간이 초과됐습니다.")); }
+        else if (TimedOutState==EEcoSessionState::Travelling)
+            DestroyLocalSession(true,TEXT("서버 접속 시간이 초과됐습니다."));
+        else if (TimedOutState==EEcoSessionState::Leaving)
+            Fail(TEXT("방 연결 정리 시간이 초과됐습니다. 나가기를 다시 시도하세요."));
+        else
+            Fail(TEXT("방 요청 시간이 초과됐습니다."),true);
+        return true;
     }
     APlayerController* PC=World->GetFirstPlayerController();
     if (!PC || !PC->IsLocalController()) return true;

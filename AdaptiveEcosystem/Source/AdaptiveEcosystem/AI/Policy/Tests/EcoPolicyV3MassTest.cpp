@@ -31,6 +31,7 @@
 #include "../EcoPolicyV3Fragments.h"
 #include "../EcoPolicyV3Processors.h"
 #include "../EcoPolicyV3Subsystem.h"
+#include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Debug/EcoPolicyTestSpawner.h"
 #include "EcoTestWorld.h"
 #include "HAL/IConsoleManager.h"
@@ -716,6 +717,41 @@ bool FEcoPolicyV3MassAllFourBehaviorsTest::RunTest(const FString& Parameters)
 }
 
 // -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3MassIntegratedIsolationTest,
+	"AdaptiveEcosystem.Policy.V3.Mass.IntegratedWriterIsolation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3MassIntegratedIsolationTest::RunTest(const FString&)
+{
+	FV3MassHarness H;
+	if (!H.Setup(*this, V3ScenarioConfig(20007))) return false;
+	auto& Manager = *H.EM;
+	// A misconfigured integration archetype must not join the sandbox's slot table or visual writer.
+	const auto IntegratedHerb = Manager.CreateArchetype({
+		FEcoIntegratedCreatureTag::StaticStruct(), FEcoPolicyV3Tag::StaticStruct(), FEcoBehaviorStateFragment::StaticStruct(),
+		FEcoPerceptionCacheFragment::StaticStruct(), FEcoControlOutFragment::StaticStruct(), FEcoHerbivoreBodyV3Fragment::StaticStruct(),
+		FTransformFragment::StaticStruct(), FMassVelocityFragment::StaticStruct()});
+	const auto IntegratedThreat = Manager.CreateArchetype({
+		FEcoIntegratedCreatureTag::StaticStruct(), FEcoThreatV3Tag::StaticStruct(), FEcoThreatStateFragment::StaticStruct(),
+		FTransformFragment::StaticStruct(), FMassVelocityFragment::StaticStruct()});
+	const auto Herb = Manager.CreateEntity(IntegratedHerb);
+	const auto Threat = Manager.CreateEntity(IntegratedThreat);
+	Manager.GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Herb).Body.Slot = 0;
+	Manager.GetFragmentDataChecked<FEcoThreatStateFragment>(Threat).Agent.Slot = 0;
+	const FVector Position(12345., 6789., 42.);
+	for (const auto Entity : {Herb, Threat})
+		Manager.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform().SetLocation(Position);
+
+	H.DecisionStep();
+	TestEqual(TEXT("Sandbox advances with its own population"), H.Sim().T, int64(1));
+	TestEqual(TEXT("Sandbox leaves the integrated herbivore position alone"),
+		Manager.GetFragmentDataChecked<FTransformFragment>(Herb).GetTransform().GetLocation(), Position);
+	TestEqual(TEXT("Sandbox leaves the integrated threat position alone"),
+		Manager.GetFragmentDataChecked<FTransformFragment>(Threat).GetTransform().GetLocation(), Position);
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEcoPolicyV3MassV1UntouchedTest,

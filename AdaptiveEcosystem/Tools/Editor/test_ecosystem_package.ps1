@@ -1,8 +1,10 @@
-param([ValidateRange(80,600)][int]$Duration=90)
+param([ValidateRange(80,600)][int]$Duration=90,
+    [ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='EcosystemLife_20261023',
+    [ValidatePattern('^[A-Za-z0-9_]+$')][string]$ArchiveFolder='EcosystemLifePackage')
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$taskOut=Join-Path $taskRoot 'Saved/EcosystemLife_20261023'
-$taskArchive=Join-Path $taskRoot 'Saved/EcosystemLifePackage/Windows'
+$taskOut=Join-Path $taskRoot ('Saved/'+$AuditFolder)
+$taskArchive=Join-Path $taskRoot ('Saved/'+$ArchiveFolder+'/Windows')
 $taskExe=Join-Path $taskArchive 'AdaptiveEcosystem.exe'
 if(-not(Test-Path $taskExe)){throw 'Build/cook/archive must succeed before packaged smoke'}
 if(Get-Process UnrealBuildTool,dotnet,UnrealEditor,UnrealEditor-Cmd,LiveCodingConsole,MSBuild,ShaderCompileWorker,AdaptiveEcosystem -ErrorAction SilentlyContinue){throw 'Engine/game/build busy; no process stopped'}

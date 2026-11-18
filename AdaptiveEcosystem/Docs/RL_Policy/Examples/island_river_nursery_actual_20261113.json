@@ -1,0 +1,764 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "partial": true,
+  "training_ready": false,
+  "golden_vector": false,
+  "restorable_world": false,
+  "condition": "Saved high-bank island, with the nursery rain test override at the mink bank",
+  "clock_note": "Depth samples are PIE world time; swim, hatch and feeding events are authority time. Near-peak brackets are approximate.",
+  "scope": "These runs observed no nursery drying. They do not validate interruption after drying or larval passage to a refuge.",
+  "runs": [
+    {
+      "seed": 20000,
+      "sources": [
+        {
+          "path": "Saved/FaunaAudit/IslandAccess_20000_saved_feeding_saved_mink_saved_perch_rain_saved_high_nursery/IslandFaunaPIE.json",
+          "sha256": "3492fadd57256c64e606e20bd911cdc5f1ee350e7ef68ad403741e0b96bb0476"
+        },
+        {
+          "path": "Saved/FaunaAudit/IslandAccessBaseline/20000_shelf_nursery_continuity.log",
+          "sha256": "d0f48e9d4a4863cd48c761663c9dd35bf39f94cea99dfb76e11a4db5cb879a35"
+        }
+      ],
+      "initial_population_count": 118,
+      "initial_authored_stock": 215.0,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "world_seconds_at_final_sample": 240.26667919754982,
+      "mink_bank_water_rise_cm": 24.0,
+      "minimum_sampled_bank_clearance_cm": 5.820858803535884,
+      "selected_water_depth_samples": [
+        {
+          "sample_index": 5,
+          "world_seconds": 25.26666798442602,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 57.60971327588595
+          }
+        },
+        {
+          "sample_index": 23,
+          "world_seconds": 115.2666726782918,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 66.63754530713595
+          }
+        },
+        {
+          "sample_index": 37,
+          "world_seconds": 185.2666763290763,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 81.60971327588595
+          }
+        },
+        {
+          "sample_index": 47,
+          "world_seconds": 235.2666789367795,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 66.63754530713595
+          }
+        },
+        {
+          "sample_index": 48,
+          "world_seconds": 240.26667919754982,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 57.60971327588595
+          }
+        }
+      ],
+      "initial_mink_actions": {
+        "110": [
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 120.58333333333333,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 131.18333333333334,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 140.83333333333334,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 149.2,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 158.85,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 167.13333333333333,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 176.73333333333332,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 188.91666666666666,
+            "both_bracketing_water_samples_near_peak": true
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 198.5,
+            "both_bracketing_water_samples_near_peak": true
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 210.3,
+            "both_bracketing_water_samples_near_peak": true
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 219.88333333333333,
+            "both_bracketing_water_samples_near_peak": true
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 231.75,
+            "both_bracketing_water_samples_near_peak": false
+          }
+        ],
+        "111": []
+      },
+      "carp_hatches": [
+        {
+          "agent_id": "133",
+          "species": "CommonCarp",
+          "nursery_id_from_log": "IslandRiverInletPlants",
+          "hatch_authority_seconds": 194.13666666547456,
+          "first_recorded_patch_payment_seconds": 196.65333333214124,
+          "final_sample_hp": 100
+        },
+        {
+          "agent_id": "134",
+          "species": "CommonCarp",
+          "nursery_id_from_log": "IslandRiverQuietMargin",
+          "hatch_authority_seconds": 229.4699999988079,
+          "first_recorded_patch_payment_seconds": null,
+          "final_sample_hp": 100
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "sources": [
+        {
+          "path": "Saved/FaunaAudit/IslandAccess_20017_saved_feeding_saved_mink_saved_perch_rain_saved_high_nursery/IslandFaunaPIE.json",
+          "sha256": "a8c8309da21ce6d805a1ec208daf1526b985d3a48eaee7cea2df1035f963b5ec"
+        },
+        {
+          "path": "Saved/FaunaAudit/IslandAccessBaseline/20017_shelf_nursery_continuity.log",
+          "sha256": "c92a90b0289b7f1155d604ea96267b51160c154568d90c891c780e53afbdcb84"
+        }
+      ],
+      "initial_population_count": 118,
+      "initial_authored_stock": 215.0,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "world_seconds_at_final_sample": 240.26667919754982,
+      "mink_bank_water_rise_cm": 24.0,
+      "minimum_sampled_bank_clearance_cm": 5.820858803535884,
+      "selected_water_depth_samples": [
+        {
+          "sample_index": 5,
+          "world_seconds": 25.26666798442602,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 57.60971327588595
+          }
+        },
+        {
+          "sample_index": 23,
+          "world_seconds": 115.2666726782918,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 66.63754530713595
+          }
+        },
+        {
+          "sample_index": 37,
+          "world_seconds": 185.2666763290763,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 81.60971327588595
+          }
+        },
+        {
+          "sample_index": 47,
+          "world_seconds": 235.2666789367795,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 66.63754530713595
+          }
+        },
+        {
+          "sample_index": 48,
+          "world_seconds": 240.26667919754982,
+          "depth_cm": {
+            "InletPlants": 150.46452356430746,
+            "QuietMargin": 150.17659695593647,
+            "RootsShore": 57.60971327588595
+          }
+        }
+      ],
+      "initial_mink_actions": {
+        "110": [
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 120.4,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 130.98333333333332,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 140.63333333333333,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 148.76666666666668,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 158.41666666666666,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 166.76666666666668,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 176.36666666666667,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 187.73333333333332,
+            "both_bracketing_water_samples_near_peak": true
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 197.31666666666666,
+            "both_bracketing_water_samples_near_peak": true
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 208.83333333333334,
+            "both_bracketing_water_samples_near_peak": true
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 218.41666666666666,
+            "both_bracketing_water_samples_near_peak": true
+          },
+          {
+            "event": "SwimExit",
+            "authority_seconds": 230.05,
+            "both_bracketing_water_samples_near_peak": false
+          },
+          {
+            "event": "SwimEnter",
+            "authority_seconds": 239.7,
+            "both_bracketing_water_samples_near_peak": false
+          }
+        ],
+        "111": []
+      },
+      "carp_hatches": [
+        {
+          "agent_id": "132",
+          "species": "CommonCarp",
+          "nursery_id_from_log": "IslandRiverInletPlants",
+          "hatch_authority_seconds": 193,
+          "first_recorded_patch_payment_seconds": 194,
+          "final_sample_hp": 100
+        },
+        {
+          "agent_id": "133",
+          "species": "CommonCarp",
+          "nursery_id_from_log": "IslandRiverQuietMargin",
+          "hatch_authority_seconds": 228,
+          "first_recorded_patch_payment_seconds": 231,
+          "final_sample_hp": 100
+        }
+      ]
+    }
+  ],
+  "local_nursery_depth_survey": {
+    "scope": "Read-only local 2D grid sampled on the saved island during a rain test override applied to IslandLowerRiver05. The grids do not validate collision-swept passage or a route beyond the survey boundary.",
+    "runs": [
+      {
+        "seed": 20000,
+        "sources": [
+          {
+            "path": "Saved/FaunaAudit/Island_20000_nursery_depth/IslandFaunaPIE.json",
+            "sha256": "c3242a594bc94b38a662cb1a3b211179405e86a3ed54cf4a308da48af97416d9"
+          },
+          {
+            "path": "Saved/FaunaAudit/IslandAccessBaseline/20000_nursery_depth.log",
+            "sha256": "5c2f0401f0c845f971a80265f2c2dbf53e572bd9d80580dbafab94747c3704ce"
+          }
+        ],
+        "observations": [
+          {
+            "phase": "early_dry",
+            "mink_bank_surface_z_cm": -4413.40478515625,
+            "world_seconds": 25.26666798442602,
+            "grid_cm": 40.0,
+            "half_width_cm": 600.0,
+            "sites": {
+              "IslandRiverInletPlants": {
+                "center_cm": [
+                  84705.94008285584,
+                  39200.06070119358,
+                  -4338.5226290330575
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4394.5226290330575,
+                  "surface_z_cm": -4244.05810546875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              },
+              "IslandRiverQuietMargin": {
+                "center_cm": [
+                  85983.61496526303,
+                  39931.08208023954,
+                  -4367.3045266434365
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4422.3045266434365,
+                  "surface_z_cm": -4272.1279296875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              }
+            }
+          },
+          {
+            "phase": "late_high",
+            "mink_bank_surface_z_cm": -4389.40478515625,
+            "world_seconds": 190.2666765898466,
+            "grid_cm": 40.0,
+            "half_width_cm": 600.0,
+            "sites": {
+              "IslandRiverInletPlants": {
+                "center_cm": [
+                  84705.94008285584,
+                  39200.06070119358,
+                  -4338.5226290330575
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4394.5226290330575,
+                  "surface_z_cm": -4244.05810546875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              },
+              "IslandRiverQuietMargin": {
+                "center_cm": [
+                  85983.61496526303,
+                  39931.08208023954,
+                  -4367.3045266434365
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4422.3045266434365,
+                  "surface_z_cm": -4272.1279296875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              }
+            }
+          },
+          {
+            "phase": "receding",
+            "mink_bank_surface_z_cm": -4413.40478515625,
+            "world_seconds": 240.26667919754982,
+            "grid_cm": 40.0,
+            "half_width_cm": 600.0,
+            "sites": {
+              "IslandRiverInletPlants": {
+                "center_cm": [
+                  84705.94008285584,
+                  39200.06070119358,
+                  -4338.5226290330575
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4394.5226290330575,
+                  "surface_z_cm": -4244.05810546875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              },
+              "IslandRiverQuietMargin": {
+                "center_cm": [
+                  85983.61496526303,
+                  39931.08208023954,
+                  -4367.3045266434365
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4422.3045266434365,
+                  "surface_z_cm": -4272.1279296875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "seed": 20017,
+        "sources": [
+          {
+            "path": "Saved/FaunaAudit/Island_20017_nursery_depth/IslandFaunaPIE.json",
+            "sha256": "c83d0714b50b803ca639c143818ffe849e579bf07131c56ad6521f84246fb0db"
+          },
+          {
+            "path": "Saved/FaunaAudit/IslandAccessBaseline/20017_nursery_depth.log",
+            "sha256": "e8a310283619ae6f0a2d6c751d1ec5abb7fcea77c07fd6e015ee175497d14310"
+          }
+        ],
+        "observations": [
+          {
+            "phase": "early_dry",
+            "mink_bank_surface_z_cm": -4413.40478515625,
+            "world_seconds": 25.26666798442602,
+            "grid_cm": 40.0,
+            "half_width_cm": 600.0,
+            "sites": {
+              "IslandRiverInletPlants": {
+                "center_cm": [
+                  84705.94008285584,
+                  39200.06070119358,
+                  -4338.5226290330575
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4394.5226290330575,
+                  "surface_z_cm": -4244.05810546875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              },
+              "IslandRiverQuietMargin": {
+                "center_cm": [
+                  85983.61496526303,
+                  39931.08208023954,
+                  -4367.3045266434365
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4422.3045266434365,
+                  "surface_z_cm": -4272.1279296875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              }
+            }
+          },
+          {
+            "phase": "late_high",
+            "mink_bank_surface_z_cm": -4389.40478515625,
+            "world_seconds": 190.2666765898466,
+            "grid_cm": 40.0,
+            "half_width_cm": 600.0,
+            "sites": {
+              "IslandRiverInletPlants": {
+                "center_cm": [
+                  84705.94008285584,
+                  39200.06070119358,
+                  -4338.5226290330575
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4394.5226290330575,
+                  "surface_z_cm": -4244.05810546875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              },
+              "IslandRiverQuietMargin": {
+                "center_cm": [
+                  85983.61496526303,
+                  39931.08208023954,
+                  -4367.3045266434365
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4422.3045266434365,
+                  "surface_z_cm": -4272.1279296875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              }
+            }
+          },
+          {
+            "phase": "receding",
+            "mink_bank_surface_z_cm": -4413.40478515625,
+            "world_seconds": 240.26667919754982,
+            "grid_cm": 40.0,
+            "half_width_cm": 600.0,
+            "sites": {
+              "IslandRiverInletPlants": {
+                "center_cm": [
+                  84705.94008285584,
+                  39200.06070119358,
+                  -4338.5226290330575
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4394.5226290330575,
+                  "surface_z_cm": -4244.05810546875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      106.08
+                    ],
+                    "center_component_area_m2": 106.08,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              },
+              "IslandRiverQuietMargin": {
+                "center_cm": [
+                  85983.61496526303,
+                  39931.08208023954,
+                  -4367.3045266434365
+                ],
+                "water_at_center": {
+                  "bottom_z_cm": -4422.3045266434365,
+                  "surface_z_cm": -4272.1279296875,
+                  "center_submerged": true
+                },
+                "cohorts": {
+                  "newly_hatched": {
+                    "minimum_depth_cm": 6.825,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  },
+                  "adult": {
+                    "minimum_depth_cm": 9.1,
+                    "component_areas_m2": [
+                      105.92
+                    ],
+                    "center_component_area_m2": 105.92,
+                    "center_component_touches_survey_edge": true
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

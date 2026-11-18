@@ -1,0 +1,751 @@
+{
+  "schema_version": 1,
+  "training_ready": false,
+  "partial": true,
+  "shore_access": [
+    {
+      "seed": 20000,
+      "root_only": {
+        "mode": "RootOnlyHigh",
+        "agent_id": 41,
+        "patch": "IslandForageSouthBrowse",
+        "root_cm": [
+          90718.38205761915,
+          38408.387527122206,
+          -4370.82750823324
+        ],
+        "start_cm": [
+          90611.23069655693,
+          38149.70125801904,
+          -4324.328946706015
+        ],
+        "dry_candidate_count": 16,
+        "low_water_routes": {
+          "Bighorn": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Buffalo": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Horse": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Jackrabbit": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          }
+        },
+        "active_water_routes": {
+          "Bighorn": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          },
+          "Buffalo": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Horse": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          },
+          "Jackrabbit": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          }
+        },
+        "extra_access_cm": null,
+        "surface_z_cm": -4343.40478515625,
+        "wade_depth_cm": {
+          "Buffalo": 35.0,
+          "Bighorn": 0.0,
+          "Jackrabbit": 0.0,
+          "Horse": 0.0
+        },
+        "stock_at_start": 10.0,
+        "stock_at_end": 10.0,
+        "meal_cap": 2.799999952316284,
+        "min_sampled_root_distance_cm": 17.026689523573804,
+        "root_proximity_world_seconds": 25.26666798442602,
+        "payments": [],
+        "report": {
+          "project_path": "Saved/FaunaAudit/Island_20000_wade_root_control/IslandFaunaPIE.json",
+          "sha256": "04333141ba6d5e56fa24621ead770b882ca1eb221da81eb4fcdcfeb2129d948c"
+        },
+        "log": {
+          "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20000_wade_root_control.log",
+          "sha256": "60585ee87268107c9cf33696e9b61cc0ea88ebdedb91be5f17a5d24e7386feac"
+        }
+      },
+      "bank_access": {
+        "mode": "SavedAccess",
+        "agent_id": 41,
+        "patch": "IslandForageSouthBrowse",
+        "root_cm": [
+          90718.38205761915,
+          38408.387527122206,
+          -4370.82750823324
+        ],
+        "start_cm": [
+          90611.23069655693,
+          38149.70125801904,
+          -4324.328946706015
+        ],
+        "dry_candidate_count": 16,
+        "low_water_routes": {
+          "Bighorn": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Buffalo": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Horse": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Jackrabbit": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          }
+        },
+        "active_water_routes": {
+          "Bighorn": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          },
+          "Buffalo": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Horse": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          },
+          "Jackrabbit": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          }
+        },
+        "extra_access_cm": [
+          90718.38205761915,
+          38223.387527122206,
+          -4334.851126076825
+        ],
+        "surface_z_cm": -4343.40478515625,
+        "wade_depth_cm": {
+          "Buffalo": 35.0,
+          "Bighorn": 0.0,
+          "Jackrabbit": 0.0,
+          "Horse": 0.0
+        },
+        "stock_at_start": 10.0,
+        "stock_at_end": 0.4268706142902374,
+        "meal_cap": 2.799999952316284,
+        "min_sampled_root_distance_cm": 17.026689523573804,
+        "root_proximity_world_seconds": 25.26666798442602,
+        "payments": [
+          {
+            "at": 31.0,
+            "amount": 2.8,
+            "remaining": 7.2,
+            "access": 1
+          },
+          {
+            "at": 41.0,
+            "amount": 2.8,
+            "remaining": 5.229,
+            "access": 1
+          },
+          {
+            "at": 47.0,
+            "amount": 2.8,
+            "remaining": 2.926,
+            "access": 1
+          },
+          {
+            "at": 55.0,
+            "amount": 2.8,
+            "remaining": 0.789,
+            "access": 1
+          },
+          {
+            "at": 65.0,
+            "amount": 1.618,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 71.0,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 76.0,
+            "amount": 0.414,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 82.32,
+            "amount": 0.524,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 88.32,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 94.32,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 100.32,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 107.32,
+            "amount": 0.58,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 112.32,
+            "amount": 0.414,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 116.42,
+            "amount": 0.34,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 123.953,
+            "amount": 0.624,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 129.487,
+            "amount": 0.459,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 135.487,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 141.487,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 145.487,
+            "amount": 0.332,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 154.487,
+            "amount": 0.746,
+            "remaining": 0.0,
+            "access": 1
+          }
+        ],
+        "report": {
+          "project_path": "Saved/FaunaAudit/Island_20000_wade_bank_saved/IslandFaunaPIE.json",
+          "sha256": "54003adc2ea6f120e4020bd7d4fe0e0601927243eef4028e166d91a3a4a53163"
+        },
+        "log": {
+          "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20000_wade_bank_saved.log",
+          "sha256": "fd2d88fbecb33994cb821729a8c623ec1cd9ae7be43e2e89d73977a073bd7f41"
+        }
+      }
+    },
+    {
+      "seed": 20017,
+      "root_only": {
+        "mode": "RootOnlyHigh",
+        "agent_id": 41,
+        "patch": "IslandForageSouthBrowse",
+        "root_cm": [
+          90718.38205761915,
+          38408.387527122206,
+          -4370.82750823324
+        ],
+        "start_cm": [
+          90611.23069655693,
+          38149.70125801904,
+          -4324.328946706015
+        ],
+        "dry_candidate_count": 16,
+        "low_water_routes": {
+          "Bighorn": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Buffalo": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Horse": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Jackrabbit": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          }
+        },
+        "active_water_routes": {
+          "Bighorn": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          },
+          "Buffalo": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Horse": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          },
+          "Jackrabbit": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          }
+        },
+        "extra_access_cm": null,
+        "surface_z_cm": -4343.40478515625,
+        "wade_depth_cm": {
+          "Buffalo": 35.0,
+          "Bighorn": 0.0,
+          "Jackrabbit": 0.0,
+          "Horse": 0.0
+        },
+        "stock_at_start": 10.0,
+        "stock_at_end": 10.0,
+        "meal_cap": 2.799999952316284,
+        "min_sampled_root_distance_cm": 16.19174315924954,
+        "root_proximity_world_seconds": 25.26666798442602,
+        "payments": [],
+        "report": {
+          "project_path": "Saved/FaunaAudit/Island_20017_wade_root_control/IslandFaunaPIE.json",
+          "sha256": "3a4197e04df2fc321158d2e9637f63dcdae38bc8d623e85f014a0b2818909b43"
+        },
+        "log": {
+          "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20017_wade_root_control.log",
+          "sha256": "f876732f54d1a8fb4aa237273b59fe577368f6f30201188f4a02bed56012cac5"
+        }
+      },
+      "bank_access": {
+        "mode": "SavedAccess",
+        "agent_id": 41,
+        "patch": "IslandForageSouthBrowse",
+        "root_cm": [
+          90718.38205761915,
+          38408.387527122206,
+          -4370.82750823324
+        ],
+        "start_cm": [
+          90611.23069655693,
+          38149.70125801904,
+          -4324.328946706015
+        ],
+        "dry_candidate_count": 16,
+        "low_water_routes": {
+          "Bighorn": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Buffalo": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Horse": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Jackrabbit": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          }
+        },
+        "active_water_routes": {
+          "Bighorn": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          },
+          "Buffalo": {
+            "0.6": {
+              "to_patch": true,
+              "from_patch": true
+            },
+            "1.0": {
+              "to_patch": true,
+              "from_patch": true
+            }
+          },
+          "Horse": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          },
+          "Jackrabbit": {
+            "0.6": {
+              "to_patch": false,
+              "from_patch": false
+            },
+            "1.0": {
+              "to_patch": false,
+              "from_patch": false
+            }
+          }
+        },
+        "extra_access_cm": [
+          90718.38205761915,
+          38223.387527122206,
+          -4334.851126076825
+        ],
+        "surface_z_cm": -4343.40478515625,
+        "wade_depth_cm": {
+          "Buffalo": 35.0,
+          "Bighorn": 0.0,
+          "Jackrabbit": 0.0,
+          "Horse": 0.0
+        },
+        "stock_at_start": 10.0,
+        "stock_at_end": 1.0775376558303833,
+        "meal_cap": 2.799999952316284,
+        "min_sampled_root_distance_cm": 16.19174315924954,
+        "root_proximity_world_seconds": 25.26666798442602,
+        "payments": [
+          {
+            "at": 31.0,
+            "amount": 2.8,
+            "remaining": 7.2,
+            "access": 1
+          },
+          {
+            "at": 41.0,
+            "amount": 2.8,
+            "remaining": 5.229,
+            "access": 1
+          },
+          {
+            "at": 47.0,
+            "amount": 2.8,
+            "remaining": 2.926,
+            "access": 1
+          },
+          {
+            "at": 55.0,
+            "amount": 2.8,
+            "remaining": 0.789,
+            "access": 1
+          },
+          {
+            "at": 65.0,
+            "amount": 1.618,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 71.0,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 76.0,
+            "amount": 0.414,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 82.0,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 88.587,
+            "amount": 0.546,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 94.587,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 100.587,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 106.587,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 113.587,
+            "amount": 0.58,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 118.587,
+            "amount": 0.414,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 122.0,
+            "amount": 0.283,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 125.687,
+            "amount": 0.306,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 130.687,
+            "amount": 0.414,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 136.687,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 142.687,
+            "amount": 0.497,
+            "remaining": 0.0,
+            "access": 1
+          },
+          {
+            "at": 146.687,
+            "amount": 0.332,
+            "remaining": 0.0,
+            "access": 1
+          }
+        ],
+        "report": {
+          "project_path": "Saved/FaunaAudit/Island_20017_wade_bank_saved/IslandFaunaPIE.json",
+          "sha256": "e679de292705471383ad3287972ab0bc84988eb55de9bc8eec2e8dd103f915fe"
+        },
+        "log": {
+          "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20017_wade_bank_saved.log",
+          "sha256": "8ae66a420f11ede68f66641adac116a6941b4baeaaf2bd59531eb8232f79abd9"
+        }
+      }
+    }
+  ]
+}

@@ -77,7 +77,7 @@ private:
     IOnlineSessionPtr Sessions;
     TSharedPtr<FOnlineSessionSearch> Search;
     TArray<FOnlineSessionSearchResult> SearchResults;
-    FDelegateHandle CreateHandle, StartHandle, FindHandle, CancelFindHandle, JoinHandle, DestroyHandle, InviteHandle;
+    FDelegateHandle CreateHandle, StartHandle, FindHandle, JoinHandle, DestroyHandle, InviteHandle;
     FDelegateHandle PostLoadHandle, NetworkFailureHandle, TravelFailureHandle;
     FTSTicker::FDelegateHandle TickerHandle;
     UPROPERTY(Transient) TObjectPtr<UEcoSessionMenuWidget> Menu;
@@ -87,7 +87,6 @@ private:
     bool bHosted = false;
     bool bAutoActionDone = false;
     bool bAutoMenuDone = false;
-    bool bTimedOut = false;
     bool bReturnAfterDestroy = false;
     FString FailureAfterDestroy;
     FString PendingRoomName;

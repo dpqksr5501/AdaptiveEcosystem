@@ -1,0 +1,688 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "source_build": "local working tree based on fb9e440a",
+  "partial": true,
+  "training_ready": false,
+  "golden_vector": false,
+  "restorable_world": false,
+  "units": {
+    "time": "simulated game seconds",
+    "stock": "Unreal authored patch resource units",
+    "granted_energy": "Unreal granted meal energy",
+    "temperature": "degrees Celsius",
+    "humidity": "normalized",
+    "rainfall": "normalized"
+  },
+  "saved_map_pie": [
+    {
+      "seed": 20000,
+      "source": "Saved/FaunaAudit/IslandAccess_20000_saved_feeding_saved_mink_saved_perch_saved_high_transition_region_approach_control_habitat_river_weather_river_approach_persisted/IslandFaunaPIE.json",
+      "source_sha256": "ef5cf70f1497933e37e651d6d82181c521781d0f477418906486b2bb449ee01d",
+      "sample_count": 43,
+      "error_count": 0,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "initial_population": {
+        "Wolf": 16,
+        "Herbivore": 48,
+        "Buffalo": 4,
+        "Crow": 3,
+        "Horse": 5,
+        "Pig": 4,
+        "Fox": 2,
+        "Jackrabbit": 4,
+        "Leopard": 1,
+        "Rat": 6,
+        "Bighorn": 5,
+        "GoldenEagle": 2,
+        "AriakeCatfish": 3,
+        "CommonCarp": 6,
+        "Mink": 2,
+        "UnidentifiedFish": 7
+      },
+      "initial_total_authored_stock": 215.0,
+      "patch_budget": {
+        "IslandForageWestForbs": {
+          "region": "Riverbank",
+          "consumers": [
+            "Bighorn",
+            "Buffalo",
+            "Horse",
+            "Jackrabbit"
+          ],
+          "capacity": 4.5,
+          "regrowth_per_second": 0.07500000298023224,
+          "dry_loss_per_second": 0.10999999940395355,
+          "energy_per_meal": 2.799999952316284,
+          "submerged": false,
+          "nursery": false
+        },
+        "IslandTransitionForbs": {
+          "region": "ZHighlandRiverTransition",
+          "consumers": [
+            "Bighorn",
+            "Buffalo",
+            "Horse",
+            "Jackrabbit"
+          ],
+          "capacity": 4.5,
+          "regrowth_per_second": 0.07500000298023224,
+          "dry_loss_per_second": 0.10999999940395355,
+          "energy_per_meal": 2.799999952316284,
+          "submerged": false,
+          "nursery": false
+        }
+      },
+      "arrivals": [
+        {
+          "agent_id": "70",
+          "game_seconds": 61,
+          "region": "ZHighlandRiverTransition",
+          "reason": "PassageArrived"
+        }
+      ],
+      "meals": [
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 67,
+          "granted_energy": 2.799999952316284
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 68,
+          "granted_energy": 1.7513562440872192
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 76,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 84.28666666547457,
+          "granted_energy": 0.42557212710380554
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 92.28666666547457,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 100.28666666547457,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 108.28666666547457,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 116.28666666547457,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 130,
+          "granted_energy": 0.5452184081077576
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 196,
+          "granted_energy": 0.21468454599380493
+        }
+      ],
+      "selected_samples": [
+        {
+          "sample_index": 0,
+          "game_seconds": 0.2666666805744171,
+          "stock": {
+            "IslandForageWestForbs": 4.5,
+            "IslandTransitionForbs": 4.5
+          },
+          "climate": {
+            "rainfall": 0.0,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 2
+            }
+          }
+        },
+        {
+          "sample_index": 12,
+          "game_seconds": 60.26666980981827,
+          "stock": {
+            "IslandForageWestForbs": 4.5,
+            "IslandTransitionForbs": 4.5
+          },
+          "climate": {
+            "rainfall": 0.6600000262260437,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 2
+            }
+          }
+        },
+        {
+          "sample_index": 13,
+          "game_seconds": 65.26667007058859,
+          "stock": {
+            "IslandForageWestForbs": 4.5,
+            "IslandTransitionForbs": 4.5
+          },
+          "climate": {
+            "rainfall": 0.6600000262260437,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 2
+            }
+          }
+        },
+        {
+          "sample_index": 19,
+          "game_seconds": 95.26667163521051,
+          "stock": {
+            "IslandForageWestForbs": 1.4013406038284302,
+            "IslandTransitionForbs": 0.10271250456571579
+          },
+          "climate": {
+            "rainfall": 0.6600000262260437,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 0.31140902307298446,
+              "visual_fraction": 0.30980393290519714,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 0.02282500101460351,
+              "visual_fraction": 0.0235294122248888,
+              "instances": 2
+            }
+          }
+        },
+        {
+          "sample_index": 42,
+          "game_seconds": 210.2666776329279,
+          "stock": {
+            "IslandForageWestForbs": 0.2374490350484848,
+            "IslandTransitionForbs": 0.05677236616611481
+          },
+          "climate": {
+            "rainfall": 0.02263398841023445,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 0.05276645223299662,
+              "visual_fraction": 0.05098039284348488,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 0.012616081370247735,
+              "visual_fraction": 0.0117647061124444,
+              "instances": 2
+            }
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "source": "Saved/FaunaAudit/IslandAccess_20017_saved_feeding_saved_mink_saved_perch_saved_high_transition_region_approach_control_habitat_river_weather_river_approach_persisted/IslandFaunaPIE.json",
+      "source_sha256": "75f5c2460fe281193b675ece4931808d0da2ae57f262c8900619b69b15c97d64",
+      "sample_count": 43,
+      "error_count": 0,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "initial_population": {
+        "Wolf": 16,
+        "Herbivore": 48,
+        "Buffalo": 4,
+        "Crow": 3,
+        "Horse": 5,
+        "Pig": 4,
+        "Fox": 2,
+        "Jackrabbit": 4,
+        "Leopard": 1,
+        "Rat": 6,
+        "Bighorn": 5,
+        "GoldenEagle": 2,
+        "AriakeCatfish": 3,
+        "CommonCarp": 6,
+        "Mink": 2,
+        "UnidentifiedFish": 7
+      },
+      "initial_total_authored_stock": 215.0,
+      "patch_budget": {
+        "IslandForageWestForbs": {
+          "region": "Riverbank",
+          "consumers": [
+            "Bighorn",
+            "Buffalo",
+            "Horse",
+            "Jackrabbit"
+          ],
+          "capacity": 4.5,
+          "regrowth_per_second": 0.07500000298023224,
+          "dry_loss_per_second": 0.10999999940395355,
+          "energy_per_meal": 2.799999952316284,
+          "submerged": false,
+          "nursery": false
+        },
+        "IslandTransitionForbs": {
+          "region": "ZHighlandRiverTransition",
+          "consumers": [
+            "Bighorn",
+            "Buffalo",
+            "Horse",
+            "Jackrabbit"
+          ],
+          "capacity": 4.5,
+          "regrowth_per_second": 0.07500000298023224,
+          "dry_loss_per_second": 0.10999999940395355,
+          "energy_per_meal": 2.799999952316284,
+          "submerged": false,
+          "nursery": false
+        }
+      },
+      "arrivals": [
+        {
+          "agent_id": "70",
+          "game_seconds": 57,
+          "region": "ZHighlandRiverTransition",
+          "reason": "PassageArrived"
+        }
+      ],
+      "meals": [
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 63,
+          "granted_energy": 2.799999952316284
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 64,
+          "granted_energy": 1.7513562440872192
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 72,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 79,
+          "granted_energy": 0.35949376225471497
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 87.30333333214124,
+          "granted_energy": 0.42642807960510254
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 95.30333333214124,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 103.30333333214124,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 111.30333333214124,
+          "granted_energy": 0.41085001826286316
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 124,
+          "granted_energy": 0.6273958086967468
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 139,
+          "granted_energy": 0.21550683677196503
+        },
+        {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 209,
+          "granted_energy": 0.2141086757183075
+        }
+      ],
+      "selected_samples": [
+        {
+          "sample_index": 0,
+          "game_seconds": 0.2666666805744171,
+          "stock": {
+            "IslandForageWestForbs": 4.5,
+            "IslandTransitionForbs": 4.5
+          },
+          "climate": {
+            "rainfall": 0.0,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 2
+            }
+          }
+        },
+        {
+          "sample_index": 12,
+          "game_seconds": 60.26666980981827,
+          "stock": {
+            "IslandForageWestForbs": 4.5,
+            "IslandTransitionForbs": 4.5
+          },
+          "climate": {
+            "rainfall": 0.6600000262260437,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 2
+            }
+          }
+        },
+        {
+          "sample_index": 13,
+          "game_seconds": 65.26667007058859,
+          "stock": {
+            "IslandForageWestForbs": 4.5,
+            "IslandTransitionForbs": 0.051356252282857895
+          },
+          "climate": {
+            "rainfall": 0.6600000262260437,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 1.0,
+              "visual_fraction": 1.0,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 0.011412500507301755,
+              "visual_fraction": 0.0117647061124444,
+              "instances": 2
+            }
+          }
+        },
+        {
+          "sample_index": 19,
+          "game_seconds": 95.26667163521051,
+          "stock": {
+            "IslandForageWestForbs": 1.248127818107605,
+            "IslandTransitionForbs": 0.35949376225471497
+          },
+          "climate": {
+            "rainfall": 0.6600000262260437,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 0.27736173735724556,
+              "visual_fraction": 0.27843138575553894,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 0.07988750272327,
+              "visual_fraction": 0.0784313753247261,
+              "instances": 2
+            }
+          }
+        },
+        {
+          "sample_index": 42,
+          "game_seconds": 210.2666776329279,
+          "stock": {
+            "IslandForageWestForbs": 0.21147505939006805,
+            "IslandTransitionForbs": 0.005076510366052389
+          },
+          "climate": {
+            "rainfall": 0.02263398841023445,
+            "temperature": 14.0,
+            "humidity": 0.7200000286102295
+          },
+          "forage": {
+            "IslandForageWestForbs": {
+              "stock_fraction": 0.04699445764223734,
+              "visual_fraction": 0.0470588244497776,
+              "instances": 3
+            },
+            "IslandTransitionForbs": {
+              "stock_fraction": 0.0011281134146783087,
+              "visual_fraction": 0.0,
+              "instances": 2
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "separate_checkpoint_save": {
+    "seed": 20017,
+    "source": "Saved/FaunaAudit/IslandAccessBaseline/IslandSavedHabitat_20017_snapshot.json",
+    "source_sha256": "662998a65d2abbc4f67767e297022168fc2370266c26c88ff312f14323e7fe1c",
+    "restore_verified": true,
+    "restore_report": "Saved/FaunaAudit/IslandSavedHabitat_20017_load/IslandFaunaPIE.json",
+    "restored_agent_first_recorded_payment": {
+      "authority_seconds": 72,
+      "energy": 0.41085001826286316
+    },
+    "agent_id": "70",
+    "agent": {
+      "species": "Jackrabbit",
+      "region": "ZHighlandRiverTransition",
+      "position": "V(X=41004.77, Y=39344.76, Z=3098.59)",
+      "hp": 100,
+      "energy": 57.301456451416016
+    },
+    "stock": {
+      "IslandForageWestForbs": 4.5,
+      "IslandTransitionForbs": 0.051356252282857895
+    },
+    "habitat": {
+      "climate": {
+        "rainfall": 0.6600000262260437,
+        "temperature": 14.0,
+        "humidity": 0.7200000286102295
+      },
+      "forage": {
+        "IslandForageWestForbs": {
+          "stock_fraction": 1.0,
+          "visual_fraction": 1.0,
+          "instances": 3
+        },
+        "IslandTransitionForbs": {
+          "stock_fraction": 0.011412500507301755,
+          "visual_fraction": 0.0117647061124444,
+          "instances": 2
+        }
+      },
+      "ledger": {
+        "Highland": {
+          "population": 23,
+          "outbound_count": 0,
+          "incoming_count": 0,
+          "migration_in_count": 0,
+          "migration_out_count": 0
+        },
+        "Riverbank": {
+          "population": 30,
+          "outbound_count": 0,
+          "incoming_count": 0,
+          "migration_in_count": 0,
+          "migration_out_count": 1
+        },
+        "ZHighlandRiverTransition": {
+          "population": 1,
+          "outbound_count": 0,
+          "incoming_count": 0,
+          "migration_in_count": 1,
+          "migration_out_count": 0
+        }
+      }
+    }
+  },
+  "ground_passage_reference": {
+    "base_walk_cm_s": 90.0,
+    "source_region": "Riverbank",
+    "patch": {
+      "region": "ZHighlandRiverTransition",
+      "capacity": 4.5,
+      "energy_per_meal": 2.799999952316284
+    },
+    "runs": [
+      {
+        "seed": 20000,
+        "route_points_cm": [
+          [
+            37650.0,
+            35700.0,
+            3098.59
+          ],
+          [
+            40679.44211789575,
+            38992.90182308231,
+            3098.5880159456783
+          ],
+          [
+            40693.53036287818,
+            39007.09764476742,
+            3098.5880159456783
+          ],
+          [
+            41008.88884136696,
+            39348.57137719221,
+            3098.5880159456783
+          ]
+        ],
+        "speed_gene": 0.9723074448533164,
+        "arrival": {
+          "agent_id": "70",
+          "game_seconds": 61,
+          "region": "ZHighlandRiverTransition",
+          "reason": "PassageArrived"
+        },
+        "first_meal": {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 67,
+          "granted_energy": 2.799999952316284
+        }
+      },
+      {
+        "seed": 20017,
+        "route_points_cm": [
+          [
+            37650.0,
+            35700.0,
+            3098.59
+          ],
+          [
+            40679.44211789575,
+            38992.90182308231,
+            3098.5880159456783
+          ],
+          [
+            40693.53036287818,
+            39007.09764476742,
+            3098.5880159456783
+          ],
+          [
+            41008.88884136696,
+            39348.57137719221,
+            3098.5880159456783
+          ]
+        ],
+        "speed_gene": 1.0322827379243205,
+        "arrival": {
+          "agent_id": "70",
+          "game_seconds": 57,
+          "region": "ZHighlandRiverTransition",
+          "reason": "PassageArrived"
+        },
+        "first_meal": {
+          "agent_id": "70",
+          "species": "Jackrabbit",
+          "game_seconds": 63,
+          "granted_energy": 2.799999952316284
+        }
+      }
+    ]
+  }
+}

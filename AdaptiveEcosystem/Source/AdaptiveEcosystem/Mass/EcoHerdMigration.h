@@ -26,6 +26,8 @@ struct FEcoHerdTravelFragment : public FMassFragment
     int32 Waypoint=0;
     double LastProgressTime=0, BestDistance=MAX_dbl, MembershipUntil=0;
     FName Reason=NAME_None;
+    static FName UnavailableRegionReason() { static const FName Name(TEXT("RouteRegionUnavailable")); return Name; }
+    bool IsWaitingForRegion() const { return bActive && Reason == UnavailableRegionReason(); }
 };
 
 /** Authored traversable knowledge. Points are world coordinates; both ends must lie inside their native stages. */
@@ -42,6 +44,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") TArray<FVector> Points;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") bool bBidirectional=true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") bool bEnabled=true;
+    /** Permits rule fauna to cross a short seam on this route. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") bool bAllowRuleFaunaPassage=false;
+    /** Water-column waypoints for obligate swimmers. Native herds use ground routes. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") bool bRuleFaunaWaterPassage=false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") float CorridorWidth=600;
     /** Explicit knowledge source for life-v1. With this off, unvisited destinations have no live habitat report. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration|Knowledge") bool bSharesHabitatReports=true;
@@ -66,6 +72,16 @@ struct FEcoKnownHabitat
     int32 Population=0;
 };
 
+/** Authority registration order and a shortage episode. Reservations are derived from live plans. */
+struct FEcoRegionalMigrationState
+{
+    TArray<int64> Residents, Approved;
+    double ShortageSince=-1, RecoverySince=-1, NextDeparture=0;
+    int32 Initial=0, KeepFloor=0, Supported=0, Projected=0;
+    bool bEpisode=false;
+    FName Reason=NAME_None;
+};
+
 /** Game-thread coordination at completed M4 resource boundaries; no replication or position integration. */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoHerdMigrationSubsystem : public UWorldSubsystem
@@ -74,8 +90,10 @@ class ADAPTIVEECOSYSTEM_API UEcoHerdMigrationSubsystem : public UWorldSubsystem
 public:
     virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
     bool Reconcile(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, int64 Step,
-        TArray<FEcoMigrationOutcome>& Arrivals);
+        TArray<FEcoMigrationOutcome>& Arrivals, TConstArrayView<FEcoRegionSpatialSnapshot> Spaces = {});
     bool IsEnabled() const;
+    void RegisterResident(FName Region,int64 Agent);
+    const TMap<FName,FEcoRegionalMigrationState>& GetRegionalStates() const { return RegionalStates; }
     /** Explicit copy-map test fixture; records food removal in the existing authority ledger. */
     UFUNCTION(BlueprintCallable,Category="Migration|Audit") bool ApplyFoodFractionForAudit(FName Region,float Fraction,bool bSuspendRegeneration=false);
     const TMap<int64,FEcoHerdJourney>& GetPlans() const { return Plans; }
@@ -87,5 +105,6 @@ private:
     TMap<int64,double> ShortageSince;
     TMap<int64,double> NextPlanAttempt;
     TMap<FName,FEcoKnownHabitat> KnownHabitats;
+    TMap<FName,FEcoRegionalMigrationState> RegionalStates;
     int64 NextPlan=1;
 };

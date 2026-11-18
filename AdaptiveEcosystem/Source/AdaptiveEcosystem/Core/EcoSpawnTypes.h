@@ -40,4 +40,5 @@ struct FEcoSpawnRequest
 	double ScheduledTime = 0.0;
 	bool bInitial = false;
     EEcoSpawnOrigin Origin=EEcoSpawnOrigin::Recovery;
+    FName DiagnosticReason;
 };

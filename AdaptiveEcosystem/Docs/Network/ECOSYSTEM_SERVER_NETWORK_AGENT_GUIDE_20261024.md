@@ -2,6 +2,8 @@
 
 최신 다종 맵의 이 역할 작업과 완료 기준은 [다종 생태계 팀 인수인계](../Team/FAUNA_TEAM_HANDOFF.md)를 먼저 확인한다.
 
+2026-11-12 통합 레벨 복사본의 60분 실험은 기존 바이너리의 NullRHI Standalone 실행이다. 권위 인구 장부와 Native 섭취는 확인했다. 이 복사본의 Dedicated·다중 Client·저장 복원, 최근 C++ 실행기 혼용 방지 변경은 각각 별도 검증이 필요하다. [통합 레벨 실행 결과](../Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존)
+
 2026-11-05 제안은 [체형의 서버·네트워크 인계](MORPHOLOGY_NETWORK_HANDOFF_20261105.md)를 참고한다. 유전·표현형·시각 DTO의 소유권과 체형 전환·풀 재사용·늦은 접속 기준을 정의한다.
 
 작성일: **2026-10-24** / 구현 기준: **`d095948`** / UE5.8. [공통 작업 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md)와 루트 AGENTS.md를 먼저 읽는다. 이 문서는 현재 Source의 소유권과 후속 작업 acceptance를 함께 설명한다. 제안한 운영 기능까지 구현됐다는 뜻은 아니다.

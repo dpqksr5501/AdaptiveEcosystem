@@ -9,6 +9,7 @@
 #include "MassMovementFragments.h"
 #include "AdaptiveEcosystem.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoFauna.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Engine/World.h"
 
@@ -39,6 +40,7 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 	Query.AddRequirement<FEcoFeedingFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoLifetimeFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoCreatureSurvivalFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	Query.AddRequirement<FEcoFaunaFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	Query.AddRequirement<FMassDesiredMovementFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
@@ -57,6 +59,7 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 		const auto Feeding = Chunk.GetFragmentView<FEcoFeedingFragment>();
 		const auto Lives = Chunk.GetFragmentView<FEcoLifetimeFragment>();
 		const auto Profiles = Chunk.GetFragmentView<FEcoCreatureSurvivalFragment>();
+		const auto Fauna = Chunk.GetFragmentView<FEcoFaunaFragment>();
 		for (int32 I = 0; I < Chunk.GetNumEntities(); ++I)
 		{
 			const auto& V = Vitals[I];
@@ -84,7 +87,9 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 			if (Profile.bEnabled && V.HP > 0)
 			{
 				const double Dt = Time.ServerTimeSeconds - R.LastTime;
-				const double Rate = Profile.BaseMetabolism + (Travel[I].State == EEcoResidenceState::Traveling ? Profile.TravelMetabolism : 0.0);
+				const double ActivityScale = Fauna.IsEmpty() ? 1. : Fauna[I].MaintenanceScale;
+				const double Rate = Profile.BaseMetabolism * ActivityScale
+					+ (Travel[I].State == EEcoResidenceState::Traveling ? Profile.TravelMetabolism : 0.0);
 				const double StartEnergy = FMath::Clamp<double>(V.Energy, 0, V.MaxEnergy);
 				const double ZeroAfter = StartEnergy <= 0 ? 0.0 : Rate > 0 ? StartEnergy / Rate : Dt;
 				const double ZeroDuration = FMath::Max(0.0, Dt - ZeroAfter);

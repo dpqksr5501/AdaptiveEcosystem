@@ -60,34 +60,53 @@ def tick(dt):
             if 'target' not in state:
                 animals = [inspect(world, k) for k in u.EcoCreatureInspectionLibrary.get_authority_agent_ids(world)]
                 animal = next(a for a in animals if a.get('species') == 'Wolf' and a.get('hp', 0) > 0)
-                state.update(target=int(animal['stable_id']), start=time.time())
-                (out/'Session.json').write_text(json.dumps(dict(run_id=run_id, target=state['target'], start=state['start'])))
+                state.update(target=int(animal['stable_id']), start=None)
             animal = inspect(world, state['target'])
-            elapsed = time.time()-state['start']
-            if animal.get('hp', 0) > 0:
-                point = u.Vector(*animal['native_world_position'])
+            now = time.time()
+            elapsed = now-state['start'] if state['start'] else 0.
+            focus = animal
+            if elapsed >= 29.5:
+                if 'deer' not in state:
+                    animals = (inspect(world, k) for k in u.EcoCreatureInspectionLibrary.get_authority_agent_ids(world))
+                    deer = next((a for a in animals if a.get('species') == 'Herbivore' and a.get('hp', 0) > 0), None)
+                    assert deer, 'The second species must exist on authority'
+                    state['deer'] = int(deer['stable_id'])
+                focus = inspect(world, state['deer'])
+            if focus.get('native_world_position') and focus.get('hp', 0) > 0:
+                point = u.Vector(*focus['native_world_position'])
                 for index, pc in enumerate(pcs):
                     pawn = pc.get_controlled_pawn()
                     pawn.player_state.set_invulnerable(True)
                     pawn.character_movement.set_movement_mode(u.MovementMode.MOVE_FLYING)
-                    # Keep the wolf's chase parallel to the shooter's line of fire.
-                    # The other observer stays behind the shooter, out of that trace.
+                    # Keep both clients inside visual relevance. The observer stays off the firing line.
                     active_client = 'A' if elapsed < 12 else 'B'
                     try:
                         marker = json.loads((out/(active_client+'_Pawn.json')).read_text())
                         active = marker.get('run_id') == run_id and marker.get('player_id') == pawn.player_state.get_editor_property('player_id')
                     except (OSError, ValueError):
                         active = index == 0
-                    pawn.set_actor_location(point+u.Vector(-650 if active else -1500, 0, 96), False, True)
+                    offset = u.Vector(-420 if active else -380, 0 if active else 270, 96)
+                    pawn.set_actor_location(point+offset, False, True)
                     pawn.character_movement.stop_movement_immediately()
                     pawn.set_actor_rotation(u.Rotator(0, 0, 0), True)
+            if now > state.get('next_packet', 0.):
+                state['next_packet'] = now+.03
+                # Deterministic UI fixture aim: render interpolation must not turn this
+                # into a moving-target marksmanship test. No animal/world values change.
+                packet = dict(run_id=run_id, target=state['target'], start=state['start'], position=focus.get('native_world_position'))
+                (out/'Session.json').write_text(json.dumps(packet))
+            if not state['start']:
+                try:
+                    peers_ready = all(json.loads((out/(client+'_Ready.json')).read_text()).get('run_id') == run_id
+                                      for client in ('A', 'B'))
+                except (OSError, ValueError):
+                    peers_ready = False
+                if peers_ready:
+                    state['start'] = now
+                return
             if elapsed > state['next_sample']:
                 state['next_sample'] = elapsed+.03
                 state['samples'].append(dict(elapsed=elapsed, hp=animal.get('hp', 0)))
-                # Deterministic UI fixture aim: render interpolation must not turn this
-                # into a moving-target marksmanship test. No animal/world values change.
-                packet = dict(run_id=run_id, target=state['target'], start=state['start'], position=animal.get('native_world_position'))
-                (out/'Session.json').write_text(json.dumps(packet))
             if elapsed > 35:
                 for client in ('A', 'B'):
                     if not (out/(client+'.json')).exists():
@@ -112,10 +131,10 @@ def tick(dt):
             return
         if session.get('run_id') != run_id:
             return
-        elapsed = time.time()-session['start']
+        elapsed = time.time()-session['start'] if session['start'] else 0.
         pc = u.GameplayStatics.get_player_controller(world, 0)
         pawn = pc.get_controlled_pawn()
-        if not pawn:
+        if not pawn or not pawn.player_state:
             return
         if not state.get('bound'):
             pawn.get_component_by_class(u.EcoWeaponFireComponent).on_damage_outcome.add_callable(outcome)
@@ -123,16 +142,20 @@ def tick(dt):
             state['bound'] = True
         visuals = [v for v in u.GameplayStatics.get_all_actors_of_class(world, u.EcoCreatureRepresentationActor) if v.get_editor_property('bound')]
         target = next((v for v in visuals if int(v.visual_state.stable_agent_id) == session['target']), None)
-        if target:
+        if session.get('position'):
             camera = pawn.get_component_by_class(u.CameraComponent)
-            point = u.Vector(*session['position']) if session.get('position') else target.get_actor_location()
+            point = u.Vector(*session['position'])
             pc.set_control_rotation(u.MathLibrary.find_look_at_rotation(camera.get_world_location(), point+u.Vector(0, 0, 45)))
+        if target:
             # The adapter defers scripted input beyond the editor RPC-local scope.
             avatar = pawn.get_component_by_class(u.EcoAbilityAvatarComponent)
             equipment = pawn.get_component_by_class(u.EcoEquipmentComponent)
             if equipment.get_editor_property('weapon') and not state.get('aim_pressed'):
                 state['aim_pressed'] = True
                 avatar.press_configured_action(aim)
+            if state.get('aim_pressed') and not state.get('ready_sent'):
+                state['ready_sent'] = True
+                (out/(name+'_Ready.json')).write_text(json.dumps(dict(run_id=run_id)))
             window = (4, 10) if name == 'A' else (13, 27)
             if window[0] < elapsed < window[1]:
                 state.setdefault('attack_baseline', target.visual_state.normalized_health)

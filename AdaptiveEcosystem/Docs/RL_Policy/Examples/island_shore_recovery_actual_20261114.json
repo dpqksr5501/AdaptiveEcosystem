@@ -1,0 +1,211 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "partial": true,
+  "training_ready": false,
+  "restorable_world": false,
+  "golden_vector": false,
+  "units": "Placement in Unreal centimeters and receipts in authority game seconds; food in game energy units",
+  "common_authored_budget": {
+    "capacity": 215.0,
+    "base_regrowth_per_game_second": 2.82
+  },
+  "saved_shelf_drawdown": {
+    "seed": 20017,
+    "source": {
+      "path": "Saved/FaunaAudit/Island_20017_island_bank_visual/IslandFaunaPIE.json",
+      "sha256": "7b65c68119872212aab3a23177cc76e468f274c4c9c5bf09c1ed1337d0a4e8b1"
+    },
+    "child_stable_id": "133",
+    "before_and_after": {
+      "before": {
+        "world_seconds": 193.3333434164524,
+        "completed_authority_seconds": 193.0,
+        "sites": {
+          "inlet": {
+            "bottom_cm": -4394.5226290330575,
+            "surface_cm": -4244.05810546875,
+            "submerged": true
+          },
+          "margin": {
+            "bottom_cm": -4422.3045266434365,
+            "surface_cm": -4272.1279296875,
+            "submerged": true
+          }
+        }
+      },
+      "lowered": {
+        "world_seconds": 193.3333434164524,
+        "completed_authority_seconds": 193.0,
+        "sites": {
+          "inlet": {
+            "bottom_cm": -4394.5226290330575,
+            "surface_cm": -4346.5224609375,
+            "submerged": false
+          },
+          "margin": {
+            "bottom_cm": -4422.3045266434365,
+            "surface_cm": -4272.1279296875,
+            "submerged": true
+          }
+        }
+      },
+      "restored": {
+        "world_seconds": 201.33334383368492,
+        "completed_authority_seconds": 201.0,
+        "sites": {
+          "inlet": {
+            "bottom_cm": -4394.5226290330575,
+            "surface_cm": -4244.05810546875,
+            "submerged": true
+          },
+          "margin": {
+            "bottom_cm": -4422.3045266434365,
+            "surface_cm": -4272.1279296875,
+            "submerged": true
+          }
+        }
+      }
+    },
+    "shelf_center_cm": [
+      84705.94008285584,
+      39200.06070119358,
+      -4370.5226290330575
+    ],
+    "payments_during_drawdown": [
+      {
+        "time": 195,
+        "region": "LowerRiver",
+        "reason": "HabitatPatchEaten",
+        "related_id": "0",
+        "amount": 2.799999952316284,
+        "resource_id": "IslandRiverSlowShelf"
+      },
+      {
+        "time": 196,
+        "region": "LowerRiver",
+        "reason": "HabitatPatchEaten",
+        "related_id": "0",
+        "amount": 2.799999952316284,
+        "resource_id": "IslandRiverSlowShelf"
+      },
+      {
+        "time": 197,
+        "region": "LowerRiver",
+        "reason": "HabitatPatchEaten",
+        "related_id": "0",
+        "amount": 2.4499995708465576,
+        "resource_id": "IslandRiverSlowShelf"
+      }
+    ]
+  },
+  "mink_roundtrip_candidate_pie": [
+    {
+      "seed": 20000,
+      "source": {
+        "path": "Saved/FaunaAudit/Island_20000_mink_bank_roundtrip/IslandFaunaPIE.json",
+        "sha256": "d25f81d7bc513c5606cf69183c08b9a97f18e50e9e04df05b9a8a5165e32b276"
+      },
+      "stable_agent_id": 111,
+      "start_cm": [
+        94731.99740640649,
+        44183.96621904676,
+        -4376.2226722380565
+      ],
+      "landing_cm": [
+        94326.00999629225,
+        43676.34999536356,
+        -4379.4492269571965
+      ],
+      "water_entry_cm": [
+        94254.01,
+        43604.35,
+        -4421.40478515625
+      ],
+      "budget": {
+        "capacity": {
+          "before": 10.0,
+          "existing": 8.5,
+          "local": 1.5
+        },
+        "regrowth_per_second": {
+          "before": 0.11250000447034836,
+          "existing": 0.0956250037997961,
+          "local": 0.016875000670552254
+        }
+      },
+      "first_roundtrip": [
+        {
+          "authority_seconds": 63.61666666666667,
+          "event": "SwimEnter"
+        },
+        {
+          "authority_seconds": 67,
+          "event": "HabitatPatchEaten"
+        },
+        {
+          "authority_seconds": 70.76666666666667,
+          "event": "SwimExit"
+        },
+        {
+          "authority_seconds": 79.68333333333334,
+          "event": "SwimDryBankReached"
+        }
+      ],
+      "dry_bank_arrivals": 5
+    },
+    {
+      "seed": 20017,
+      "source": {
+        "path": "Saved/FaunaAudit/Island_20017_mink_bank_roundtrip/IslandFaunaPIE.json",
+        "sha256": "b956b0f3e8159b677b28f336cdb09ead770aa385c0c8ac11a6fa39dab96f9b7d"
+      },
+      "stable_agent_id": 111,
+      "start_cm": [
+        94731.99740640649,
+        44183.96621904676,
+        -4376.2226722380565
+      ],
+      "landing_cm": [
+        94326.00999629225,
+        43676.34999536356,
+        -4379.4492269571965
+      ],
+      "water_entry_cm": [
+        94254.01,
+        43604.35,
+        -4421.40478515625
+      ],
+      "budget": {
+        "capacity": {
+          "before": 10.0,
+          "existing": 8.5,
+          "local": 1.5
+        },
+        "regrowth_per_second": {
+          "before": 0.11250000447034836,
+          "existing": 0.0956250037997961,
+          "local": 0.016875000670552254
+        }
+      },
+      "first_roundtrip": [
+        {
+          "authority_seconds": 63.63333333333333,
+          "event": "SwimEnter"
+        },
+        {
+          "authority_seconds": 66,
+          "event": "HabitatPatchEaten"
+        },
+        {
+          "authority_seconds": 69.6,
+          "event": "SwimExit"
+        },
+        {
+          "authority_seconds": 78.48333333333333,
+          "event": "SwimDryBankReached"
+        }
+      ],
+      "dry_bank_arrivals": 5
+    }
+  ]
+}
