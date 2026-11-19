@@ -6,6 +6,7 @@
 - 다음 단계는 run_stage_r10.py 로 띄우고 --init-from <앞 단계 폴더> <base> (앞 단계에 없는 종은 base 에서 잇는다).
 - 단계가 끝날 때마다 export_r10.py 로 언리얼 폴더(기본 AdaptiveEcosystem/Saved/R10Demo)에 가장 새 두뇌를 내보낸다
   (끝난 단계 → 앞 단계들 → base 차례로 종마다 찾음). 물 단계가 끝나면 마지막으로 한 번 더 내보내고 끝.
+- --stage-hours air=2.2 water=2.3 처럼 단계마다 시간을 따로 줄 수 있다(없으면 --wall-hours). --curriculum 은 run_stage 로 넘긴다.
 - 기록: <root>/chain.log
 """
 
@@ -49,7 +50,10 @@ def main(argv=None) -> int:
     ap.add_argument("--stall-min", type=float, default=30.0)
     ap.add_argument("--poll-s", type=float, default=120.0)
     ap.add_argument("--wall-hours", type=float, default=12.0)
+    ap.add_argument("--stage-hours", nargs="*", default=[], help="단계=시간 (예: air=2.2 water=2.3)")
+    ap.add_argument("--curriculum", type=int, default=None, help="run_stage --curriculum 로 넘김 (없으면 run_stage 기본)")
     a = ap.parse_args(argv)
+    hours = {k: float(v) for k, _, v in (x.partition("=") for x in a.stage_hours)}
     root = Path(a.root)
     log = (root / "chain.log").open("a", encoding="utf-8")
 
@@ -82,7 +86,9 @@ def main(argv=None) -> int:
         nf = root / FOLDER[nxt]
         say(f"{prev} 끝 ({why}) → {nxt} 띄움 ({nf})")
         cmd = [sys.executable, "-X", "utf8", str(HERE / "run_stage_r10.py"), "--stage", nxt, "--out", str(nf),
-               "--init-from", str(pf), a.base, "--wall-hours", str(a.wall_hours)]
+               "--init-from", str(pf), a.base, "--wall-hours", str(hours.get(nxt, a.wall_hours))]
+        if a.curriculum is not None:
+            cmd += ["--curriculum", str(a.curriculum)]
         r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
         say(r.stdout.strip().replace("\n", " | ") + (f" !! {r.stderr.strip()[-300:]}" if r.returncode else ""))
         if r.returncode:

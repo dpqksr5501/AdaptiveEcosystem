@@ -188,6 +188,8 @@ struct FEcoR10DemoState
 	float CaptureFps = 10.0f, CaptureSeconds = 0.0f;
 	float ExitAfter = 0.0f;
 	float CamCycle = 0.0f;
+	FString CamSpeciesId;   // -EcoR10CamSpecies=<종> : 처음 따라갈 종 (촬영용)
+	bool bCamBySize = false; // -EcoR10CamBySize : 카메라 거리 · 높이를 따라가는 몸 크기(반지름)에 맞춤 (쥐 · 물고기도 보이게)
 
 	enum class EPhase : uint8 { Off, Waiting, Running, Failed };
 	EPhase Phase = EPhase::Off;
@@ -347,6 +349,18 @@ static void ResolveR10DemoSettings(FEcoR10DemoState& S)
 	}
 	FParse::Value(Cmd, TEXT("-EcoR10ExitAfter="), S.ExitAfter);
 	FParse::Value(Cmd, TEXT("-EcoR10CamCycle="), S.CamCycle);
+	// 촬영용: 글 끄기 · 카메라 거리 · 처음 따라갈 종 (H · - = · N/P 키와 같은 일)
+	if (FParse::Param(Cmd, TEXT("EcoR10NoText")))
+	{
+		S.bShowText = false;
+	}
+	double Zoom = 0.0;
+	if (FParse::Value(Cmd, TEXT("-EcoR10Zoom="), Zoom) && Zoom > 0.0)
+	{
+		S.Zoom = FMath::Clamp(Zoom, 0.3, 6.0);
+	}
+	FParse::Value(Cmd, TEXT("-EcoR10CamSpecies="), S.CamSpeciesId);
+	S.bCamBySize = FParse::Param(Cmd, TEXT("EcoR10CamBySize"));
 }
 
 // eco.R10Demo.OnlyMap 안의 맵인가 (R9 eco.R9Demo.OnlyMap 과 같은 꼴: '/Game/X/LV' · '/Game/X/LV.LV' · 'LV').
@@ -1336,6 +1350,14 @@ void UEcoR10DemoSubsystem::Tick(float DeltaTime)
 		S.Acc = 0.0;
 		S.NextCycleAt = Now + FMath::Max(1.0f, S.CamCycle);
 		PickSubject(-1, 1);
+		for (int32 t = 0; !S.CamSpeciesId.IsEmpty() && t < static_cast<int32>(S.Species.size()); ++t)
+		{
+			if (S.CamSpecies >= 0 && S.CamSpeciesId.Equals(UTF8_TO_TCHAR(S.Species[static_cast<size_t>(S.CamSpecies)].Id.c_str())))
+			{
+				break;
+			}
+			PickSubject(S.CamSpecies, 1);
+		}
 		return;
 	}
 	// 돌기
@@ -1852,7 +1874,16 @@ void UEcoR10DemoSubsystem::UpdateCamera(float DeltaTime)
 	{
 		S.CamLostAt = -1.0;
 	}
-	const FVector Focus = Slot >= 0 ? BodyLocation(Slot, Alpha) + FVector(0, 0, 60.0) : S.CamFocus;
+	double SizeK = 1.0;
+	if (S.bCamBySize && Slot >= 0)
+	{
+		const int32 Sp = Wd.Sp[static_cast<size_t>(Slot)];
+		if (Sp >= 0 && Sp < static_cast<int32>(S.Species.size()))
+		{
+			SizeK = FMath::Clamp(S.Species[static_cast<size_t>(Sp)].RadiusM / 0.45, 0.22, 1.8);
+		}
+	}
+	const FVector Focus = Slot >= 0 ? BodyLocation(Slot, Alpha) + FVector(0, 0, 60.0 * SizeK) : S.CamFocus;
 	const double Blend = 1.0 - FMath::Exp(-6.0 * DeltaTime);
 	S.CamFocus = S.CamFocus.IsZero() ? Focus : FMath::Lerp(S.CamFocus, Focus, Blend);
 	if (Slot >= 0)
@@ -1860,7 +1891,7 @@ void UEcoR10DemoSubsystem::UpdateCamera(float DeltaTime)
 		const double Yaw = FMath::RadiansToDegrees(FMath::Atan2(Wd.Hy[static_cast<size_t>(Slot)], Wd.Hx[static_cast<size_t>(Slot)]));
 		S.CamYaw = S.CamYaw + FMath::FindDeltaAngleDegrees(S.CamYaw, Yaw) * (1.0 - FMath::Exp(-1.5 * DeltaTime));
 	}
-	const double Dist = 900.0 * S.Zoom;
+	const double Dist = 900.0 * S.Zoom * SizeK;
 	const FRotator R(-25.0, S.CamYaw + 30.0, 0.0);
 	FVector Eye = S.CamFocus - R.Vector() * Dist;
 	const double G = GroundCm(Eye.X, Eye.Y, Eye.Z - 1000.0);
@@ -1908,7 +1939,10 @@ void UEcoR10DemoSubsystem::TickCapture(float DeltaTime)
 	const int32 Due = FMath::FloorToInt32(S.CaptureClock * S.CaptureFps) + 1;
 	if (S.CaptureFrames < Due)
 	{
-		FScreenshotRequest::RequestScreenshot(FPaths::Combine(S.CaptureDir, FString::Printf(TEXT("f_%05d.png"), S.CaptureFrames)), /*bShowUI*/ true, false);
+		// 파일 이름에 카메라가 따라가는 종 (영상 자막용): f_00012_wolf.png
+		const FString Who = (S.CamSpecies >= 0 && S.CamSpecies < static_cast<int32>(S.Species.size()) && !S.bTop && !S.bFree)
+			? FString(TEXT("_")) + UTF8_TO_TCHAR(S.Species[static_cast<size_t>(S.CamSpecies)].Id.c_str()) : FString();
+		FScreenshotRequest::RequestScreenshot(FPaths::Combine(S.CaptureDir, FString::Printf(TEXT("f_%05d%s.png"), S.CaptureFrames, *Who)), /*bShowUI*/ true, false);
 		++S.CaptureFrames;
 	}
 	if (S.CaptureClock >= S.CaptureSeconds)
