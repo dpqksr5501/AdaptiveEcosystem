@@ -29,7 +29,11 @@
   "max_slope_deg": 89.0,
   "step_m": 0.0,
   "stamina_s": 10.0,
-  "stamina_recover_s": 7.69
+  "stamina_recover_s": 7.69,
+  "burst_mps": null,
+  "burst_s": null,
+  "burst_exhaust_mps": null,
+  "burst_exhaust_s": null
  },
  "senses": {
   "sight_m": 4.5,
@@ -87,7 +91,8 @@
    "body.turn_dps",
    "senses.sight_m",
    "eat.rate_per_s",
-   "metabolism.drain_per_day"
+   "metabolism.drain_per_day",
+   "body.burst_mps"
   ]
  },
  "sources": {

@@ -1,6 +1,7 @@
 """R10 두뇌 — 마스크를 감각에서 읽는 정책 (0 단계 사양 8 절).
 
-몸이 못 하는 행동(땅 몸의 오르기·내리기, 날지 않는 몸의 급강하, 예비 칸)은 감각의 몸 벡터(b_swim·b_fly)로 정해진다.
+몸이 못 하는 행동(땅 몸의 오르기·내리기, 날지 않는 몸의 급강하, 덮치기 없거나 준비 안 된 몸의 덮치기, 예비 칸)은
+감각의 몸 벡터(b_swim·b_fly·b_burst)와 자기 칸 burst_ready 로 정해진다.
 그래서 마스크를 따로 넘기지 않고 감각에서 계산해 로짓에 −1e9 를 더한다. 학습(SB3 PPO)·고정 두뇌(numpy)·언리얼(C++)이 같은 규칙을 쓴다.
 """
 
@@ -15,6 +16,8 @@ from r10 import contract as C
 _B0 = C.SLICES["body"][0]
 I_SWIM = _B0 + C.BODY_NAMES.index("b_swim")
 I_FLY = _B0 + C.BODY_NAMES.index("b_fly")
+I_BURST = _B0 + C.BODY_NAMES.index("b_burst")
+I_BURST_READY = C.SELF_NAMES.index("burst_ready")
 NEG = -1e9
 
 
@@ -28,6 +31,7 @@ def mask_from_obs(obs: np.ndarray) -> np.ndarray:
     m[:, C.A_UP] = fly | swim
     m[:, C.A_DOWN] = fly | swim
     m[:, C.A_DIVE] = fly
+    m[:, C.A_BURST] = (obs[:, I_BURST] > 0) & (obs[:, I_BURST_READY] > 0.5)
     m[:, list(C.SPARE_ACTIONS)] = False
     return m
 
@@ -79,6 +83,7 @@ def make_sb3_policy():
             m[:, C.A_UP] = fly | swim
             m[:, C.A_DOWN] = fly | swim
             m[:, C.A_DIVE] = fly
+            m[:, C.A_BURST] = (obs[:, I_BURST] > 0) & (obs[:, I_BURST_READY] > 0.5)
             m[:, list(C.SPARE_ACTIONS)] = False
             return m
 

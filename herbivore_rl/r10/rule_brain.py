@@ -1,7 +1,7 @@
 """R10 공통 규칙 두뇌 (0 단계 사양 9 절) — 종 이름을 모르고 감각만 읽는다. 0 바퀴 상대·잣대·이름 모를 동물에 쓴다.
 
 1. 나보다 1.5 배 넘게 크고 다가오는 몸이 보이면 반대쪽으로 빠르게 (나는 몸은 오르기)
-2. 배고프고 고기를 먹는 몸이면 나보다 작은 가장 가까운 몸 쪽으로 빠르게
+2. 배고프고 고기를 먹는 몸이면 물 수 있는 가장 가까운 몸 쪽으로 빠르게 (덮치기 몸은 12 m 안·앞 ±30° 면 덮치기)
 3. 발밑에 먹이가 있고 배가 덜 찼으면 먹기 (공중이면 내리기)
 4. 먹이 냄새가 가장 큰 쪽으로 천천히
 5. 아니면 지켜보기
@@ -20,6 +20,8 @@ _OTH0 = C.SLICES["other"][0]
 _F = {f: k for k, f in enumerate(C.OTHER_SLOT_FIELDS)}
 NF = len(C.DIR_FIELDS)
 BIG = np.log2(1.5) / C.NORM["ratio_log2_max"]
+POUNCE_LG = float(C.lg(12.0, C.NORM["dist_m"]["ref"], C.NORM["dist_m"]["max"]))   # 덮치기 시작 거리 (언리얼 Native 체감 거리 어림)
+POUNCE_COS = float(np.cos(np.radians(30.0)))
 
 
 def _dir_of_vector(lx, ly) -> np.ndarray:
@@ -72,6 +74,10 @@ def decide(obs: np.ndarray, rng: np.random.Generator | None = None) -> np.ndarra
         k = np.argmin(d, axis=1)
         j = _dir_of_vector(o[np.arange(n), k, _F["x"]], o[np.arange(n), k, _F["y"]])
         a = np.where(airborne, np.where(o[np.arange(n), k, _F["height_diff"]] < -0.05, C.A_DIVE, C.A_FAST0 + j), C.A_FAST0 + j)
+        tx, ty = o[np.arange(n), k, _F["x"]], o[np.arange(n), k, _F["y"]]
+        td = np.hypot(tx, ty)
+        pounce = mask[:, C.A_BURST] & (td <= POUNCE_LG) & (tx >= POUNCE_COS * td)
+        a = np.where(pounce, C.A_BURST, a)
         act = np.where(hunt, a, act)
         done |= hunt
     # 3 먹기

@@ -49,7 +49,7 @@ def observe(world) -> np.ndarray:
     snow = w.weather[w.wk, 1]
     temp = w.weather[w.wk, 2]
 
-    # ---------------------------------------------------------------- 자기 14
+    # ---------------------------------------------------------------- 자기 16
     lo, _ = C.SLICES["self"]
     mat = np.maximum(p["maturity_days"], 1e-6)
     adult = w.age_days >= mat
@@ -64,10 +64,13 @@ def observe(world) -> np.ndarray:
         np.where(w.airborne, C.lg(w.z, 0.5, 60.0), 0.0),
         np.where(w.swimming, np.clip((w.z - bed) / col, 0, 1), 0.0),
         w.swimming.astype(float), w.g_shelter[c].astype(float), np.clip(w.breath, 0, 1), w.airborne.astype(float),
+        w.burst_ready().astype(float),
+        np.where(w.burst_left > 0, np.clip(w.burst_left / np.maximum(p["burst_s"], 1e-6), 0, 1),
+                 -np.clip(w.exhaust_left / np.maximum(p["burst_exhaust_s"], 1e-6), 0, 1)),
     ], axis=1)
-    obs[:, lo:lo + 14] = self_v
+    obs[:, lo:lo + len(C.SELF_NAMES)] = self_v
 
-    # ---------------------------------------------------------------- 몸 17
+    # ---------------------------------------------------------------- 몸 18
     lo, hi = C.SLICES["body"]
     obs[:, lo:hi] = w.body_vec
 

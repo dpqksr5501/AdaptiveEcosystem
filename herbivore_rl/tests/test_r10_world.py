@@ -1,4 +1,4 @@
-"""R10 세계·감각 시험 (0 단계 사양 5·7·10 절): 몸 물리(경사·물·날기), 몸으로 정하는 물기, 감각 회전 불변·종 수 불변·결정성."""
+"""R10 세계·감각 시험 (0 단계 사양 5·7·10 절): 몸 물리(경사·물·날기·덮치기), 몸으로 정하는 물기, 감각 회전 불변·종 수 불변·결정성."""
 
 import copy
 import math
@@ -26,7 +26,8 @@ def card(kind="ground", mass=50.0, kill=0.0, **body):
     b.update(mass_kg=mass, radius_m=0.3, walk_mps=1.0, run_mps=4.0, accel_mps2=20.0, turn_dps=720.0, lat_accel_mps2=40.0,
              max_slope_deg=35.0, step_m=0.2, swim_mps=1.0 if kind in ("fish", "amph") else None,
              swim_fast_mps=2.0 if kind in ("fish", "amph") else None, fly_mps=4.0 if kind == "air" else None,
-             cruise_mps=8.0 if kind == "air" else None, dive_mps=15.0 if kind == "air" else None)
+             cruise_mps=8.0 if kind == "air" else None, dive_mps=15.0 if kind == "air" else None,
+             burst_mps=None, burst_s=None, burst_exhaust_mps=None, burst_exhaust_s=None)
     b.update(body)
     c["diet"] = {k: 0.0 for k in S.DIET_KEYS}
     c["diet"].update(grass=1.0) if kill == 0 else c["diet"].update(meat=1.0, carrion=1.0)
@@ -231,3 +232,47 @@ def test_dead_slots_zero_and_masks_applied():
     idx = {n: i for i, n in enumerate(C.OBS_NAMES)}
     assert o[0, idx["air_height"]] == 0 and o[0, idx["breath"]] == 0
     assert not o[0, C.SLICES["spare"][0]:C.SLICES["spare"][1]].any()
+
+
+POUNCE = dict(burst_mps=13.5, burst_s=1.6, burst_exhaust_mps=1.8, burst_exhaust_s=4.0)
+
+
+def test_burst_fast_then_exhaust_then_ready():
+    """덮치기: burst_s 동안 run 보다 빠르게, 뒤에 지침(속력 상한), 지침이 끝나면 다시 준비. 마스크·감각도 그 상태를 따른다."""
+    from r10 import policy as P
+    m = T.blank_map(80, 10)
+    w = world_of(m, [card(**POUNCE), card()])
+    put(w, 0, 5.0, 3.0)
+    put(w, 1, 5.0, 7.0)
+    idx = {n: i for i, n in enumerate(C.OBS_NAMES)}
+    o = O.observe(w)
+    assert o[0, idx["burst_ready"]] == 1.0 and o[1, idx["burst_ready"]] == 0.0
+    mk = P.mask_from_obs(o)
+    assert mk[0, C.A_BURST] and not mk[1, C.A_BURST]                 # 덮치기 없는 몸은 못 고름
+    assert not w.amask[1, C.A_BURST]
+    run(w, {0: C.A_BURST, 1: EAST_FAST}, 6)                           # 12 걸음 = 1.6 s
+    assert w.x[0] - 5.0 > 1.6 * 4.0 * 2.0                             # 같은 시간 뛰기(4 m/s)의 두 배 넘게
+    assert w.burst_left[0] == 0.0 and w.exhaust_left[0] == pytest.approx(4.0)
+    o = O.observe(w)
+    assert o[0, idx["burst_ready"]] == 0.0 and o[0, idx["burst_phase"]] < 0
+    assert not P.mask_from_obs(o)[0, C.A_BURST]                       # 지친 중에는 막힘
+    run(w, {0: EAST_FAST}, 5)
+    assert w.speed[0] <= 1.8 + 1e-6                                   # 지친 중: 뛰어도 상한
+    run(w, {0: EAST_FAST}, 10)                                         # 4 s 지나면
+    assert w.exhaust_left[0] == 0.0 and w.burst_ready()[0]
+    assert O.observe(w)[0, idx["burst_ready"]] == 1.0
+
+
+def test_burst_bite_ends_burst():
+    """덮쳐 물면 덮치기가 끝나고 지침으로 (언리얼 Native: 잡으면 Exhaust)."""
+    m = T.blank_map(60, 10)
+    hunter = card("ground", 40.0, kill=1.6, **POUNCE)
+    prey = card("ground", 30.0)
+    w = world_of(m, [hunter, prey])
+    put(w, 0, 5.0, 5.0)
+    put(w, 1, 12.0, 5.0)
+    run(w, {0: C.A_BURST}, 1)
+    assert w.burst_left[0] > 0 or w.exhaust_left[0] > 0
+    run(w, {0: C.A_BURST}, 5)
+    assert any(b[2] == w.uid[0] for b in w.events["bites"])
+    assert w.burst_left[0] == 0.0 and w.exhaust_left[0] > 0.0

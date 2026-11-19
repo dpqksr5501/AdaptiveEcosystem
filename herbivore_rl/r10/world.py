@@ -144,7 +144,8 @@ class World:
     # ------------------------------------------------------------------ 슬롯
 
     _BODY = ("mass_kg", "radius_m", "walk_mps", "run_mps", "swim_mps", "swim_fast_mps", "fly_mps", "cruise_mps", "dive_mps",
-             "accel_mps2", "turn_dps", "lat_accel_mps2", "max_slope_deg", "step_m", "stamina_s", "stamina_recover_s")
+             "accel_mps2", "turn_dps", "lat_accel_mps2", "max_slope_deg", "step_m", "stamina_s", "stamina_recover_s",
+             "burst_mps", "burst_s", "burst_exhaust_mps", "burst_exhaust_s")
 
     def _build_slots(self, rosters, jitter):
         N = self.N
@@ -177,6 +178,8 @@ class World:
         self.age_days, self.sex, self.preg_left, self.birth_wait = f(), b(), f(), f()
         self.pregnant = b()
         self.breath, self.attack_cd = f(), f()
+        self.burst_left, self.exhaust_left = f(), f()        # 덮치기 남은 s · 지침 남은 s
+        self._burst_now = b()
         self.dead_wait = np.zeros(N, np.int64)
         self.respawn_wait = np.full(N, self.rules.respawn_decisions, np.int64)   # 학습 칸은 vec_env 가 1 로
         self.uid = np.zeros(N, np.int64)
@@ -231,8 +234,9 @@ class World:
             p[k][idx] = c["life"][k]
         p["diet"][idx] = [float(c["diet"][k]) for k in S.DIET_KEYS]
         self.body_vec[idx] = S.body_vector(c)
-        self.amask[idx] = C.action_mask(c["medium"])
-        self.omask[idx] = C.obs_mask(c["medium"])
+        burst = c["body"].get("burst_mps") is not None
+        self.amask[idx] = C.action_mask(c["medium"], burst)
+        self.omask[idx] = C.obs_mask(c["medium"], burst)
 
     # ------------------------------------------------------------------ 자리
 
@@ -296,6 +300,8 @@ class World:
         self.birth_wait[i] = 0.0
         self.breath[i] = 1.0
         self.attack_cd[i] = 0.0
+        self.burst_left[i] = 0.0
+        self.exhaust_left[i] = 0.0
         self.alive[i] = True
         self.dead_wait[i] = 0
         self.uid[i] = self._next_uid
@@ -338,6 +344,11 @@ class World:
 
     # ------------------------------------------------------------------ 이동
 
+    def burst_ready(self) -> np.ndarray:
+        """덮치기를 지금 시작할 수 있나: 덮치기 몸 · 땅 위(날거나 헤엄치지 않음) · 덮치는 중도 지친 중도 아님."""
+        return (self.alive & (self.p["burst_mps"] > 0) & ~self.airborne & ~self.swimming
+                & (self.burst_left <= 0) & (self.exhaust_left <= 0))
+
     def _dir_of_action(self, a):
         """행동 → (머리 기준 방향 번호 j 또는 −1, 빠르기 0 서기·1 천천히·2 빠르게)."""
         j = np.full(a.shape, -1)
@@ -374,6 +385,13 @@ class World:
         stam_lock = self.stam <= 0.0
         v_t = np.where(flying, fly_v, np.where(swim_now, swim_v, ground_v))
         v_t = np.where(stam_lock & (gait == 2), np.where(flying, p["fly_mps"], np.where(swim_now, p["swim_mps"], walk)), v_t)
+        # 덮치기: 시작하면 burst_s 동안 행동과 상관없이 burst_mps (방향 칸이면 그쪽으로 꺾음, 아니면 머리 쪽 곧장), 뒤에 지침
+        start = (a == C.A_BURST) & self.burst_ready()
+        self.burst_left = np.where(start, p["burst_s"], self.burst_left)
+        bursting = al & (self.burst_left > 1e-9) & ~swim_now & ~flying
+        self._burst_now = bursting
+        v_t = np.where(bursting, p["burst_mps"] * wade_f, v_t)
+        v_t = np.where(al & (self.exhaust_left > 1e-9) & ~bursting, np.minimum(v_t, p["burst_exhaust_mps"]), v_t)
         v_t = v_t * (0.5 + 0.5 * self.hp) * np.where(self.weather[wk, 1] > 0.5, r.snow_speed, 1.0) * al
         # 원하는 방향 (머리 기준 j → 세계)
         moving = j >= 0
@@ -425,6 +443,13 @@ class World:
         self.vy = (fy - self.y) / C.STEP_S * al
         self.x = np.where(al, fx, self.x)
         self.y = np.where(al, fy, self.y)
+        # 덮치기·지침 시계 (덮치기가 물에 들어가 끊겨도 지침으로)
+        had = self.burst_left > 1e-9
+        self.burst_left = np.where(had & bursting, self.burst_left - C.STEP_S, np.where(had, 0.0, self.burst_left))
+        ended = had & (self.burst_left <= 1e-9)
+        self.burst_left = np.where(ended, 0.0, self.burst_left)
+        ex = np.maximum(self.exhaust_left - C.STEP_S, 0.0)
+        self.exhaust_left = np.where(ended, p["burst_exhaust_s"], np.where(ex <= 1e-9, 0.0, ex))
         self._vertical()
 
     def _pass_ok(self, i, x0, y0, x1, y1) -> np.ndarray:
@@ -517,15 +542,27 @@ class World:
         al = self.alive.reshape(K, Sl)
         x = self.x.reshape(K, Sl)
         y = self.y.reshape(K, Sl)
-        dx = x[:, None, :] - x[:, :, None]           # [k, i(공격), j(대상)] = j − i
-        dy = y[:, None, :] - y[:, :, None]
-        dist = np.hypot(dx, dy)
+        # 이번 걸음 동안 가장 가까웠던 때로 잰다 (빠른 몸이 한 걸음에 상대를 지나쳐 버리지 않게 — 덮치기 13.5 m/s = 1.8 m/걸음)
+        px = x - self.vx.reshape(K, Sl) * C.STEP_S
+        py = y - self.vy.reshape(K, Sl) * C.STEP_S
+        dx1 = x[:, None, :] - x[:, :, None]          # [k, i(공격), j(대상)] = j − i
+        dy1 = y[:, None, :] - y[:, :, None]
+        dx0 = px[:, None, :] - px[:, :, None]
+        dy0 = py[:, None, :] - py[:, :, None]
+        ddx, ddy = dx1 - dx0, dy1 - dy0
+        tc = np.clip(-(dx0 * ddx + dy0 * ddy) / np.maximum(ddx * ddx + ddy * ddy, 1e-12), 0.0, 1.0)
+        dist = np.hypot(dx0 + tc * ddx, dy0 + tc * ddy)
+        # 앞쪽·다가감은 걸음 끝에서 잰다. 다만 걸음 가운데서 가장 가까웠으면(지나쳤으면) 걸음 처음 방향으로 잰다.
+        mid = tc < 1.0 - 1e-9
+        dx = np.where(mid, dx0, dx1)
+        dy = np.where(mid, dy0, dy1)
+        dd = np.hypot(dx, dy)
         hx = self.hx.reshape(K, Sl)[:, :, None]
         hy = self.hy.reshape(K, Sl)[:, :, None]
-        cosf = (hx * dx + hy * dy) / np.maximum(dist, 1e-6)
+        cosf = (hx * dx + hy * dy) / np.maximum(dd, 1e-6)
         vx = self.vx.reshape(K, Sl)[:, :, None]
         vy = self.vy.reshape(K, Sl)[:, :, None]
-        appr = (vx * dx + vy * dy) / np.maximum(dist, 1e-6)
+        appr = (vx * dx + vy * dy) / np.maximum(dd, 1e-6)
         mass = p["mass_kg"].reshape(K, Sl)
         kr = p["kill_mass_ratio"].reshape(K, Sl)
         sp = self.sp.reshape(K, Sl)
@@ -562,6 +599,9 @@ class World:
                 gi, gj = k * Sl + i, k * Sl + tj
                 taken.add(tj)
                 self.attack_cd[gi] = p["attack_cd_s"][gi]
+                if self.burst_left[gi] > 0:                  # 덮쳐 물면 덮치기 끝 → 지침 (Native: 잡으면 Exhaust)
+                    self.burst_left[gi] = 0.0
+                    self.exhaust_left[gi] = p["burst_exhaust_s"][gi]
                 dmg = float(np.clip(r.bite_damage_k * p["mass_kg"][gi] * p["kill_mass_ratio"][gi] / p["mass_kg"][gj], 0.2, 1.0))
                 # 반격: 대상 앞쪽에 공격자가 있고 대상이 아직 버틸 때
                 bx, by = self.x[gi] - self.x[gj], self.y[gi] - self.y[gj]
@@ -651,7 +691,7 @@ class World:
         gain = self._gain
         self._gain = np.zeros(self.N)
         _, gait = self._dir_of_action(self.actions)
-        fast = (gait == 2) | (self.actions == C.A_DIVE)
+        fast = (gait == 2) | (self.actions == C.A_DIVE) | self._burst_now
         mult = np.where(fast, p["run_cost"], 1.0)
         mult = np.where(self.swimming, mult * p["swim_cost"], mult)
         mult = np.where(self.airborne, mult * p["fly_cost"], mult)

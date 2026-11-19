@@ -2,7 +2,7 @@
 
 - 파일: herbivore_rl/species/<id>.json (SI: m·kg·s·°). 파이썬 학습 세계와 언리얼이 같은 파일을 읽는다.
 - 값 기준: 언리얼이 실제로 실행하는 값. 출처는 카드의 "sources" 에 칸마다 적는다(없는 값을 정했으면 '정함: 까닭').
-- 몸 벡터 17 칸(감각 S1 의 body 묶음)과 학습 흔들기·'배운 범위' 표, 이름 모를 동물 카드를 만든다.
+- 몸 벡터 18 칸(감각 S1 의 body 묶음)과 학습 흔들기·'배운 범위' 표, 이름 모를 동물 카드를 만든다.
 """
 
 from __future__ import annotations
@@ -38,6 +38,9 @@ FIELDS = {
     ("body", "lat_accel_mps2"): (0.1, 50.0, False), ("body", "max_slope_deg"): (5.0, 89.0, False),
     ("body", "step_m"): (0.0, 2.0, False), ("body", "stamina_s"): (1.0, 3600.0, False),
     ("body", "stamina_recover_s"): (1.0, 3600.0, False),
+    # 덮치기 (잠깐 매우 빠르게, 뒤에 지침) — 없으면 넷 다 null. 언리얼 Native 늑대 pounce 값 (EcoThreatModel.h:205-208)
+    ("body", "burst_mps"): (0.0, 60.0, True), ("body", "burst_s"): (0.1, 30.0, True),
+    ("body", "burst_exhaust_mps"): (0.0, 30.0, True), ("body", "burst_exhaust_s"): (0.0, 120.0, True),
     ("senses", "sight_m"): (0.05, 200.0, False), ("senses", "fov_deg"): (30.0, 360.0, False),
     ("senses", "smell_m"): (0.0, 200.0, False), ("senses", "hearing_m"): (0.0, 300.0, False),
     ("senses", "night_vision"): (0.0, 1.0, False),
@@ -53,12 +56,16 @@ FIELDS = {
 }
 RANDOMIZE_DEFAULT_KEYS = ("body.mass_kg", "body.radius_m", "body.walk_mps", "body.run_mps", "body.swim_mps", "body.fly_mps",
                           "body.cruise_mps", "body.accel_mps2", "body.turn_dps", "senses.sight_m", "eat.rate_per_s",
-                          "metabolism.drain_per_day")
+                          "metabolism.drain_per_day", "body.burst_mps")
 
 
 def _need(card: dict, group: str, key: str) -> bool:
     """매체에 따라 꼭 있어야 하는 칸."""
     m = card.get("medium", {})
+    if key == "burst_mps":
+        return False
+    if key in ("burst_s", "burst_exhaust_mps", "burst_exhaust_s"):
+        return card.get("body", {}).get("burst_mps") is not None
     if key in ("swim_mps", "swim_fast_mps", "swim_depth_frac", "swim_cost"):
         return bool(m.get("swim"))
     if key in ("fly_mps", "cruise_mps", "dive_mps", "cruise_height_m", "ceiling_m", "takeoff_s", "fly_cost"):
@@ -103,6 +110,8 @@ def validate(card: dict) -> list[str]:
     b = card.get("body", {})
     if isinstance(b.get("walk_mps"), (int, float)) and isinstance(b.get("run_mps"), (int, float)) and b["run_mps"] < b["walk_mps"]:
         bad.append("body: run_mps < walk_mps")
+    if isinstance(b.get("burst_mps"), (int, float)) and isinstance(b.get("run_mps"), (int, float)) and b["burst_mps"] < b["run_mps"]:
+        bad.append("body: burst_mps < run_mps")
     if (card.get("combat", {}).get("kill_mass_ratio") or 0) > 0 and (diet.get("meat") or 0) <= 0:
         bad.append("combat: can kill but does not eat meat")
     for key in card.get("randomize", {}).get("keys", []):
@@ -136,7 +145,7 @@ def _v(card, g, k, default=0.0) -> float:
 
 
 def body_vector(card: dict) -> np.ndarray:
-    """감각 S1 body 묶음 17 칸 (0~1). 이름 차례는 contract.BODY_NAMES."""
+    """감각 S1 body 묶음 18 칸 (0~1). 이름 차례는 contract.BODY_NAMES."""
     m = card["medium"]
     d = card["diet"]
     tot = sum(float(d[k]) for k in DIET_KEYS) or 1.0
@@ -158,6 +167,7 @@ def body_vector(card: dict) -> np.ndarray:
         sum(float(d[k]) for k in WATER_DIET) / tot,
         sum(float(d[k]) for k in MEAT_DIET) / tot,
         np.clip(_v(card, "combat", "kill_mass_ratio") / 4.0, 0, 1),                      # 물 수 있는 몸무게 비 (0 ~ 4 배)
+        C.lg(_v(card, "body", "burst_mps"), 1.0, 25.0),                                  # 덮치기 속력 (0 = 없음)
     ]
     out = np.asarray([float(x) for x in v], dtype=np.float32)
     assert out.shape == (len(C.BODY_NAMES),)
@@ -184,6 +194,8 @@ def jitter(card: dict, rng: np.random.Generator) -> dict:
         c[g][k] = float(rng.uniform(lo, hi))
     b = c["body"]
     b["run_mps"] = max(b["run_mps"], b["walk_mps"])
+    if b.get("burst_mps") is not None:
+        b["burst_mps"] = max(b["burst_mps"], b["run_mps"])
     return c
 
 
@@ -204,6 +216,7 @@ def random_card(rng: np.random.Generator, idx: int = 0) -> dict:
         diet["carrion"] = float(rng.uniform(0.2, 1.0))
     if medium_kind == "water":
         diet.update(aquatic=1.0, insects=0.5, drift=0.5)
+    burst = medium_kind == "ground" and diet["meat"] > 0 and rng.random() < 0.4     # 땅 사냥꾼 가운데 덮치는 몸
     card = {
         "id": f"unknown_{idx}", "name_ko": "이름 모를 동물", "card_version": CARD_VERSION,
         "medium": {"ground": medium_kind != "water", "swim": medium_kind == "water", "fly": medium_kind == "air",
@@ -215,7 +228,9 @@ def random_card(rng: np.random.Generator, idx: int = 0) -> dict:
                  "fly_mps": 2.0 * run if medium_kind == "air" else None, "cruise_mps": 3.5 * run if medium_kind == "air" else None,
                  "dive_mps": 6.0 * run if medium_kind == "air" else None, "accel_mps2": 4.0 * j(), "turn_dps": 200.0 * j(),
                  "lat_accel_mps2": 8.0 * j(), "max_slope_deg": 35.0 * j(), "step_m": 0.4 * radius, "stamina_s": 30.0 * j(),
-                 "stamina_recover_s": 60.0 * j()},
+                 "stamina_recover_s": 60.0 * j(),
+                 "burst_mps": 1.9 * run * j() if burst else None, "burst_s": 1.6 * j() if burst else None,
+                 "burst_exhaust_mps": 0.25 * run if burst else None, "burst_exhaust_s": 4.0 * j() if burst else None},
         "senses": {"sight_m": 15.0 * j(), "fov_deg": 270.0, "smell_m": 8.0 * j(), "hearing_m": 20.0 * j(), "night_vision": float(rng.uniform(0, 1))},
         "diet": diet,
         "eat": {"rate_per_s": 0.02 * j(), "energy_per_unit": 0.5 * j()},

@@ -96,6 +96,13 @@ def diet_of(c, sid):
     return d
 
 
+# 언리얼 Native 잠행-돌진형 위협 설정 (EcoThreatModel.h:203-208): 돌진 1.5 × HerbSpeed 12 걸음, 지침 0.2 × HerbSpeed 30 걸음.
+# HerbSpeed 0.6 단위/걸음 = 9 m/s (사슴 뛰기, 1 단위 = 1 m × 15 걸음/s 환산은 초안 wolf.json run_mps 와 같음)
+NATIVE_POUNCE = {"pounce_steps": 12, "exhaust_speed": 0.2, "exhaust_steps": 30, "herb_speed_mps": 9.0,
+                 "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:203-208"}
+STEP_S = 2.0 / 15.0
+
+
 def build(c: dict) -> dict:
     sid = c["id"]
     ch = CHOSEN.get(sid, {})
@@ -160,8 +167,22 @@ def build(c: dict) -> dict:
         b["stamina_s"] = ch.get("stamina_s", 10.0)
         b["stamina_recover_s"] = ch.get("stamina_recover_s", 10.0)
         srcs["body.stamina_s"] = srcs["body.stamina_recover_s"] = "정함: Native 는 지구력 없음 → R9 어림"
+    # 덮치기: 초안에 pounce_mps 가 있는 종(언리얼 Native 잠행-돌진형)만. 시간·지침은 같은 Native 설정의 걸음 수 × 2/15 s
+    pounce = num(v(c, "body", "pounce_mps"))
+    if pounce:
+        b["burst_mps"] = pounce
+        b["burst_s"] = round(NATIVE_POUNCE["pounce_steps"] * STEP_S, 4)
+        b["burst_exhaust_mps"] = round(NATIVE_POUNCE["exhaust_speed"] * NATIVE_POUNCE["herb_speed_mps"], 4)
+        b["burst_exhaust_s"] = round(NATIVE_POUNCE["exhaust_steps"] * STEP_S, 4)
+        srcs["body.burst_mps"] = src(c, "body", "pounce_mps")
+        srcs["body.burst_s"] = srcs["body.burst_exhaust_mps"] = srcs["body.burst_exhaust_s"] = (
+            f"{NATIVE_POUNCE['src']} (native) — PounceSteps·ExhaustSteps × 2/15 s, ExhaustSpeed × HerbSpeed. "
+            "언제 덮칠지는 두뇌가 정함 (Native 는 체감 거리 StalkDist 에서 자동)")
+    else:
+        b["burst_mps"] = b["burst_s"] = b["burst_exhaust_mps"] = b["burst_exhaust_s"] = None
     order = ("mass_kg", "radius_m", "walk_mps", "run_mps", "swim_mps", "swim_fast_mps", "fly_mps", "cruise_mps", "dive_mps",
-             "accel_mps2", "turn_dps", "lat_accel_mps2", "max_slope_deg", "step_m", "stamina_s", "stamina_recover_s")
+             "accel_mps2", "turn_dps", "lat_accel_mps2", "max_slope_deg", "step_m", "stamina_s", "stamina_recover_s",
+             "burst_mps", "burst_s", "burst_exhaust_mps", "burst_exhaust_s")
     body = {k: b.get(k) for k in order}
 
     nv = v(c, "senses", "night_vision")

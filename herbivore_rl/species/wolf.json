@@ -29,7 +29,11 @@
   "max_slope_deg": 40.0,
   "step_m": 0.35,
   "stamina_s": 8.0,
-  "stamina_recover_s": 10.0
+  "stamina_recover_s": 10.0,
+  "burst_mps": 13.5,
+  "burst_s": 1.6,
+  "burst_exhaust_mps": 1.8,
+  "burst_exhaust_s": 4.0
  },
  "senses": {
   "sight_m": 28.0,
@@ -87,7 +91,8 @@
    "body.turn_dps",
    "senses.sight_m",
    "eat.rate_per_s",
-   "metabolism.drain_per_day"
+   "metabolism.drain_per_day",
+   "body.burst_mps"
   ]
  },
  "sources": {
@@ -106,6 +111,10 @@
   "body.lat_accel_mps2": "정함: M1 회전 한계 (사용자 결정 11-13, RL_R9_TURN_EFFORT_DESIGN.md 3-2)",
   "body.stamina_s": "정함: Native 는 지구력 없음 → R9 어림",
   "body.stamina_recover_s": "정함: Native 는 지구력 없음 → R9 어림",
+  "body.burst_mps": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:205-207 (native)",
+  "body.burst_s": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:203-208 (native) — PounceSteps·ExhaustSteps × 2/15 s, ExhaustSpeed × HerbSpeed. 언제 덮칠지는 두뇌가 정함 (Native 는 체감 거리 StalkDist 에서 자동)",
+  "body.burst_exhaust_mps": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:203-208 (native) — PounceSteps·ExhaustSteps × 2/15 s, ExhaustSpeed × HerbSpeed. 언제 덮칠지는 두뇌가 정함 (Native 는 체감 거리 StalkDist 에서 자동)",
+  "body.burst_exhaust_s": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:203-208 (native) — PounceSteps·ExhaustSteps × 2/15 s, ExhaustSpeed × HerbSpeed. 언제 덮칠지는 두뇌가 정함 (Native 는 체감 거리 StalkDist 에서 자동)",
   "senses.sight_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:182 (native)",
   "senses.fov_deg": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:183 (native)",
   "senses.smell_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:178-260 (native)",

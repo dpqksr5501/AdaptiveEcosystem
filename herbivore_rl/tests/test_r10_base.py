@@ -109,7 +109,7 @@ def test_random_cards_valid_and_body_vector_in_range():
         c = S.random_card(rng, i)
         assert not S.validate(c)
         v = S.body_vector(c)
-        assert v.shape == (17,) and v.min() >= 0.0 and v.max() <= 1.0
+        assert v.shape == (len(C.BODY_NAMES),) and v.min() >= 0.0 and v.max() <= 1.0
 
 
 def test_validate_catches_bad_cards():
