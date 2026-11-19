@@ -4,6 +4,8 @@
 
 - 끝 판정: 앞 단계 폴더의 종마다 <종>.out 에 '끝:' 줄이 있거나, 모든 .out 이 --stall-min 분 동안 안 바뀜(멈춤·죽음).
 - 다음 단계는 run_stage_r10.py 로 띄우고 --init-from <앞 단계 폴더> <base> (앞 단계에 없는 종은 base 에서 잇는다).
+- 단계가 끝날 때마다 export_r10.py 로 언리얼 폴더(기본 AdaptiveEcosystem/Saved/R10Demo)에 가장 새 두뇌를 내보낸다
+  (끝난 단계 → 앞 단계들 → base 차례로 종마다 찾음). 물 단계가 끝나면 마지막으로 한 번 더 내보내고 끝.
 - 기록: <root>/chain.log
 """
 
@@ -19,7 +21,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 sys.path.insert(0, str(HERE))
 
-from run_stage_r10 import ORDER, STAGES  # noqa: E402
+from run_stage_r10 import ORDER, STAGES, first_found, latest_npz  # noqa: E402
 
 FOLDER = {"ground": "stage1", "air": "stage2", "water": "stage3"}
 
@@ -55,15 +57,28 @@ def main(argv=None) -> int:
         log.write(f"{time.strftime('%m-%d %H:%M')} {msg}\n")
         log.flush()
 
+    def export(stage):
+        folders = [str(root / FOLDER[st]) for st in reversed(ORDER[:ORDER.index(stage) + 1])] + [a.base]
+        picks = [f"{s}={f}" for s in stage_species("water") if (f := first_found(folders, s, latest_npz))]
+        cmd = [sys.executable, "-X", "utf8", str(HERE / "export_r10.py"), "--brain", *picks]
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        say(f"언리얼 내보냄 ({stage} 까지, 두뇌 {len(picks)}): " + (r.stdout.strip().splitlines() or ["?"])[-1]
+            + (f" !! {r.stderr.strip()[-300:]}" if r.returncode else ""))
+
+    def wait(stage):
+        pf = root / FOLDER[stage]
+        say(f"기다림: {stage} ({pf})")
+        while True:
+            ok, why = finished(pf, stage_species(stage), a.stall_min * 60)
+            if ok:
+                return why
+            time.sleep(a.poll_s)
+
     prev = a.after
     for nxt in ORDER[ORDER.index(a.after) + 1:]:
         pf = root / FOLDER[prev]
-        say(f"기다림: {prev} ({pf})")
-        while True:
-            ok, why = finished(pf, stage_species(prev), a.stall_min * 60)
-            if ok:
-                break
-            time.sleep(a.poll_s)
+        why = wait(prev)
+        export(prev)
         nf = root / FOLDER[nxt]
         say(f"{prev} 끝 ({why}) → {nxt} 띄움 ({nf})")
         cmd = [sys.executable, "-X", "utf8", str(HERE / "run_stage_r10.py"), "--stage", nxt, "--out", str(nf),
@@ -74,7 +89,9 @@ def main(argv=None) -> int:
             return r.returncode
         time.sleep(300)          # 새 .out 이 생길 시간
         prev = nxt
-    say("이어 달리기 끝 (물 단계까지 띄움)")
+    why = wait(prev)
+    export(prev)
+    say(f"{prev} 끝 ({why}) — 이어 달리기 끝")
     return 0
 
 
