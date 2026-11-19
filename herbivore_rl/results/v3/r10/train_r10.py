@@ -21,6 +21,7 @@ from pathlib import Path
 
 for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
     os.environ.setdefault(_v, "1")
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")   # anaconda numpy(MKL) 와 torch 가 각자 libiomp5md 를 실음 (상대 두뇌 numpy 행렬곱 + torch)
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -78,6 +79,9 @@ def main(argv=None) -> int:
     ap.add_argument("--snapshot-every", type=int, default=1_000_000)
     ap.add_argument("--wall-hours", type=float, default=24.0)
     ap.add_argument("--flat", action="store_true", help="작은 확인: 평평하고 물 없는 맵만")
+    ap.add_argument("--curriculum", type=int, default=0, help="밀도 단계: 이 결정 수에 걸쳐 작은·빽빽한 맵 → 보통 범위 (0 = 끔)")
+    ap.add_argument("--size0", type=int, nargs=2, default=[30, 45], help="밀도 단계 첫 맵 한 변 범위 m")
+    ap.add_argument("--prey0", type=int, nargs=2, default=[8, 12], help="밀도 단계 첫 먹잇감 종마다 수 범위")
     a = ap.parse_args(argv)
 
     import torch
@@ -93,8 +97,9 @@ def main(argv=None) -> int:
         sid, _, path = spec.partition("=")
         brains[sid] = load_brain(path)
     overrides = {"shape": "flat", "water": "none"} if a.flat else None
+    curriculum = {"decisions": a.curriculum, "size0": a.size0, "prey0": a.prey0} if a.curriculum > 0 else None
     env = R10VecEnv(a.species, cards, n_worlds=a.worlds, learner_cap=a.learner_cap, brains=brains, seed=a.seed,
-                    map_overrides=overrides)
+                    map_overrides=overrides, curriculum=curriculum)
     policy_cls = P.make_sb3_policy()
     if a.init:
         model = PPO.load(a.init, env=env, device="cpu", custom_objects={"policy_class": policy_cls, "learning_rate": a.lr})
@@ -107,7 +112,8 @@ def main(argv=None) -> int:
     card = cards[a.species]
     meta_base = {"format": "r10-brain", "version": 1, "species": a.species, "io_hash": C.io_hash(), "card_sha": sha(card),
                  "trained_range": S.trained_range(card), "map_ranges_sha": sha(G.RANGES), "rules": dataclasses.asdict(W.Rules()),
-                 "world_species": sorted(cards), "opponent_brains": sorted(brains), "flat": a.flat, "git": git_sha(), "seed": a.seed}
+                 "world_species": sorted(cards), "opponent_brains": sorted(brains), "flat": a.flat, "git": git_sha(), "seed": a.seed,
+                 "curriculum": curriculum, "prey_by_body": sorted(env.prey)}
     log = (out / f"{a.species}.log.jsonl").open("a", encoding="utf-8")
     t0 = time.time()
 
@@ -135,7 +141,7 @@ def main(argv=None) -> int:
 
         def _on_rollout_end(self):
             w = env.world
-            row = {"t": self.num_timesteps, "wall_s": round(time.time() - t0, 1),
+            row = {"t": self.num_timesteps, "wall_s": round(time.time() - t0, 1), "cur": round(env.progress(), 3),
                    "dps": round(self.num_timesteps / max(time.time() - t0, 1e-6), 1),
                    "ep_ret": round(float(np.mean(self.rets[-200:])), 3) if self.rets else None,
                    "E": round(float(w.E[env.learner_slots][w.alive[env.learner_slots]].mean()), 3) if w.alive[env.learner_slots].any() else None,

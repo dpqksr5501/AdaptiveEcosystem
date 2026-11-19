@@ -3,6 +3,8 @@
 - 세계 K 개, 세계마다 무작위 맵(학습 시드 범위)과 무작위 종 목록. 학습하는 종은 늘 있고 세계마다 learner_cap 칸.
 - 다른 종은 고정 두뇌(numpy 가중치)나 공통 규칙 두뇌로 움직인다. 이름 모를 동물도 가끔 넣는다(규칙 두뇌).
 - renew_decisions 마다 모든 세계를 새 맵·새 종 목록으로 바꾼다(그때 학습 칸 모두 끝). 학습 칸은 죽으면 다음 결정에 되살아난다.
+- curriculum(밀도 단계): 처음엔 작은 맵에 학습 종이 물 수 있는 몸(몸무게 비·같은 매체, 종 이름 아님)을 많이 두고,
+  curriculum["decisions"] 결정에 걸쳐 맵 크기·먹잇감 수를 보통 범위(mapgen RANGES·1~other_cap)로 넓힌다. 세계 규칙·계약은 그대로.
 """
 
 from __future__ import annotations
@@ -29,7 +31,7 @@ class R10VecEnv(VecEnv):
     def __init__(self, learner: str, cards: dict, n_worlds: int = 8, learner_cap: int = 8, other_cap: int = 6,
                  present_p: float = 0.75, unknown_max: int = 2, brains: dict | None = None, seed: int = 0,
                  renew_decisions: int = 2500, map_purpose: str = "train", map_seed0: int | None = None,
-                 map_overrides: dict | None = None, rules: W.Rules | None = None):
+                 map_overrides: dict | None = None, rules: W.Rules | None = None, curriculum: dict | None = None):
         if learner not in cards:
             raise ValueError(f"learner {learner!r} not in cards {sorted(cards)}")
         self.learner = learner
@@ -48,7 +50,11 @@ class R10VecEnv(VecEnv):
         self.map_seed0 = int(map_seed0 if map_seed0 is not None else lo + (int(seed) * 997) % (hi - lo))
         self.map_overrides = map_overrides
         self.rules = rules or W.Rules()
-        self.slots = self.learner_cap + self.other_cap * (len(cards) - 1) + 2 * self.unknown_max
+        self.curriculum = dict(curriculum) if curriculum else None
+        self.prey = self._prey_ids()
+        self.prey_cap = max(self.other_cap, int(self.curriculum["prey0"][1])) if self.curriculum else self.other_cap
+        self.slots = (self.learner_cap + self.other_cap * (len(cards) - 1 - len(self.prey)) + self.prey_cap * len(self.prey)
+                      + 2 * self.unknown_max)
         self.n_renew = 0
         self.decisions = 0
         self._build()
@@ -65,13 +71,45 @@ class R10VecEnv(VecEnv):
 
     # ------------------------------------------------------------------ 세계 만들기
 
+    def _prey_ids(self) -> set:
+        """학습 종이 물 수 있는 종: 고기를 먹고, 상대 몸무게 ≤ 내 몸무게 × kill_mass_ratio, 같은 매체 (세계 물기 규칙의 몸 조건)."""
+        me = self.cards[self.learner]
+        kr = (me.get("combat", {}).get("kill_mass_ratio") or 0.0)
+        if kr <= 0 or (me.get("diet", {}).get("meat") or 0) <= 0:
+            return set()
+        lim = me["body"]["mass_kg"] * kr
+        return {sid for sid, c in self.cards.items()
+                if sid != self.learner and c["body"]["mass_kg"] <= lim
+                and any(me["medium"].get(k) and c["medium"].get(k) for k in ("ground", "swim", "fly"))}
+
+    def progress(self) -> float:
+        """밀도 단계 진행 0 → 1 (학습 칸 결정 수 기준)."""
+        if not self.curriculum:
+            return 1.0
+        return float(min(1.0, self.decisions * self.K * self.learner_cap / max(1, int(self.curriculum["decisions"]))))
+
+    def _lerp(self, a, b):
+        t = self.progress()
+        return a + (b - a) * t
+
     def _roster(self):
         ents = [(self.cards[self.learner], self.learner_cap, self.learner_cap)]
         ids = [self.learner]
+        cur = self.curriculum
         for sid, card in self.cards.items():
-            if sid == self.learner or self.rng.random() > self.present_p:
+            if sid == self.learner:
                 continue
-            ents.append((card, int(self.rng.integers(1, self.other_cap + 1)), self.other_cap))
+            if sid in self.prey and cur:
+                lo = int(round(self._lerp(cur["prey0"][0], 1)))
+                hi = int(round(self._lerp(cur["prey0"][1], self.other_cap)))
+                if self.rng.random() > self._lerp(1.0, self.present_p):
+                    continue
+                ents.append((card, int(self.rng.integers(lo, max(lo, hi) + 1)), self.prey_cap))
+                ids.append(sid)
+                continue
+            if self.rng.random() > self.present_p:
+                continue
+            ents.append((card, int(self.rng.integers(1, self.other_cap + 1)), self.prey_cap if sid in self.prey else self.other_cap))
             ids.append(sid)
         for u in range(int(self.rng.integers(0, self.unknown_max + 1))):
             uc = S.random_card(self.rng, u)
@@ -85,7 +123,13 @@ class R10VecEnv(VecEnv):
             seed = self.map_seed0 + self.n_renew * self.K + k
             lo, hi = G.SEED_RANGES[self.map_purpose]
             seed = lo + (seed - lo) % (hi - lo)
-            maps.append(G.make_map(seed, self.map_purpose, self.map_overrides))
+            ov = dict(self.map_overrides or {})
+            if self.curriculum:
+                lo = int(round(self._lerp(self.curriculum["size0"][0], G.RANGES["size_m"][0])))
+                hi = int(round(self._lerp(self.curriculum["size0"][1], G.RANGES["size_m"][1])))
+                ov.setdefault("w", int(self.rng.integers(lo, hi + 1)))
+                ov.setdefault("h", int(self.rng.integers(lo, hi + 1)))
+            maps.append(G.make_map(seed, self.map_purpose, ov or None))
             r, ids = self._roster()
             rosters.append(r)
             self.ids.append(ids)
