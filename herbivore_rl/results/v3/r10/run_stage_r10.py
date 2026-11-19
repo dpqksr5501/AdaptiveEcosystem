@@ -5,7 +5,7 @@
     python -X utf8 results/v3/r10/run_stage_r10.py --stage water --out ckpt/r10/stage3 --init-from ckpt/r10/stage2
 
 - 세계 종 = 그 단계까지의 종 모두. 학습 종 = 그 단계까지의 종 모두(앞 단계 종은 이어 배움). 같은 --out 폴더가 리그(서로 최신 두뇌를 상대로).
-- --init-from 폴더에 그 종의 zip 이 있으면 가장 큰 결정 수에서 잇는다. 없으면 처음부터.
+- --init-from 폴더에 그 종의 zip 이 있으면 가장 큰 결정 수에서 잇는다. 없으면 처음부터. 그 폴더의 다른 종 npz 는 첫 상대(리그가 차기 전).
 - 사냥하는 몸(고기를 먹고 kill_mass_ratio > 0)은 밀도 단계(처음 작은 맵·먹잇감 많이)를 쓴다.
 - 종마다 프로세스 하나(torch 스레드 1). 출력은 <out>/<종>.out · .log.jsonl · <종>_<결정>.zip/.npz.
 """
@@ -39,6 +39,11 @@ def latest_zip(folder: Path, sid: str):
     return best[1] if best else None
 
 
+def latest_npz(folder: Path, sid: str):
+    z = latest_zip(folder, sid)
+    return z.with_suffix(".npz") if z and z.with_suffix(".npz").exists() else None
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--stage", choices=ORDER, required=True)
@@ -67,6 +72,10 @@ def main(argv=None) -> int:
         init = latest_zip(Path(a.init_from), sid) if a.init_from else None
         if init:
             cmd += ["--init", str(init)]
+        if a.init_from:   # 리그 폴더가 비어 있는 첫 1M 동안도 규칙 두뇌가 아니라 앞 폴더의 다른 종 두뇌를 상대로
+            opp = [f"{o}={f}" for o in species if o != sid and (f := latest_npz(Path(a.init_from), o))]
+            if opp:
+                cmd += ["--brains", *opp]
         print(sid, "사냥" if hunter else "", init.name if init else "처음부터", flush=True)
         if not a.dry:
             fh = open(out / f"{sid}.out", "a", encoding="utf-8")

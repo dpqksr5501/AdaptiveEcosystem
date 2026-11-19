@@ -141,6 +141,7 @@ def main(argv=None) -> int:
                  "curriculum": curriculum, "prey_by_body": sorted(env.prey)}
     log = (out / f"{a.species}.log.jsonl").open("a", encoding="utf-8")
     t0 = time.time()
+    n_start = int(model.num_timesteps)      # 이어 학습 시작 결정 수 (dps 는 이번 실행분만)
 
     def snapshot(tag):
         w = P.extract_sb3(model)
@@ -152,8 +153,9 @@ def main(argv=None) -> int:
     class Cb(BaseCallback):
         def __init__(self):
             super().__init__()
-            self.next_snap = a.snapshot_every
-            self.next_refresh = a.refresh_every
+            n0 = int(model.num_timesteps)           # 이어 학습이면 그 결정 수 다음 칸부터 (한꺼번에 여러 번 찍지 않게)
+            self.next_snap = (n0 // a.snapshot_every + 1) * a.snapshot_every
+            self.next_refresh = (n0 // a.refresh_every + 1) * a.refresh_every
             self.rets = []
 
         def _on_step(self):
@@ -178,7 +180,7 @@ def main(argv=None) -> int:
                 log.write(json.dumps({"t": self.num_timesteps, "league": got}) + "\n")
             w = env.world
             row = {"t": self.num_timesteps, "wall_s": round(time.time() - t0, 1), "cur": round(env.progress(), 3),
-                   "dps": round(self.num_timesteps / max(time.time() - t0, 1e-6), 1),
+                   "dps": round((self.num_timesteps - n_start) / max(time.time() - t0, 1e-6), 1),
                    "ep_ret": round(float(np.mean(self.rets[-200:])), 3) if self.rets else None,
                    "E": round(float(w.E[env.learner_slots][w.alive[env.learner_slots]].mean()), 3) if w.alive[env.learner_slots].any() else None,
                    "deaths": dict(__import__("collections").Counter(d[4] for d in w.events["deaths"]))}
