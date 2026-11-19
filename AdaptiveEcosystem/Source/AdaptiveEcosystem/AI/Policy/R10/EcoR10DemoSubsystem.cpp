@@ -34,6 +34,7 @@
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
+#include "Misc/PackageName.h"
 #include "Misc/Paths.h"
 #include "ShaderCompiler.h"
 #include "UnrealClient.h"
@@ -63,6 +64,9 @@ namespace EcoR10DemoImpl
 		TEXT("R10 데모 종마다 '시작 수,상한' (예 8,12)."), ECVF_Default);
 	static TAutoConsoleVariable<float> CVarSpeed(TEXT("eco.R10Demo.Speed"), 1.0f, TEXT("R10 데모 빠르기 (1 = 학습 세계 시간 그대로)."), ECVF_Default);
 	static TAutoConsoleVariable<int32> CVarSeed(TEXT("eco.R10Demo.Seed"), 1, TEXT("R10 데모 시드 (장면·확률 뽑기)."), ECVF_Default);
+	static TAutoConsoleVariable<FString> CVarOnlyMap(TEXT("eco.R10Demo.OnlyMap"), TEXT(""),
+		TEXT("R10 데모를 콘솔 값(eco.R10Demo 1)으로 켰을 때 이 맵들(패키지 경로 또는 짧은 이름, 쉼표)에서만 Play 때 켬. 비면 모든 맵. 명령줄·Play 중 직접 친 값은 거르지 않음."),
+		ECVF_Default);
 	static TAutoConsoleVariable<int32> CVarHide(TEXT("eco.R10Demo.HideOthers"), 1,
 		TEXT("R10 데모 동안 맵의 다른 동물 표현 액터를 보이지 않게 (그쪽 시뮬레이션은 그대로)."), ECVF_Default);
 
@@ -172,6 +176,7 @@ struct FEcoR10DemoState
 	// 설정
 	bool bWanted = false;
 	bool bFromCmd = false;
+	FString OnlyMap;
 	FString Dir;
 	int32 AreaM = 300;
 	double CellM = 1.0;
@@ -282,6 +287,7 @@ static void ResolveR10DemoSettings(FEcoR10DemoState& S)
 		S.bFromCmd = true;
 	}
 	S.bWanted = S.bFromCmd || CVarDemo.GetValueOnGameThread() != 0;
+	S.OnlyMap = CVarOnlyMap.GetValueOnGameThread().TrimStartAndEnd();
 	if (Dir.IsEmpty())
 	{
 		Dir = CVarDir.GetValueOnGameThread();
@@ -343,11 +349,51 @@ static void ResolveR10DemoSettings(FEcoR10DemoState& S)
 	FParse::Value(Cmd, TEXT("-EcoR10CamCycle="), S.CamCycle);
 }
 
+// eco.R10Demo.OnlyMap 안의 맵인가 (R9 eco.R9Demo.OnlyMap 과 같은 꼴: '/Game/X/LV' · '/Game/X/LV.LV' · 'LV').
+static bool R10MapAllowed(const FString& OnlyMap, const UWorld* W)
+{
+	if (OnlyMap.IsEmpty() || !W || !W->GetPackage())
+	{
+		return true;
+	}
+	const FString Pkg = UWorld::RemovePIEPrefix(W->GetPackage()->GetName());
+	const FString Short = FPackageName::GetShortName(Pkg);
+	FString List = OnlyMap;
+	List.ReplaceInline(TEXT(";"), TEXT(","));
+	TArray<FString> Items;
+	List.ParseIntoArray(Items, TEXT(","), true);
+	for (FString Item : Items)
+	{
+		Item.TrimStartAndEndInline();
+		Item.TrimQuotesInline();
+		if (Item.IsEmpty())
+		{
+			continue;
+		}
+		const FString ItemPkg = Item.StartsWith(TEXT("/")) ? FPackageName::ObjectPathToPackageName(Item) : Item;
+		if (ItemPkg.Equals(Pkg, ESearchCase::IgnoreCase) || ItemPkg.Equals(Short, ESearchCase::IgnoreCase))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+static void ApplyR10MapFilter(FEcoR10DemoState& S, const UWorld* W)
+{
+	if (S.bWanted && !S.bFromCmd && !R10MapAllowed(S.OnlyMap, W))
+	{
+		S.bWanted = false;
+		UE_LOG(LogEcoR10Demo, Log, TEXT("[EcoR10Demo] 이 맵은 eco.R10Demo.OnlyMap(%s) 밖 — 켜지 않음 (Play 중 콘솔 eco.R10Demo 1 로 켤 수 있음)"), *S.OnlyMap);
+	}
+}
+
 void UEcoR10DemoSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
 	State = MakeShared<FEcoR10DemoState>();
 	ResolveR10DemoSettings(*State);
+	ApplyR10MapFilter(*State, GetWorld());
 	State->DrawHandle = UDebugDrawService::Register(TEXT("Game"), FDebugDrawDelegate::CreateUObject(this, &UEcoR10DemoSubsystem::DrawOverlay));
 	if (State->bWanted)
 	{
@@ -385,6 +431,7 @@ void UEcoR10DemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 	ResolveR10DemoSettings(*State);
+	ApplyR10MapFilter(*State, &InWorld);
 	if (State->bWanted)
 	{
 		StartDemo(TEXT("Play 시작"));
