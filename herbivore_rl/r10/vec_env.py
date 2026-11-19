@@ -161,7 +161,7 @@ class R10VecEnv(VecEnv):
         for sid, idx in by_id.items():
             idx = np.array(idx)
             wts = self.brains.get(sid)
-            a[idx] = P.act_np(wts, obs_all[idx]) if wts is not None else RB.decide(obs_all[idx])
+            a[idx] = P.sample_np(wts, obs_all[idx], self.rng) if wts is not None else RB.decide(obs_all[idx])   # 계약 select = 확률 뽑기
         return a
 
     # ------------------------------------------------------------------ VecEnv

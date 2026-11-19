@@ -4,7 +4,9 @@
 
 - PPO(SB3) + 감각 마스크 정책(r10.policy) · 망 206 → 128 → 128 → 24 tanh · γ 0.99.
 - 판: <out>/<종>_<결정>.zip (SB3, 옵티마이저 포함) · .npz (numpy 가중치 + meta_json: 계약 해시·카드 sha·배운 범위·맵 범위·규칙).
-- 상대: --brains 종=npz 가 없으면 공통 규칙 두뇌. 이름 모를 동물은 늘 규칙 두뇌.
+- 상대: --brains 종=npz 가 없으면 공통 규칙 두뇌. 이름 모를 동물은 늘 규칙 두뇌. 상대 두뇌도 확률 뽑기(계약 select).
+- 리그: --league-dir 를 주면 --refresh-every 결정마다 그 폴더에서 다른 종의 가장 큰 결정 수 npz 를 다시 읽어 상대로 쓴다
+  (여러 종을 같은 폴더로 동시에 학습하면 서로 최신 두뇌를 상대로 함께 는다).
 """
 
 from __future__ import annotations
@@ -53,11 +55,25 @@ def git_sha() -> str:
 load_brain = P.load_brain
 
 
+def latest_brains(folder, skip: str, want) -> dict:
+    """폴더에서 종마다 가장 큰 결정 수 npz → {종: 경로} (skip 종 제외, want 안의 종만)."""
+    best = {}
+    for f in Path(folder).glob("*_*.npz"):
+        sid, _, n = f.stem.rpartition("_")
+        if sid == skip or sid not in want or not n.isdigit():
+            continue
+        if sid not in best or int(n) > best[sid][0]:
+            best[sid] = (int(n), f)
+    return {k: v[1] for k, v in best.items()}
+
+
 def save_brain(path: Path, weights: dict, meta: dict) -> None:
     arrays = dict(weights)
     arrays["meta_json"] = np.array(json.dumps(meta, sort_keys=True, ensure_ascii=True))
-    with open(path, "wb") as fh:
+    tmp = Path(str(path) + ".part")          # 리그로 다른 프로세스가 읽으므로 다 쓴 뒤 이름을 바꾼다
+    with open(tmp, "wb") as fh:
         np.savez(fh, **arrays)
+    os.replace(tmp, path)
 
 
 def main(argv=None) -> int:
@@ -82,6 +98,8 @@ def main(argv=None) -> int:
     ap.add_argument("--curriculum", type=int, default=0, help="밀도 단계: 이 결정 수에 걸쳐 작은·빽빽한 맵 → 보통 범위 (0 = 끔)")
     ap.add_argument("--size0", type=int, nargs=2, default=[30, 45], help="밀도 단계 첫 맵 한 변 범위 m")
     ap.add_argument("--prey0", type=int, nargs=2, default=[8, 12], help="밀도 단계 첫 먹잇감 종마다 수 범위")
+    ap.add_argument("--league-dir", default=None, help="상대 두뇌를 주기적으로 다시 읽을 폴더 (종_결정.npz)")
+    ap.add_argument("--refresh-every", type=int, default=1_000_000)
     a = ap.parse_args(argv)
 
     import torch
@@ -96,6 +114,13 @@ def main(argv=None) -> int:
     for spec in a.brains:
         sid, _, path = spec.partition("=")
         brains[sid] = load_brain(path)
+    if a.league_dir:
+        for sid, f in latest_brains(a.league_dir, a.species, cards).items():
+            if sid not in brains:
+                try:
+                    brains[sid] = load_brain(f)
+                except ValueError as e:   # 계약이 다른 옛 두뇌
+                    print(f"리그 건너뜀 {f}: {e}", flush=True)
     overrides = {"shape": "flat", "water": "none"} if a.flat else None
     curriculum = {"decisions": a.curriculum, "size0": a.size0, "prey0": a.prey0} if a.curriculum > 0 else None
     env = R10VecEnv(a.species, cards, n_worlds=a.worlds, learner_cap=a.learner_cap, brains=brains, seed=a.seed,
@@ -112,7 +137,7 @@ def main(argv=None) -> int:
     card = cards[a.species]
     meta_base = {"format": "r10-brain", "version": 1, "species": a.species, "io_hash": C.io_hash(), "card_sha": sha(card),
                  "trained_range": S.trained_range(card), "map_ranges_sha": sha(G.RANGES), "rules": dataclasses.asdict(W.Rules()),
-                 "world_species": sorted(cards), "opponent_brains": sorted(brains), "flat": a.flat, "git": git_sha(), "seed": a.seed,
+                 "world_species": sorted(cards), "opponent_brains": sorted(brains), "league_dir": a.league_dir, "flat": a.flat, "git": git_sha(), "seed": a.seed,
                  "curriculum": curriculum, "prey_by_body": sorted(env.prey)}
     log = (out / f"{a.species}.log.jsonl").open("a", encoding="utf-8")
     t0 = time.time()
@@ -128,6 +153,7 @@ def main(argv=None) -> int:
         def __init__(self):
             super().__init__()
             self.next_snap = a.snapshot_every
+            self.next_refresh = a.refresh_every
             self.rets = []
 
         def _on_step(self):
@@ -140,6 +166,16 @@ def main(argv=None) -> int:
             return (time.time() - t0) < a.wall_hours * 3600
 
         def _on_rollout_end(self):
+            if a.league_dir and self.num_timesteps >= self.next_refresh:
+                self.next_refresh += a.refresh_every
+                got = []
+                for sid, f in latest_brains(a.league_dir, a.species, cards).items():
+                    try:
+                        env.brains[sid] = load_brain(f)
+                        got.append(f.stem)
+                    except Exception as e:  # noqa: BLE001 — 옛 계약·깨진 파일은 건너뛰고 예전 상대를 그대로
+                        print(f"리그 건너뜀 {f}: {e}", flush=True)
+                log.write(json.dumps({"t": self.num_timesteps, "league": got}) + "\n")
             w = env.world
             row = {"t": self.num_timesteps, "wall_s": round(time.time() - t0, 1), "cur": round(env.progress(), 3),
                    "dps": round(self.num_timesteps / max(time.time() - t0, 1e-6), 1),
