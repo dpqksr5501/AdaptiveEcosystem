@@ -26,7 +26,10 @@ R9(`env_v2/r9_*`, `results/v3/r9/`)는 그대로 두고 새 꾸러미 `herbivore
 | `r10/policy.py` · `r10/rule_brain.py` | 감각 마스크 정책(SB3·numpy) · 공통 규칙 두뇌(잣대·0 바퀴 상대) |
 | `r10/vec_env.py` | 한 종 학습 칸 (SB3 VecEnv) |
 | `make_cards.py` · `card_sources/` | 언리얼 값 초안(칸마다 출처) → 종 카드. 언리얼 값이 바뀌면 다시 돌림 |
-| `train_r10.py` · `eval_r10.py` | 한 종 학습 · 처음 보는 맵에서 배운 두뇌 대 규칙 두뇌 |
+| `train_r10.py` · `eval_r10.py` | 한 종 학습(밀도 단계·리그) · 처음 보는 맵에서 배운 두뇌 대 규칙 두뇌 |
+| `run_stage_r10.py` | 정식 학습 단계 띄우개 (땅 10 → 하늘 2 → 물 4, 종마다 프로세스 하나, 같은 폴더가 리그) |
+| `export_r10.py` | 언리얼로 내보내기: 종 카드 → `species.txt`, 두뇌 npz → `<종>.r10brain` (기본 `AdaptiveEcosystem/Saved/R10Demo`) |
+| 언리얼 `AI/Policy/R10/` | `EcoR10Core.h` 엔진 없는 C++ 세계·감각·두뇌(파이썬과 감각·상태 차이 0) · `EcoR10DemoSubsystem` 맵 훑기·16 종 몸·카메라 |
 | `tests/test_r10_base.py` · `tests/test_r10_world.py` | 계약·생성기·카드·물리·감각 회전 불변·종 수 불변·결정성 (23 개) |
 
 ## 명령 (herbivore_rl/ 에서, PYTHONUTF8=1)
@@ -38,6 +41,28 @@ python -X utf8 results/v3/r10/eval_r10.py --only deer wolf boar --flat          
 python -X utf8 results/v3/r10/train_r10.py --species deer --only deer wolf boar --flat --decisions 5000000 --out ckpt/r10/small
 python -X utf8 results/v3/r10/eval_r10.py --only deer wolf boar --flat --brain deer=ckpt/r10/small/deer_<결정>.npz
 ```
+
+## 언리얼에서 돌리기
+
+```
+python -X utf8 results/v3/r10/export_r10.py --brains-dir ckpt/r10/all1 --out ../AdaptiveEcosystem/Saved/R10Demo
+```
+- 켜기: 명령줄 `-EcoR10Demo[=폴더]`, 콘솔 `eco.R10Demo 1` (Play 전이나 Play 중). `eco.R10Demo.OnlyMap` 에 맵을 두면 콘솔 값으로 켠 판은 그 맵에서만.
+  이 PC 는 `Config/UserEngine.ini`(git 제외)에 `eco.R10Demo=1` · `OnlyMap=/Game/EcoTest/Maps/LV_EcoV3_Island` — 섬 맵 Play 하면 바로 뜬다. R10 이 켜지면 그 실행의 R9 데모는 꺼진다.
+- 플레이어 둘레 300 m 를 1 m 칸으로 훑어(학습 맵과 같은 칸) 높이·물·나무·가림을 코어 지형 층으로, 먹이는 mapgen 규칙으로 만든다. 물이 영역 밖이면 가장 가까운 물가 쪽으로 옮긴다.
+- 종마다 8 마리(상한 12), 죽은 칸은 50 결정 뒤 다시 남. 결정마다 감각 → 개체마다 시드 둔 확률 뽑기 → 한 결정. 두뇌가 없는 종은 공통 규칙 두뇌.
+- 단축키: N/P 종 · `,` `.` 개체 · T 위에서 · F 자유 · H 글.
+- 알려진 것: 섬 메시 이름으로는 덤불·바위가 거의 안 잡혀 은신처는 가림 값만 있고 보이는 물체가 없다 · 먹이 층은 그리지 않는다 · 화면은 코어 x·y 를 언리얼 X·Y 그대로(거울 꼴, 코어 안에서는 일관).
+
+## 정식 학습
+
+```
+python -X utf8 results/v3/r10/run_stage_r10.py --stage ground --out ckpt/r10/stage1 --init-from ckpt/r10/all1
+```
+- 설계 10·16 절 차례: 땅 10 종 → 하늘 2 종(까마귀·검독수리) → 물 4 종(밍크·메기·잉어·작은 물고기). 앞 단계 종은 이어 배운다.
+- 리그: 같은 폴더에서 함께 배우는 다른 종의 최신 두뇌를 100 만 결정마다 다시 읽어 상대로 쓴다(상대도 확률 뽑기).
+- 사냥하는 몸은 밀도 단계(처음 30~45 m 맵·먹잇감 종마다 4~8, 300 만 결정에 걸쳐 보통 범위로).
+- 하늘·물 단계 앞에 먹이·기운 숫자를 맞춘다(규칙 잣대 16 종: 검독수리 굶음 1.6/k, 물고기 0.46~0.77/k).
 
 ## 지금 알려진 것 (2026-11-19)
 
@@ -70,3 +95,8 @@ python -X utf8 results/v3/r10/eval_r10.py --only deer wolf boar --flat --brain d
 
 - 사슴은 덮치기 세계에서도 잘 배웠다(굶음 0, 물림이 규칙의 60 %).
 - **늑대는 덮치기가 있어도 사냥을 못 배웠다.** 원인은 속도보다 '못 만남'이다. 늑대 결정 가운데 물 수 있는 먹잇감이 보이는 때가 2~3 % 뿐이고(시야 28 m, 맵 60~200 m, 종마다 6 마리), 배운 늑대는 먹잇감이 보일 때 덮치기를 0.1 % 만 고른다. 규칙 늑대도 보일 때까지 서서 기다린다(늑대는 냄새 0 이라 먹잇감 방향 감각이 없음).
+
+## 사체 방향 감각 (2026-11-19, 8a8ed32e)
+
+고기 먹는 몸은 먹이 감각 반경(max(냄새, 시야/2)) 안 사체 고기를 8 방향 '먹이' 칸에 더한다(칸 이름·수 그대로). 전에는 사체를 발밑 1.4 m 안에서만 느껴 물어 죽이고도 고기를 못 찾았다.
+규칙 잣대 16 종(점검 시드 60000~60007, 1,350 결정): 늑대 굶음 0.672 → 0.303/k · 살아남음 8 → 20/48 · 죽임 1.03 → 1.58/k, 표범 굶음 0.412 → 0.211/k.
