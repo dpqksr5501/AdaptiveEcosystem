@@ -60,7 +60,7 @@
  },
  "metabolism": {
   "drain_per_day": 0.5533,
-  "reserve_days": 3.0,
+  "reserve_days": 8.0,
   "run_cost": 3.0,
   "swim_cost": null,
   "fly_cost": null
@@ -121,8 +121,8 @@
   "senses.hearing_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:178-260 (native)",
   "senses.night_vision": "정함: Native 는 낮밤 규칙만 있고 밤눈 값 없음",
   "diet": "초안 diet (선호 수치·True=1·목록=1) + 정함: {}",
-  "eat": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다",
-  "metabolism": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다",
+  "eat": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 11-19 기운 장부로 맞춤: 물에만 사는 몸 헤엄 비용 1(땅·물 몸 2), 나는 비용 1.5, 고기가 먹이 절반 이상이면 비축 8 일(아니면 3 일). 언리얼 식사·에너지 모형과 단위가 다르다",
+  "metabolism": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 11-19 기운 장부로 맞춤: 물에만 사는 몸 헤엄 비용 1(땅·물 몸 2), 나는 비용 1.5, 고기가 먹이 절반 이상이면 비축 8 일(아니면 3 일). 언리얼 식사·에너지 모형과 단위가 다르다",
   "combat.kill_mass_ratio": "정함: Native 늑대는 사슴만 — 사슴 60 kg 이 드는 비율",
   "combat.reach_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:184 (native)",
   "combat.defense": "herbivore_rl/configs/v3_r9.yaml:189 (r9-yaml)",

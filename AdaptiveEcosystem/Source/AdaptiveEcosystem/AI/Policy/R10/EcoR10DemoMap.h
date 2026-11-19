@@ -331,7 +331,11 @@ namespace EcoR10Demo
 				case 6: bWhere = bWater; break;                         // aquatic
 				default: bWhere = false; break;                         // drift (물살 0)
 				}
-				const double P = std::min(1.0, std::max(0.0, std::min(1.0, std::max(0.0, Patch[k] - Cut)) * 2.0));
+				double P = std::min(1.0, std::max(0.0, std::min(1.0, std::max(0.0, Patch[k] - Cut)) * 2.0));
+				if (f == 6)
+				{
+					P = std::max(P, 0.3);   // mapgen AQUATIC_FLOOR: 물 바닥 먹이는 물 전체에 얇게 (11-19)
+				}
 				const double C = bWhere ? P * BaseCap * Abund * (1.0 - M.Block[k]) : 0.0;
 				CapAll[f][k] = C;
 				RegenAll[f][k] = C > 0.0 ? BaseRegen * Abund * RegenJ : 0.0;

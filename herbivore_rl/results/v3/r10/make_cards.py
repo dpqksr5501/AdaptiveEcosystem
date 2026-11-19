@@ -36,10 +36,15 @@ CHOSEN = {
              "diet": {"grass": 1.0, "forbs": 0.8, "browse": 0.5, "wet_meadow": 0.8}},
     "wolf": {"accel_mps2": 20.0, "stamina_s": 8.0, "stamina_recover_s": 10.0, "night_vision": 0.3, "kill_mass_ratio": 1.6},
     "mink": {"diet": {"roots": 0.3}},
-    "ariake_catfish": {"diet": {"insects": 1.0, "aquatic": 0.5}},
+    "ariake_catfish": {"diet": {"insects": 1.0, "aquatic": 0.5}, "smell_m": 15.0},
+    # 11-19 정함: 물고기는 눈(3~5 m)보다 냄새·맛(화학 감각)으로 먹이를 찾는다 — 언리얼 초안에 값 없음. 메기는 몸 전체 맛봉오리라 더 멀리
+    "common_carp": {"smell_m": 10.0},
+    "small_fish": {"smell_m": 10.0},
 }
 RESERVE_DAYS = 3.0
-RUN_COST, SWIM_COST, FLY_COST = 3.0, 2.0, 3.0
+RESERVE_DAYS_MEAT = 8.0           # 11-19 정함: 고기가 먹이 절반 이상인 몸 (굶주림·포식 반복 — 늑대 등은 1~2 주 굶고 버팀)
+RUN_COST, FLY_COST = 3.0, 1.5     # 11-19 정함: 나는 몸의 순항 비용 3 → 1.5 (까마귀가 공중 31 % 로 먹는 것보다 더 씀)
+SWIM_COST_LAND, SWIM_COST_WATER = 2.0, 1.0   # 11-19 정함: 물에만 사는 몸은 헤엄이 걷기 (늘 2 배라 60~78 % 먹어도 굶음)
 DAY_S = 120.0                     # 하루 = 900 걸음 × 2/15 s
 
 
@@ -187,12 +192,14 @@ def build(c: dict) -> dict:
 
     nv = v(c, "senses", "night_vision")
     senses = {"sight_m": num(v(c, "senses", "sight_m"), 10.0), "fov_deg": num(v(c, "senses", "fov_deg"), 198.0),
-              "smell_m": num(v(c, "senses", "smell_m"), 0.0), "hearing_m": num(v(c, "senses", "hearing_m"), 0.0),
+              "smell_m": ch.get("smell_m", num(v(c, "senses", "smell_m"), 0.0)), "hearing_m": num(v(c, "senses", "hearing_m"), 0.0),
               "night_vision": ch.get("night_vision", num(nv, 0.5))}
     for k in senses:
         srcs[f"senses.{k}"] = src(c, "senses", k)
     if "night_vision" in ch:
         srcs["senses.night_vision"] = "정함: Native 는 낮밤 규칙만 있고 밤눈 값 없음"
+    if "smell_m" in ch:
+        srcs["senses.smell_m"] = "정함(11-19): 물고기 화학 감각 — 눈보다 냄새·맛으로 먹이를 찾음 (언리얼 초안 값 없음, 기운 장부에서 먹이 없는 물에 갇혀 굶음)"
 
     diet = diet_of(c, sid)
     srcs["diet"] = "초안 diet (선호 수치·True=1·목록=1) + 정함: " + json.dumps(CHOSEN.get(sid, {}).get("diet", {}), ensure_ascii=False)
@@ -202,10 +209,14 @@ def build(c: dict) -> dict:
     drain = min(max(0.5 * (m / 60.0) ** -0.25, 0.1), 3.0)
     epu = 4.0 * drain / (DAY_S * rate)
     eat = {"rate_per_s": round(rate, 5), "energy_per_unit": round(epu, 4)}
-    metab = {"drain_per_day": round(drain, 4), "reserve_days": RESERVE_DAYS, "run_cost": RUN_COST,
-             "swim_cost": SWIM_COST if medium["swim"] else None, "fly_cost": FLY_COST if medium["fly"] else None}
+    tot = sum(float(x) for x in diet.values()) or 1.0
+    meat_frac = (float(diet.get("meat") or 0) + float(diet.get("carrion") or 0)) / tot
+    swim_cost = (SWIM_COST_LAND if medium["ground"] else SWIM_COST_WATER) if medium["swim"] else None
+    metab = {"drain_per_day": round(drain, 4), "reserve_days": RESERVE_DAYS_MEAT if meat_frac >= 0.5 else RESERVE_DAYS,
+             "run_cost": RUN_COST, "swim_cost": swim_cost, "fly_cost": FLY_COST if medium["fly"] else None}
     srcs["eat"] = srcs["metabolism"] = ("정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. "
-                                        "언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다")
+                                        "11-19 기운 장부로 맞춤: 물에만 사는 몸 헤엄 비용 1(땅·물 몸 2), 나는 비용 1.5, "
+                                        "고기가 먹이 절반 이상이면 비축 8 일(아니면 3 일). 언리얼 식사·에너지 모형과 단위가 다르다")
 
     hunts = v(c, "combat", "hunts") or []
     ratios = [h.get("max_prey_mass_ratio") for h in hunts if isinstance(h, dict) and isinstance(h.get("max_prey_mass_ratio"), (int, float))]

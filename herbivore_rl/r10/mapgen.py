@@ -28,6 +28,7 @@ RANGES = {
     "tree_density": (0.0, 0.04), "rock_density": (0.0, 0.01), "bush_cover": (0.0, 0.40), "shelters": (0, 8),
     "food_abundance": (0.5, 2.0),
 }
+AQUATIC_FLOOR = 0.3   # 11-19: 물 바닥 조류·작은 동물은 물 전체에 얇게 깔린다 (군락만 두면 큰 물의 82~84 % 가 먹이 없음 → 물고기가 갇혀 굶음)
 FOOD_BASE = {   # 셀당 용량(단위)·재생/s 의 바탕 (먹이 양 단위는 종 카드 energy_per_unit 와 짝)
     "grass": (1.0, 0.0020), "forbs": (0.8, 0.0015), "browse": (1.2, 0.0010), "wet_meadow": (1.2, 0.0025),
     "roots": (0.6, 0.0008), "insects": (0.3, 0.0030), "aquatic": (0.8, 0.0020), "drift": (0.4, 0.0040),
@@ -232,7 +233,10 @@ def make_map(seed: int, purpose: str = "train", overrides: dict | None = None) -
         where = {"grass": land & (shade < 0.3), "forbs": land, "browse": land & (shade > 0.05),
                  "wet_meadow": land & near_water, "roots": land, "insects": np.ones_like(land),
                  "aquatic": water_any, "drift": water_any & (np.hypot(cur[..., 0], cur[..., 1]) > 0.05)}[kind]
-        cap[i] = np.clip(patch, 0, 1) * base_cap * abund * where * (1 - block)
+        dens = np.clip(patch, 0, 1)
+        if kind == "aquatic":
+            dens = np.maximum(dens, AQUATIC_FLOOR)
+        cap[i] = dens * base_cap * abund * where * (1 - block)
         regen[i] = (cap[i] > 0) * base_regen * abund * rng.uniform(0.6, 1.4)
     amount = cap * rng.uniform(0.3, 1.0)
     dry = regen * rng.uniform(0.0, 0.3)

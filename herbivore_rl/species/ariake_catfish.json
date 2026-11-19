@@ -38,7 +38,7 @@
  "senses": {
   "sight_m": 4.5,
   "fov_deg": 198.0,
-  "smell_m": 0.0,
+  "smell_m": 15.0,
   "hearing_m": 0.0,
   "night_vision": 1.0
  },
@@ -62,7 +62,7 @@
   "drain_per_day": 2.275,
   "reserve_days": 3.0,
   "run_cost": 3.0,
-  "swim_cost": 2.0,
+  "swim_cost": 1.0,
   "fly_cost": null
  },
  "combat": {
@@ -115,11 +115,11 @@
   "body.stamina_recover_s": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:108; AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:109; lock/unlock AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:1522-1524 (unreal-default) — 1/SprintDrain, 1/Recovery",
   "senses.sight_m": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:331-338 (unreal-script)",
   "senses.fov_deg": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:86 (unreal-default)",
-  "senses.smell_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:113 (unreal-default)",
+  "senses.smell_m": "정함(11-19): 물고기 화학 감각 — 눈보다 냄새·맛으로 먹이를 찾음 (언리얼 초안 값 없음, 기운 장부에서 먹이 없는 물에 갇혀 굶음)",
   "senses.night_vision": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:119 (unreal-default)",
   "diet": "초안 diet (선호 수치·True=1·목록=1) + 정함: {\"insects\": 1.0, \"aquatic\": 0.5}",
-  "eat": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다",
-  "metabolism": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다",
+  "eat": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 11-19 기운 장부로 맞춤: 물에만 사는 몸 헤엄 비용 1(땅·물 몸 2), 나는 비용 1.5, 고기가 먹이 절반 이상이면 비축 8 일(아니면 3 일). 언리얼 식사·에너지 모형과 단위가 다르다",
+  "metabolism": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 11-19 기운 장부로 맞춤: 물에만 사는 몸 헤엄 비용 1(땅·물 몸 2), 나는 비용 1.5, 고기가 먹이 절반 이상이면 비축 8 일(아니면 3 일). 언리얼 식사·에너지 모형과 단위가 다르다",
   "combat.kill_mass_ratio": "정함: 언리얼 사냥 표의 max_prey_mass_ratio 가운데 가장 큰 값 — 종 이름 목록 대신 몸무게 비율 하나 (사양 3 절)",
   "combat.reach_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:84 (unreal-default)",
   "combat.defense": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:114 (unreal-default)",

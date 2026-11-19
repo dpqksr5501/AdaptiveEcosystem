@@ -1,11 +1,12 @@
 """R10 정식 학습 단계 띄우기 (설계 10·16 절: 땅 10 → 하늘 2 → 물 4, 종마다 따로, 리그).
 
     python -X utf8 results/v3/r10/run_stage_r10.py --stage ground --out ckpt/r10/stage1 --init-from ckpt/r10/all1
-    python -X utf8 results/v3/r10/run_stage_r10.py --stage air --out ckpt/r10/stage2 --init-from ckpt/r10/stage1
-    python -X utf8 results/v3/r10/run_stage_r10.py --stage water --out ckpt/r10/stage3 --init-from ckpt/r10/stage2
+    python -X utf8 results/v3/r10/run_stage_r10.py --stage air --out ckpt/r10/stage2 --init-from ckpt/r10/stage1 ckpt/r10/all1
+    python -X utf8 results/v3/r10/run_stage_r10.py --stage water --out ckpt/r10/stage3 --init-from ckpt/r10/stage2 ckpt/r10/all1
+    (이어 달리기: chain_r10.py 가 앞 단계가 끝나길 기다려 다음 단계를 띄운다)
 
 - 세계 종 = 그 단계까지의 종 모두. 학습 종 = 그 단계까지의 종 모두(앞 단계 종은 이어 배움). 같은 --out 폴더가 리그(서로 최신 두뇌를 상대로).
-- --init-from 폴더에 그 종의 zip 이 있으면 가장 큰 결정 수에서 잇는다. 없으면 처음부터. 그 폴더의 다른 종 npz 는 첫 상대(리그가 차기 전).
+- --init-from 폴더들을 앞에서부터 찾아 그 종의 zip 이 있으면 가장 큰 결정 수에서 잇는다. 없으면 처음부터. 다른 종 npz 도 같은 차례로 찾아 첫 상대(리그가 차기 전).
 - 사냥하는 몸(고기를 먹고 kill_mass_ratio > 0)은 밀도 단계(처음 작은 맵·먹잇감 많이)를 쓴다.
 - 종마다 프로세스 하나(torch 스레드 1). 출력은 <out>/<종>.out · .log.jsonl · <종>_<결정>.zip/.npz.
 """
@@ -44,11 +45,19 @@ def latest_npz(folder: Path, sid: str):
     return z.with_suffix(".npz") if z and z.with_suffix(".npz").exists() else None
 
 
+def first_found(folders, sid: str, fn):
+    for d in folders:
+        f = fn(Path(d), sid)
+        if f:
+            return f
+    return None
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--stage", choices=ORDER, required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--init-from", default=None)
+    ap.add_argument("--init-from", nargs="*", default=[], help="이어 받을 폴더들 (앞 폴더부터 찾음: 예 stage1 all1)")
     ap.add_argument("--decisions", type=int, default=30_000_000)
     ap.add_argument("--wall-hours", type=float, default=12.0)
     ap.add_argument("--snapshot-every", type=int, default=1_000_000)
@@ -69,13 +78,13 @@ def main(argv=None) -> int:
                "--league-dir", str(out), "--refresh-every", str(a.refresh_every), "--seed", str(a.seed0 + i), "--out", str(out)]
         if hunter:
             cmd += ["--curriculum", str(a.curriculum), "--prey0", "4", "8"]
-        init = latest_zip(Path(a.init_from), sid) if a.init_from else None
+        init = first_found(a.init_from, sid, latest_zip)
         if init:
             cmd += ["--init", str(init)]
-        if a.init_from:   # 리그 폴더가 비어 있는 첫 1M 동안도 규칙 두뇌가 아니라 앞 폴더의 다른 종 두뇌를 상대로
-            opp = [f"{o}={f}" for o in species if o != sid and (f := latest_npz(Path(a.init_from), o))]
-            if opp:
-                cmd += ["--brains", *opp]
+        # 리그 폴더가 비어 있는 첫 1M 동안도 규칙 두뇌가 아니라 앞 폴더의 다른 종 두뇌를 상대로
+        opp = [f"{o}={f}" for o in species if o != sid and (f := first_found(a.init_from, o, latest_npz))]
+        if opp:
+            cmd += ["--brains", *opp]
         print(sid, "사냥" if hunter else "", init.name if init else "처음부터", flush=True)
         if not a.dry:
             fh = open(out / f"{sid}.out", "a", encoding="utf-8")
