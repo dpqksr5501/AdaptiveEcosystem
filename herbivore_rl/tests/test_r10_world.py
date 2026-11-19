@@ -276,3 +276,29 @@ def test_burst_bite_ends_burst():
     run(w, {0: C.A_BURST}, 5)
     assert any(b[2] == w.uid[0] for b in w.events["bites"])
     assert w.burst_left[0] == 0.0 and w.exhaust_left[0] > 0.0
+
+
+def test_carcass_shows_in_food_direction():
+    """고기를 먹는 몸은 먹이 감각 반경 안 사체를 그 방향 '먹이' 칸으로 느낀다 (풀 먹는 몸은 못 느낌)."""
+    m = T.blank_map(60, 20)
+    hunter = card("ground", 40.0, kill=1.6)
+    hunter["diet"] = {k: 0.0 for k in S.DIET_KEYS} | {"meat": 1.0, "carrion": 1.0}
+    grazer = card("ground", 30.0)
+    w = world_of(m, [hunter, grazer])
+    put(w, 0, 10.0, 10.0)
+    put(w, 1, 30.0, 10.0)
+    w.hx[:], w.hy[:] = 1.0, 0.0
+    lo = C.SLICES["dir"][0]
+    f0 = lambda o, i, j: o[i, lo + j * len(C.DIR_FIELDS) + 5]
+    o = O.observe(w)
+    base0, base_left = f0(o, 0, 0), f0(o, 0, 2)
+    ci = 0
+    w.carcass["wk"][ci], w.carcass["x"][ci], w.carcass["y"][ci] = 0, 15.0, 10.0
+    w.carcass["meat"][ci], w.carcass["kin"][ci] = 20.0, 1
+    o = O.observe(w)
+    assert f0(o, 0, 0) > base0 + 0.5          # 앞(0°)
+    assert abs(f0(o, 0, 2) - base_left) < 1e-9  # 왼쪽(90°) 그대로
+    w.carcass["x"][ci], w.carcass["y"][ci] = 10.0, 15.0
+    o = O.observe(w)
+    assert f0(o, 0, 2) > base_left + 0.5      # 왼쪽
+    assert abs(f0(o, 1, 4) - f0(O.observe(w), 1, 4)) < 1e-9

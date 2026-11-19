@@ -80,6 +80,26 @@ def observe(world) -> np.ndarray:
     high_air = w.airborne & (w.z >= w.rules.air_clear_m)
     sight = p["sight_m"]
     smell = np.maximum(p["smell_m"], sight * 0.5)
+    # 사체 고기도 '그쪽 먹이' 로 (11-19): 고기·사체를 먹는 몸, 먹이 감각 반경(smell) 안, 제 종 사체 제외 (_eat 와 같은 조건).
+    # 머리 기준 각을 가장 가까운 8 방향에 넣는다. 양 = 고기 × max(meat, carrion) 선호. 이것이 없으면 물어 죽이고도 사체를 못 찾는다.
+    carc_dir = np.zeros((N, C.N_DIR))
+    meat_w = np.maximum(p["diet"][:, S.DIET_KEYS.index("meat")], p["diet"][:, S.DIET_KEYS.index("carrion")])
+    cw = w.carcass["wk"]
+    live_c = np.nonzero((cw >= 0) & (w.carcass["meat"] > 0))[0]
+    if len(live_c):
+        for i in np.nonzero(al & (meat_w > 0))[0]:
+            m = live_c[(cw[live_c] == w.wk[i]) & (w.carcass["kin"][live_c] != w.sp[i])]
+            if len(m) == 0:
+                continue
+            ddx = w.carcass["x"][m] - w.x[i]
+            ddy = w.carcass["y"][m] - w.y[i]
+            keep = np.hypot(ddx, ddy) <= smell[i]
+            if not keep.any():
+                continue
+            lx = ddx * w.hx[i] + ddy * w.hy[i]
+            ly = -ddx * w.hy[i] + ddy * w.hx[i]
+            jj = np.round(np.arctan2(ly, lx) / (np.pi / 4)).astype(np.int64) % C.N_DIR
+            np.add.at(carc_dir[i], jj[keep], w.carcass["meat"][m][keep] * meat_w[i])
     for j in range(C.N_DIR):
         dx, dy = _rot(w.hx, w.hy, np.radians(45.0 * j))
         # 갈 수 있는 거리: 이 몸으로 표본점을 차례로 지나갈 수 있는 마지막 거리 (시야 안)
@@ -109,6 +129,7 @@ def observe(world) -> np.ndarray:
                 cf = w.cidx(w.wk, fx, fy)
                 inr = (d <= smell) & w.inside(w.wk, fx, fy)
                 food += np.where(inr, (w.g_food[:, cf].T * fw).sum(axis=1), 0.0)
+        food += carc_dir[:, j]
         base = lo + j * len(C.DIR_FIELDS)
         obs[:, base + 0] = C.lg(free, C.NORM["dist_m"]["ref"], C.NORM["dist_m"]["max"])
         obs[:, base + 1] = C.slg(rise, C.NORM["height_m"]["ref"], C.NORM["height_m"]["max"])
