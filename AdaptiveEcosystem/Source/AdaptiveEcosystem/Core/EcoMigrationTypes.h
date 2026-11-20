@@ -28,7 +28,7 @@ struct FEcoMigrationSettings
 	UPROPERTY(EditAnywhere, Category="Migration", meta=(ClampMin="0.0"))
 	float FoodEpsilon = 0.0001f;
 	UPROPERTY(EditAnywhere, Category="Migration")
-	bool bPrintTransitions = true;
+	bool bPrintTransitions = false;
 	bool IsValid() const
 	{
 		return FMath::IsFinite(DecisionIntervalSeconds) && DecisionIntervalSeconds >= 0.25

@@ -24,6 +24,7 @@
 #include "Player/EcoPlayerState.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "InputCoreTypes.h"
 #include "Misc/Paths.h"
 #include "Misc/FileHelper.h"
@@ -37,7 +38,10 @@
 #include "World/EcologyRegion.h"
 #include "World/EcologyWorldSubsystem.h"
 
-static TAutoConsoleVariable<int32> CVarInspectorVisible(TEXT("eco.Inspector.Visible"),1,TEXT("Show the creature detail panel. Migration overview has its own M/debug switch."));
+static TAutoConsoleVariable<int32> CVarInspectorVisible(TEXT("eco.Inspector.Visible"), 0,
+    TEXT("Show the creature detail panel. 0: hidden, 1: visible."));
+static TAutoConsoleVariable<int32> CVarGrassInspection(TEXT("eco.Grass.Debug"), 0,
+    TEXT("Show the grass inspection panel. 0: hidden, 1: visible. Alt+G toggles."));
 bool UEcoCreatureInspectionLibrary::InspectFaunaWater(UObject* Context, FName RegionId, FVector Point,
     float Clearance, FVector2D& BottomAndSurface, FVector& Current)
 {
@@ -547,8 +551,9 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
 void AEcoCreatureInspectorHUD::DrawGrassInspection()
 {
     const bool bAlt = PlayerOwner->IsInputKeyDown(EKeys::LeftAlt) || PlayerOwner->IsInputKeyDown(EKeys::RightAlt);
-    if (bAlt && PlayerOwner->WasInputKeyJustPressed(EKeys::G)) bGrassInspection = !bGrassInspection;
-    if (!bGrassInspection) return;
+    if (bAlt && PlayerOwner->WasInputKeyJustPressed(EKeys::G))
+        CVarGrassInspection->Set(CVarGrassInspection.GetValueOnGameThread() == 0 ? 1 : 0, ECVF_SetByConsole);
+    if (CVarGrassInspection.GetValueOnGameThread() == 0) return;
 
     TArray<AEcoVegetationField*> Fields;
     for (TActorIterator<AEcoVegetationField> It(GetWorld()); It; ++It)
@@ -651,27 +656,32 @@ void AEcoCreatureInspectorHUD::DrawHUD()
     }
     if(PlayerOwner->WasInputKeyJustPressed(EKeys::M))EcoHerdMigrationDebug::Toggle(*GetWorld());
     const int32 MigrationMode=EcoHerdMigrationDebug::Mode(*GetWorld());
-    if(MigrationMode){
+    if (const APawn* Pawn = PlayerOwner->GetPawn(); MigrationMode && Pawn) {
         if(GetWorld()->GetTimeSeconds()>=NextMigrationCapture){
             NextMigrationCapture=GetWorld()->GetTimeSeconds()+.25;
             FEcoHerdMigrationDebugSnapshot Fresh;if(EcoHerdMigrationDebug::Capture(*GetWorld(),Fresh))MigrationSnapshot=MoveTemp(Fresh);
         }
-        if(SelectedId!=LastMigrationSelectedAgent){
-            LastMigrationSelectedAgent=SelectedId;
-            if(const auto* Member=MigrationSnapshot.Members.FindByPredicate([&](const auto& V){return V.Agent==SelectedId;});Member&&Member->Plan>0)MigrationFocus=Member->Plan;
+        if (const auto* Region = EcoHerdMigrationDebug::FindNearbyRegion(MigrationSnapshot, Pawn->GetActorLocation())) {
+            if(SelectedId!=LastMigrationSelectedAgent){
+                LastMigrationSelectedAgent=SelectedId;
+                if(const auto* Member=MigrationSnapshot.Members.FindByPredicate([&](const auto& V){return V.Agent==SelectedId;});Member&&Member->Plan>0)MigrationFocus=Member->Plan;
+            }
+            TArray<const FEcoMigrationDebugPlan*> Plans;
+            for (const auto& Plan : MigrationSnapshot.Plans)
+                if (Plan.Origin == Region->Id || Plan.Destination == Region->Id) Plans.Add(&Plan);
+            int32 Index = Plans.IndexOfByPredicate([&](const auto* Plan){return Plan->Id == MigrationFocus;});
+            if (Index == INDEX_NONE && !Plans.IsEmpty()) {
+                Index = Plans.IndexOfByPredicate([](const auto* Plan){return Plan->State != EEcoHerdJourneyState::Settled;});
+                if (Index == INDEX_NONE) Index = 0;
+            }
+            if (!Plans.IsEmpty()) {
+                if (PlayerOwner->WasInputKeyJustPressed(EKeys::LeftBracket)) Index = (Index + Plans.Num() - 1) % Plans.Num();
+                if (PlayerOwner->WasInputKeyJustPressed(EKeys::RightBracket)) Index = (Index + 1) % Plans.Num();
+                MigrationFocus = Plans[Index]->Id;
+            }
+            EcoHerdMigrationDebug::Draw(*this, *PlayerOwner, FVector2D(Canvas->SizeX, Canvas->SizeY), MigrationSnapshot,
+                *Region, Index != INDEX_NONE ? MigrationFocus : 0, MigrationMode);
         }
-        const auto& Plans=MigrationSnapshot.Plans;
-        int32 Index=Plans.IndexOfByPredicate([&](const auto& V){return V.Id==MigrationFocus;});
-        if(Index==INDEX_NONE&&!Plans.IsEmpty()){
-            Index=Plans.IndexOfByPredicate([](const auto& V){return V.State!=EEcoHerdJourneyState::Settled;});
-            if(Index==INDEX_NONE)Index=0;
-        }
-        if(!Plans.IsEmpty()){
-            if(PlayerOwner->WasInputKeyJustPressed(EKeys::LeftBracket))Index=(Index+Plans.Num()-1)%Plans.Num();
-            if(PlayerOwner->WasInputKeyJustPressed(EKeys::RightBracket))Index=(Index+1)%Plans.Num();
-            MigrationFocus=Plans[Index].Id;
-        }
-        EcoHerdMigrationDebug::Draw(*this,*PlayerOwner,FVector2D(Canvas->SizeX,Canvas->SizeY),MigrationSnapshot,MigrationFocus,MigrationMode);
     }
     if(!CVarInspectorVisible.GetValueOnGameThread())return;
     const bool Preview=Actors.ContainsByPredicate([](const AEcoCreatureRepresentationActor* Actor){return Actor->ActorHasTag(TEXT("JYU.VisualAudit"));});

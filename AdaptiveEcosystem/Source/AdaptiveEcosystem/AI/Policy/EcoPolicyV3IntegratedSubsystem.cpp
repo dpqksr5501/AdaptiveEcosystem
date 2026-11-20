@@ -3,7 +3,6 @@
 #include "AI/Social/Shelter/EcoShelterAnchor.h"
 #include "AI/Social/Shelter/EcoRefugeHabitat.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
-#include "Core/EcoRuntimeSettings.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -403,8 +402,59 @@ namespace EcoPolicyV3IntegratedImpl
 	static TAutoConsoleVariable<int32> CVarDebug(
 		TEXT("eco.V3Debug"),
 		0,
-		TEXT("통합 v3 모드 디버그 표시 (1 = 사슴 행동·늑대 상태 글자, 무대 사각형, 은신처 원, 지역 집계). 서버·단독만. 명령줄 -EcoV3Debug 는 시작값."),
+		TEXT("Default for integrated v3 debug layers. 0: hidden, 1: visible. Per-layer switches override this."),
 		ECVF_Default);
+	static TAutoConsoleVariable<int32> CVarDebugAgents(TEXT("eco.V3Debug.Agents"), -1,
+		TEXT("Deer and wolf labels and recent captures. -1: inherit eco.V3Debug, 0: hide, 1: show."));
+	static TAutoConsoleVariable<int32> CVarDebugObstacles(TEXT("eco.V3Debug.Obstacles"), -1,
+		TEXT("Obstacle and body clearance circles. -1: inherit eco.V3Debug, 0: hide, 1: show."));
+	static TAutoConsoleVariable<int32> CVarDebugShelters(TEXT("eco.V3Debug.Shelters"), -1,
+		TEXT("Shelter circles. -1: inherit eco.V3Debug, 0: hide, 1: show."));
+	static TAutoConsoleVariable<int32> CVarDebugRegions(TEXT("eco.V3Debug.Regions"), -1,
+		TEXT("Stage boundaries. -1: inherit eco.V3Debug, 0: hide, 1: show."));
+	static TAutoConsoleVariable<int32> CVarDebugLog(TEXT("eco.V3Debug.Log"), 0,
+		TEXT("Write periodic integrated v3 region diagnostics to the Output Log. 0: off, 1: on."));
+
+	bool IsDebugLayerEnabled(const TAutoConsoleVariable<int32>& Layer)
+	{
+		const int32 Mode = Layer.GetValueOnGameThread();
+		return Mode < 0 ? CVarDebug.GetValueOnGameThread() != 0 : Mode != 0;
+	}
+
+	static FAutoConsoleCommandWithWorldAndArgs CVarDebugReport(
+		TEXT("eco.V3Debug.Report"), TEXT("Write one current obstacle and population report. Usage: eco.V3Debug.Report [RegionId]"),
+		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+		{
+			const auto* Runtime = World ? World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+			if (!Runtime || !Runtime->IsActive() || World->GetNetMode() == NM_Client)
+			{
+				UE_LOG(LogEcoPolicyV3I, Display, TEXT("eco.V3Debug.Report requires an active authority v3 world."));
+				return;
+			}
+			const FName Region = Args.IsEmpty() ? NAME_None : FName(*Args[0]);
+			bool bReported = false;
+			for (int32 Index = 0; Index < Runtime->NumContexts(); ++Index)
+			{
+				const auto* Context = Runtime->GetContext(Index);
+				if (!Context || (!Region.IsNone() && Context->RegionId != Region)) continue;
+				const auto& Obstacles = Context->Sim.Config.Obstacles;
+				double MinRadius = TNumericLimits<double>::Max();
+				double MaxRadius = 0.0;
+				for (int32 Disc = 0; Disc < Obstacles.Num(); ++Disc)
+				{
+					const double Radius = Obstacles.Discs[3 * Disc + 2] * EcoRepertoireV3::kUnitCm;
+					MinRadius = FMath::Min(MinRadius, Radius);
+					MaxRadius = FMath::Max(MaxRadius, Radius);
+				}
+				UE_LOG(LogEcoPolicyV3I, Display,
+					TEXT("[Eco v3 Report] %s Deer=%d Wolves=%d Food=%.1f%% Obstacles=%d Enabled=%d Imported=%d RadiusCm=%.1f..%.1f BodyCm=%.1f BelowMinRadius=%d Capped=%d"),
+					*Context->RegionId.ToString(), Context->AliveDeer, Context->Wolves, 100.0 * Context->FoodFraction(),
+					Obstacles.Num(), Obstacles.bEnabled, Context->bObstaclesImported, Obstacles.Num() ? MinRadius : 0.0,
+					MaxRadius, Obstacles.BodyR * EcoRepertoireV3::kUnitCm, Context->ObstacleScan.Tiny, Context->ObstacleScan.Capped);
+				bReported = true;
+			}
+			if (!bReported) UE_LOG(LogEcoPolicyV3I, Display, TEXT("No v3 region matched '%s'."), *Region.ToString());
+		}));
 
 	/** 시작 자리 난수의 첫 해시 입력 (세계 난수·지연 해시와 다른 값). */
 	constexpr uint64 kPlanRngTag = 0x56334950ULL;   // "V3IP"
@@ -883,6 +933,12 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.V3Debug"), TEXT("1"));
 	}
+	float TestDuration = 0.0f;
+	if (FParse::Param(CmdLine, TEXT("EcoV3Debug"))
+		|| (FParse::Value(CmdLine, TEXT("EcoIntegrationExitAfter="), TestDuration) && TestDuration > 0.0f))
+	{
+		SetIfUnset(TEXT("eco.V3Debug.Log"), TEXT("1"));
+	}
 	int32 SeedArg = 0;
 	if (FParse::Value(CmdLine, TEXT("EcoV3Seed="), SeedArg))
 	{
@@ -1195,7 +1251,7 @@ int32 UEcoPolicyV3IntegratedSubsystem::GetRequestedVersion()
 bool UEcoPolicyV3IntegratedSubsystem::IsDebugDrawEnabled()
 {
 	EcoPolicyV3IntegratedImpl::EnsureCommandLineApplied();
-	return EcoPolicyV3IntegratedImpl::CVarDebug.GetValueOnGameThread() != 0;
+	return EcoPolicyV3IntegratedImpl::IsDebugLayerEnabled(EcoPolicyV3IntegratedImpl::CVarDebugAgents);
 }
 
 bool UEcoPolicyV3IntegratedSubsystem::IsAutoAdaptEnabled()
@@ -1237,7 +1293,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		// 기본: 아무것도 바꾸지 않는다 — 팀 레벨은 지금 그대로 돈다. 왜 팀 두뇌로 도는지 알 수 있게 한 줄만 남긴다
 		if (!Found.IsEmpty())
 		{
-			UE_LOG(LogEcoPolicyV3I, Log,
+			UE_LOG(LogEcoPolicyV3I, Verbose,
 				   TEXT("[EcoV3I] 통합 v3 모드 꺼짐 (기본) — 팀 두뇌로 돈다. 켜려면 Play 전에 콘솔에 eco.IntegratedPolicyVersion 3 (PIE 넷 모드 '오프라인 플레이', ")
 					   TEXT("독립형 게임은 추가 실행 인수 -EcoIntegratedV3)"));
 		}
@@ -1245,12 +1301,12 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	if (Found.IsEmpty())
 	{
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 통합 모드가 요청됐지만 이 월드에 통합 조정자(AEcoCreatureIntegrationSpawner)가 없다 — 아무것도 바꾸지 않는다"));
+		UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 통합 모드가 요청됐지만 이 월드에 통합 조정자(AEcoCreatureIntegrationSpawner)가 없다 — 아무것도 바꾸지 않는다"));
 		return;
 	}
 	if (InWorld.GetNetMode() == NM_Client)
 	{
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] Client: presentation only; canonical proxy templates registered by M4."));
+		UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] Client: presentation only; canonical proxy templates registered by M4."));
 		return;
 	}
 	if (Found.Num() > 1)
@@ -1290,11 +1346,11 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	BeginEnvWatch(InWorld);
 	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp): Play 시작 때 한 번 읽는다 (같은 씨 같은 결과 — Play 중 바꿈은 다음 Play 부터). 계획은 지역 세계가 생긴 직후
 	ForestSettings = ForestSettingsFromConsole();
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 숲 자람: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 숲 자람: %s"),
 		   ForestSettings.bOn ? *FString::Printf(TEXT("켬 (eco.IntegratedV3.ForestGrowth 1 — 시험 모드) — %s, 지역 세계가 생기면 자리를 정한다"), *ForestSettings.Region.ToString())
 							  : TEXT("끔 (eco.IntegratedV3.ForestGrowth 0)"));
 	const int32 Wolves = Settings.WolvesPerRegion;
-	UE_LOG(LogEcoPolicyV3I, Log,
+	UE_LOG(LogEcoPolicyV3I, Verbose,
 		   TEXT("[EcoV3I] 통합 모드 켬 — 조정자 %s | 내장 모델 %s (관측 %d, 마스크 판 %d — 시작 두뇌는 '사슴 두뇌' 줄, 기본 %s) | 지역 %d, 지역마다 사슴 %d·늑대 %d ")
 			   TEXT("(잠행 %d·추격 %d, 모두 주행성, 속력 %.2f배) | 무대 한 변 %.0f m | 시드 %lld | 이주·웨이브·1초 에너지 소모 끔, 낮밤 60+60초 | 늑대 밤잠: %s | 시작 자리 지면 검사: %s"),
 		   *GetNameSafe(Found[0]), UTF8_TO_TCHAR(EcoPolicyV3::kModelName), EcoPolicyV3::kObsDim, EcoPolicyV3::kMaskVersion, *FEcoV3BrainRegistry::Default()->Id, Plans.Num(),
@@ -1304,7 +1360,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								  : TEXT("곧바로 (eco.IntegratedV3.GradualNight 0 — 어둠 0.5 에 바로 잠)"),
 		   bStreamingSpawner ? TEXT("서식지 스트리밍이 끝나는 프레임에 조정자 시작 직전 다시") : TEXT("끝 (스트리밍 없음 — 조정자가 BeginPlay 에서 시작)"));
 	const int32 EatSteps = Settings.WolfEatSteps();
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 얼기: %s | 늑대 식사: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 사슴 얼기: %s | 늑대 식사: %s"),
 		   Settings.bNoFreeze ? TEXT("막힘 (eco.IntegratedV3.NoFreeze 1, 사람 결정 10-15 (A) — R1b−F: 가중치 그대로, 마스크가 FREEZE 를 늘 막는다)")
 							  : TEXT("열림 (eco.IntegratedV3.NoFreeze 0 — R1b 그대로 얼기를 쓴다)"),
 		   *(Settings.LongWolfEat()
@@ -1314,7 +1370,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   EatSteps * EcoRepertoireV3::kStepSeconds, Settings.WolfEatSeconds)));
 	const EcoWorldV3::FWildFlightConfig Keep = Settings.WildFlightConfig();
 	const double MPerUnit = EcoRepertoireV3::kUnitCm / 100.0;
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 도주 반사 거리: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 사슴 도주 반사 거리: %s"),
 		   *(Keep.bEnabled
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.WildFlight 1, 야생 w3) — 사냥 중인 늑대를 알아채면 %.0f m 안 = 먹으며 멀어짐(경계), %.0f m 안이거나 다가옴 = ")
 									   TEXT("%s %.0f m 밖·은신처까지 뜀(도주, 반대쪽 ±60° 은신처 쪽, %s), 은신처 안이면 웅크림, ")
@@ -1327,7 +1383,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildFlight 0 — 두뇌 그대로)"))));
 	// 10-27 사용자 보고 두 고침 (거리 두기 = 쉬는 늑대, 먹기 걷기 고침)
 	const EcoWorldV3::FGrazeCalmConfig Calm = Settings.GrazeCalmConfig();
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 쉬는 늑대 거리 두기: %s | 먹기 걷기 고침: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 쉬는 늑대 거리 두기: %s | 먹기 걷기 고침: %s"),
 		   *(Keep.bRestKeep
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.RestKeep 1) — 먹거나 배불러 쉬는 늑대의 시야(%.0f m × 날씨) 안에서 알아채면 걸어서 시야 + %.0f m 밖까지 ")
 									   TEXT("물러난 뒤 쉼, 그 밖 %.0f m 띠에서는 그 늑대 쪽으로 다가가지 않음"),
@@ -1338,7 +1394,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Calm.EdgeR * MPerUnit, Calm.EdgeW, Calm.Inertia, Calm.WallMargin * MPerUnit)
 				 : FString(TEXT("끔 (eco.IntegratedV3.GrazeCalm 0)"))));
 	const EcoWorldV3::FWildReserveConfig Wr;
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 지방 비축: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 사슴 지방 비축: %s"),
 		   *(Settings.bWildReserve
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.WildReserve 1, 사람 결정 10-15 (7) 야생 w1) — 배가 비어도 비축으로 %.1f일(%d 스텝) 버팀, 굶음 = 배·비축 모두 0, ")
 									   TEXT("배 %.0f%% 이상에서 먹으면 %.0f%% 가 비축으로, 배 %.0f%% 밑이면 %.2f배 느림"),
@@ -1346,13 +1402,13 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   100.0 * Wr.WeakE, Wr.WeakSpeed)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildReserve 0 — 에너지 0 이면 곧바로 굶음)"))));
 	const EcoWorldV3::FWildSatiationConfig Ws;
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 늑대 포만: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 늑대 포만: %s"),
 		   *(Settings.bWildSatiation
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.WildSatiation 1, 야생 w2) — 먹기가 끝나면 %.1f일(%d 스텝 = %.0f초) 사냥하지 않고 %.1f배 속력으로 어슬렁거림, 사슴 눈에 보임"),
 								   Ws.SatDays, EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900),
 								   EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900) * EcoRepertoireV3::kStepSeconds, Ws.RestSpeed)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildSatiation 0 — 먹기가 끝나면 곧바로 사냥)"))));
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 은신처: %s | 생명주기 %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 은신처: %s | 생명주기 %s"),
 		   *(Settings.bShelterSafe
 				 ? FString::Printf(TEXT("안전 (eco.IntegratedV3.ShelterSafe 1, 10-16) — 원 안 사슴은 표적·포획에서 빠지고 늑대는 반지름 + 몸 여유 %.2f m 둘레를 ")
 								   TEXT("따라 미끄러짐 (eco.IntegratedV3.WolfBodyMargin, 10-17)"),
@@ -1363,14 +1419,14 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		   Settings.bProtectedRefuges ? TEXT("켬 (eco.IntegratedV3.ProtectedRefuges 1 — 지워진 은신처 비활성·늦은 은신처 추가·잃은 HIDE 목표 풀기)")
 									  : TEXT("끔 (eco.IntegratedV3.ProtectedRefuges 0)"));
 	const EcoWorldV3::FShelterFoodConfig Sf;
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 은신처 먹이: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 은신처 먹이: %s"),
 		   *(Settings.bShelterFood
 				 ? FString::Printf(TEXT("부족 (eco.IntegratedV3.ShelterFood 1, 기본 — 10-17 야생 2단계 1) — 은신처 원과 겹치는 셀의 용량 %.0f%%·재생 %.0f%% (밖 대비), ")
 									   TEXT("배고픈 사슴은 밖으로 나와야 함"),
 								   100.0 * Sf.CapFrac, 100.0 * Sf.RegenFrac)
 				 : FString(TEXT("끔 (eco.IntegratedV3.ShelterFood 0 — 은신처 셀은 재생만 0.3배, R1b 학습 세계)"))));
 	const EcoThreatV3::FPackHuntConfig Pk;
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 늑대 무리: 지역마다 %d (eco.IntegratedV3.WolvesPerRegion) | 협동 사냥 %s"), Wolves,
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 늑대 무리: 지역마다 %d (eco.IntegratedV3.WolvesPerRegion) | 협동 사냥 %s"), Wolves,
 		   *(Settings.bPackHunt
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.PackHunt 1, 10-17 야생 2단계 2) — 한 늑대가 쫓는 사슴이 %.0f m 안이면 사냥 중인 동료가 그 사슴이 향하는 ")
 									   TEXT("은신처의 문(%.0f m·±%.0f° 안) 또는 도주선 앞 %.0f m 로 가서 %.0f m 안이면 기다림"),
@@ -1378,7 +1434,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Pk.WaitR * MPerUnit)
 				 : FString(TEXT("끔 (eco.IntegratedV3.PackHunt 0 — 늑대마다 따로 사냥)"))));
 	const EcoThreatV3::FDetourConfig Dt;   // 돌아가기 값 = 기본값 (MakeRegionWorldConfig 는 켬 칸만 바꾼다)
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 세로 장애물: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 세로 장애물: %s"),
 		   *(Settings.bObstacles
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.Obstacles 1, 10-17 야생 2단계 3) — 무대 안 레벨의 충돌하는 나무·바위를 원판으로 읽어 사슴·늑대가 둘레를 따라 미끄러지고 ")
 									   TEXT("눈길이 가린다(발소리는 못 가림), 원판 밑 먹이는 덮인 몫만큼 적다. 원판이 없는 무대는 그대로 | 돌아가기 %s%s"),
@@ -1390,7 +1446,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 									   : TEXT("끔 (eco.IntegratedV3.ObstacleDetour 0 — 미끄러짐만)"),
 								   Settings.ObstacleImportPath.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" | 측정 전용 원판 가져오기: %s"), *Settings.ObstacleImportPath))
 				 : FString(TEXT("끔 (eco.IntegratedV3.Obstacles 0 — 읽기만 하고 세계에 넣지 않는다)"))));
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 숲 시야: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 숲 시야: %s"),
 		   *(Settings.bFoliage && Settings.bObstacles
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.Foliage 1, 10-22 — 측정용, R1b 는 배우지 않은 세계) — 나무 원판마다 잎 원 %.1f m, 눈길이 잎 안을 %.1f m 이상 지나면 가림 ")
 									   TEXT("(사슴의 늑대 알아챔·늑대 표적·관측 threat_hidden, 발소리 그대로)"),
@@ -1402,7 +1458,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		{
 			Counts += FString::Printf(TEXT(" %s %d"), UTF8_TO_TCHAR(St.Region), St.Num);
 		}
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 무대 나무: %s"),
+		UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 무대 나무: %s"),
 			   *(Settings.bStageTrees && Settings.bObstacles
 					 ? FString::Printf(TEXT("실행 중 놓기 켬 (eco.IntegratedV3.StageTrees 1, 예비 — 10-17) — 레벨 나무(꼬리표 %s)가 없는 무대에만 배치 표 %s (지문 %s, 무대 한 변 %.0f m):%s 그루, ")
 										   TEXT("팀 메시 %s 를 충돌 없이 놓고 줄기 원판(밑동 반경 %.2f cm × 크기 %.1f~%.1f)을 세계에 넣음, 시작 자리는 줄기를 피함 (파이썬 configs/v3_wild2_trees_mirror.yaml)"),
@@ -1416,7 +1472,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 											 kLevelTreeSnapCm)
 						   : FString(TEXT("끔 (eco.IntegratedV3.Obstacles 0 — v3 세계에 원판이 없다. 레벨 나무 줄기 막이는 팀 이동 제약에서는 그대로 막는다)"))));
 	}
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
 		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6 — 기본 아님) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다, 파이썬과 다름")
 								   : TEXT("끔 (eco.IntegratedV3.SocialControl 0, 기본 — 사람 결정 10-17 (8): v3 사슴 움직임은 파이썬 세계 그대로, Social 처리기는 기록만)"));
 	{
@@ -1433,7 +1489,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 				Table += TEXT(" (덮음 — 팀 설계·파이썬 거울과 다름)");
 			}
 		}
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 지역 날씨: %s"),
+		UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 지역 날씨: %s"),
 			   *(Settings.bWeather
 					 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.Weather 1, 10-18 야생 3단계 — 파이썬 configs/v3_wild3_mirror.yaml) — %s | 비 = 시야 × %.2f·사슴 청각 × %.2f, ")
 										   TEXT("눈 = 시야 × %.2f·사슴 청각 × %.2f·사슴 이동 × %.2f·늑대 이동 × %.2f (세기 1, 세기 I 는 1 − (1 − 값)·I) | 관측 visibility × 시야 | 연출 %s"),
@@ -1443,7 +1499,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 																 : TEXT("켬 (eco.IntegratedV3.WeatherVisuals 1 — 카메라가 비·눈 지역 안이면 카메라 곁에 팀 Rain_System·A_Rain_Cue·NS_Blizzard)"))
 					 : FString(TEXT("끔 (eco.IntegratedV3.Weather 0 — 날씨 없음)"))));
 	}
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 감지: 위협 시야 %s | 늑대 발소리 %s"),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 사슴 감지: 위협 시야 %s | 늑대 발소리 %s"),
 		   Settings.bRealismVision ? TEXT("300° (eco.IntegratedV3.RealismVision 1 — 바로 뒤 60° 만 사각)") : TEXT("120° (eco.IntegratedV3.RealismVision 0 — R1b 그대로)"),
 		   Settings.bRealismHearing ? TEXT("켬 (eco.IntegratedV3.RealismHearing 1 — 쫓아 달리면 최대 40 m, 어슬렁거리면 4 m, 서 있으면 없음)")
 									: TEXT("끔 (eco.IntegratedV3.RealismHearing 0)"));
@@ -1483,7 +1539,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			Reg.Queue(Pick.Brain.ToSharedRef(), Pick.Why);
 		}
 		const float SwapAt = EcoV3Brain::SwapAtSeconds();
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_LOG(LogEcoPolicyV3I, Verbose,
 			   TEXT("[EcoV3I] 사슴 두뇌: 지금 %s%s | 시작 고르기: %s | 기본 %s · 내장 %s | 예정 바꾸기 %s | 폴더 감시 %s | ")
 				   TEXT("바꾸기 eco.V3Brain.Load <파일|default|builtin> (결정 스텝 경계에서, Play 그대로), 보기 eco.V3Brain.Info·List, 찾는 폴더 %s"),
 			   *Reg.GetActive()->Describe(), Reg.GetPending().IsValid() ? *FString::Printf(TEXT(" → 첫 결정 스텝에 %s"), *Reg.GetPending()->Id) : TEXT(""),
@@ -1492,7 +1548,7 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 							  : TEXT("끔"),
 			   Reg.EffectiveWatchFolder().IsEmpty() ? TEXT("끔 (eco.V3Brain.WatchFolder)") : *Reg.EffectiveWatchFolder(),
 			   *FString::Join(FEcoV3BrainRegistry::SearchFolders(), TEXT(" · ")));
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 적응 고리: %s | 화면 알림 %s · 화면 찍기 %s"),
+		UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 적응 고리: %s | 화면 알림 %s · 화면 찍기 %s"),
 			   bAutoAdapt ? *FString::Printf(TEXT("켬 (eco.IntegratedV3.AutoAdapt 1) — Play 번호 %s · 두뇌 감시 %s (Play 시작 때 있던 파일·다른 Play 의 두뇌는 읽지 않음) · 상태 파일 %s · ")
 										      TEXT("되돌리기 eco.V3Brain.Rollback"),
 										  *PlayId, *Reg.EffectiveWatchFolder(), *Reg.EffectiveStatusFile())
@@ -2803,11 +2859,11 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 	TeamHerbivoreConfig = S.HerbivoreConfig;
 	TeamWolfConfig = S.WolfConfig;
 
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 설정 교체: 사슴 %s → %s, 늑대 %s → %s"), *GetNameSafe(S.HerbivoreConfig.Get()),
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 설정 교체: 사슴 %s → %s, 늑대 %s → %s"), *GetNameSafe(S.HerbivoreConfig.Get()),
 		   *DeerConfig->GetName(), *GetNameSafe(S.WolfConfig.Get()), *WolfConfig->GetName());
 	if (S.DaySeconds != 60.0 || S.NightSeconds != 60.0)
 	{
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 낮밤 %.0f+%.0f초 → 60+60초 (학습 주기 900 스텝)"), S.DaySeconds, S.NightSeconds);
+		UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 낮밤 %.0f+%.0f초 → 60+60초 (학습 주기 900 스텝)"), S.DaySeconds, S.NightSeconds);
 	}
 	S.Groups = NewGroups;
 	S.HerbivoreConfig = DeerConfig;
@@ -2842,7 +2898,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 		}
 		if (bIsland)
 		{
-			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 섬 무대 계획 %s: 정사각 원점 (%.0f, %.0f), 한 변 %.0f m — 힌트 자리 사슴 %d·늑대 %d 로 조정자가 섬 전체를 불러온다 ")
+			UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 섬 무대 계획 %s: 정사각 원점 (%.0f, %.0f), 한 변 %.0f m — 힌트 자리 사슴 %d·늑대 %d 로 조정자가 섬 전체를 불러온다 ")
 										   TEXT("(서식지 스트리밍 반지름 %.0f m). 진짜 시작 자리는 조정자 시작 직전 땅/물 지도로 고른다"),
 				   *G.RegionId.ToString(), IslandOriginCm.X, IslandOriginCm.Y, Plan.SizeUnits * 2.0, G.Herbivores, G.Wolves, S.HabitatStreamingRadius / 100.0);
 			continue;
@@ -2853,7 +2909,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 				   *G.RegionId.ToString(), G.Herbivores, Plan.SizeUnits,
 				   FEcoV3IntegratedSettings::kTrainDeer * Plan.SizeUnits * Plan.SizeUnits / (110.0 * 110.0));
 		}
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_LOG(LogEcoPolicyV3I, Verbose,
 			   TEXT("[EcoV3I] 무대 계획 %s: 중심 (%.0f, %.0f), 한 변 %.0f m, 사슴 %d (무대 균등, 밀도 %.4f/m²), 늑대 %d (모든 사슴에게서 %.0f m 밖), 지면 검사 %s"),
 			   *G.RegionId.ToString(), Plan.CenterCm.X, Plan.CenterCm.Y, Plan.SizeUnits * 2.0, G.Herbivores,
 			   G.Herbivores / FMath::Square(Plan.SizeUnits * 2.0), G.Wolves, Settings.WolfMinStartDistCm / 100.0,
@@ -2918,7 +2974,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ValidateSpawnPointsNow()
 		Summary += FString::Printf(TEXT(" %s 사슴 %d/%d 늑대 %d/%d%s"), *Plans[k].RegionId.ToString(), Plans[k].DeerPoints.Num(), Plans[k].WantDeer,
 								   Plans[k].WolfPoints.Num(), Plans[k].WantWolves, Partial[k] ? TEXT(" (사슴 일부만)") : TEXT(""));
 	}
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 조정자 시작 직전 지면 검사 %d 번째 끝 (BeginPlay 뒤 %.2f 초):%s"), ValidationPasses,
+	UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 조정자 시작 직전 지면 검사 %d 번째 끝 (BeginPlay 뒤 %.2f 초):%s"), ValidationPasses,
 		   World->GetTimeSeconds() - BeginPlaySeconds, *Summary);
 	return true;
 }
@@ -2971,7 +3027,9 @@ void UEcoPolicyV3IntegratedSubsystem::HandlePreActorTick(UWorld* InWorld, ELevel
 		IslandTickMarkers();    // 섬 무대 먼 개체 표식 (11-05 — 섬 무대가 아니면 아무것도 하지 않는다)
 		IslandTickStats();      // 섬 무대 기록 줄 (11-05 — 10 초마다, 섬 무대가 아니면 아무것도 하지 않는다)
 		TallyTeamWolfVisuals();
-		if (IsDebugDrawEnabled())
+		using namespace EcoPolicyV3IntegratedImpl;
+		if (FApp::CanEverRender() && (IsDebugDrawEnabled() || IsDebugLayerEnabled(CVarDebugObstacles)
+			|| IsDebugLayerEnabled(CVarDebugShelters) || IsDebugLayerEnabled(CVarDebugRegions)))
 		{
 			DrawOverlay();
 		}
@@ -3034,7 +3092,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		const FString Path = FPaths::ConvertRelativePathToFull(Settings.ObstacleImportPath);
 		if (LoadObstacleImport(Path, ImportedDiscs))
 		{
-			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 장애물 원판을 가져왔다 (측정 전용, 레벨에 보이는 물체 없음): %s — 지역 %d"), *Path, ImportedDiscs.Num());
+			UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 장애물 원판을 가져왔다 (측정 전용, 레벨에 보이는 물체 없음): %s — 지역 %d"), *Path, ImportedDiscs.Num());
 		}
 		else
 		{
@@ -3318,10 +3376,10 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 				{
 					Area += UE_DOUBLE_PI * Ob.Discs[3 * k + 2] * Ob.Discs[3 * k + 2];
 				}
-				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 장애물 | 가져온 원판 %d (넓이 %.2f%%) 으로 돈다 — 측정 전용, 레벨에서 읽은 원판 %d 대신 (eco.IntegratedV3.ObstacleImport)"),
+				UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] %s 장애물 | 가져온 원판 %d (넓이 %.2f%%) 으로 돈다 — 측정 전용, 레벨에서 읽은 원판 %d 대신 (eco.IntegratedV3.ObstacleImport)"),
 					   *G.RegionId.ToString(), Ob.Num(), 100.0 * Area / (Plan.SizeUnits * Plan.SizeUnits), Sc.Num());
 			}
-			UE_LOG(LogEcoPolicyV3I, Log,
+			UE_LOG(LogEcoPolicyV3I, Verbose,
 				   TEXT("[EcoV3I] %s 장애물 | 원판 %d (반지름 평균 %.2f m·최대 %.2f m, 넓이 %.2f%%) %s | 무대 안 메시 %d: 충돌 없음 %d (많은 것:%s) · 작음(반지름 %.0f cm 밑) %d · ")
 					   TEXT("낮음(%.0f cm 밑) %d · 은신처 원 안 %d · 은신처 장식 %d · 상한 넘침 %d · 무대 벽 곁 원판 %d | 원판 메시:%s | 지면 2 m 격자 %d 칸: 가파름 %d · 물 %d · 지면 없음 %d (기록만)"),
 				   *G.RegionId.ToString(), Sc.Num(), RMean * MPerUnit, RMax * MPerUnit, 100.0 * Sc.AreaFrac(Plan.SizeUnits),
@@ -3358,7 +3416,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 				const bool bPlanSame = Ctx->PlanTrunkDiscs == WorldTrunks;
 				const bool bTableSame = WorldTrunks == StageTreeDiscs(G.RegionId, Plan.SizeUnits);
 				const FEcoV3TrunkProbe& Pr = Ctx->TrunkProbe;
-				UE_LOG(LogEcoPolicyV3I, Log,
+				UE_LOG(LogEcoPolicyV3I, Verbose,
 					   TEXT("[EcoV3I] %s 나무 | 레벨 나무 줄기 %d (꼬리표 %s, 반지름 %.2f~%.2f m) — 배치 표 %s %d 그루와 맞춤 %d (읽은 값 ↔ 표 차이 최대 %.2g cm) · 표와 다름 %d | ")
 						   TEXT("세계 원판 %s 표 · 시작 자리가 피한 원판 %d 은 세계 줄기 원판과 %s | 이동 검사(팀 ConstrainStep): 줄기 가로지르기 %d/%d 막힘 (줄기 막이에 닿음 %d) · ")
 						   TEXT("잎 아래 둘레 걸음 %d 가운데 막힘 %d (우리 나무에 닿음 %d) | 실행 중 나무 놓지 않음"),
@@ -3384,7 +3442,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 					RHi = k == 0 ? Rm : FMath::Max(RHi, Rm);
 					Area += UE_DOUBLE_PI * T.Discs[3 * k + 2] * T.Discs[3 * k + 2];
 				}
-				UE_LOG(LogEcoPolicyV3I, Log,
+				UE_LOG(LogEcoPolicyV3I, Verbose,
 					   TEXT("[EcoV3I] %s 나무 | 배치 표 %s %d 그루 → 놓음 %d (줄기 원판 반지름 %.2f~%.2f m, 넓이 %.3f%%, 밑동 아래 땅 높낮이 최대 %.0f cm, 가장 낮은 땅보다 %.0f cm 묻음, ")
 						   TEXT("충돌 없음) · 뺌: 은신처 곁 %d · 지면 없음 %d · 메시·액터 없음 %d | 세계 원판 %d = 나무 %d + 레벨 %d (eco.IntegratedV3.StageTrees 1)"),
 					   *G.RegionId.ToString(), UTF8_TO_TCHAR(EcoTreeLayoutV3::kVersion), T.Layout, T.Num(), RLo, RHi,
@@ -3398,14 +3456,14 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			}
 			else if (bInTable && Settings.bObstacles && !Imported)
 			{
-				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 나무 | 레벨 나무(꼬리표 %s)가 무대에 없다 — %s"), *G.RegionId.ToString(), *LevelTrunkTag().ToString(),
+				UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] %s 나무 | 레벨 나무(꼬리표 %s)가 무대에 없다 — %s"), *G.RegionId.ToString(), *LevelTrunkTag().ToString(),
 					   Settings.bStageTrees ? (Plan.SizeUnits == EcoTreeLayoutV3::kStageSizeUnits ? TEXT("실행 중에도 놓지 못했다")
 																							   : TEXT("무대 한 변이 배치 표와 달라 실행 중에도 놓지 않았다"))
 											: TEXT("나무 없는 세계로 돈다 (편집기 명령 -run=EcoV3PlaceTrees 로 놓거나 -EcoV3StageTrees=1 로 실행 중에 놓는다)"));
 			}
 			else if (bInTable && Settings.bStageTrees)
 			{
-				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 나무 | 놓지 않음 — %s"), *G.RegionId.ToString(),
+				UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] %s 나무 | 놓지 않음 — %s"), *G.RegionId.ToString(),
 					   !Settings.bObstacles ? TEXT("eco.IntegratedV3.Obstacles 0")
 					   : Imported		   ? TEXT("이 지역 원판을 가져왔다 (eco.IntegratedV3.ObstacleImport, 측정 전용)")
 										   : *FString::Printf(TEXT("무대 한 변 %.0f m 가 배치 표(%.0f m)와 다르다"), Plan.SizeUnits * 2.0,
@@ -3505,7 +3563,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
                     {
                         Transferred += Grid.Food[Target];
                         ++Moved;
-                        UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Forage Spread] Target=%d Stock=%.9f Regen=%.9f X=%.1f Y=%.1f"),
+                        UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[Eco Snow Forage Spread] Target=%d Stock=%.9f Regen=%.9f X=%.1f Y=%.1f"),
                             Target, Grid.Food[Target], Grid.Regen[Target], Ground.X, Ground.Y);
                     }
                     continue;
@@ -3523,13 +3581,13 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
                 Swap(Grid.Cap[Target], Grid.Cap[Donor]);
                 if (!Grid.Cap0.empty()) Swap(Grid.Cap0[Target], Grid.Cap0[Donor]);
                 ++Moved;
-                UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Forage Trial] Donor=%d Target=%d Stock=%.9f Regen=%.9f X=%.1f Y=%.1f"),
+                UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[Eco Snow Forage Trial] Donor=%d Target=%d Stock=%.9f Regen=%.9f X=%.1f Y=%.1f"),
                     Donor, Target, Grid.Food[Target], Grid.Regen[Target], Ground.X, Ground.Y);
             }
             Grid.ComputeFields(Ctx->Sim.ObsCfg.SeeR);
-            UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Forage Trial] Sites=%d StartFood=%.9f Total=%.9f"), Moved, Ctx->StartFood, Grid.Total());
+            UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[Eco Snow Forage Trial] Sites=%d StartFood=%.9f Total=%.9f"), Moved, Ctx->StartFood, Grid.Total());
             if (bSpreadSnowForage)
-                UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Forage Spread] Budget=%.9f Transferred=%.9f"), SpreadBudget, Transferred);
+                UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[Eco Snow Forage Spread] Budget=%.9f Transferred=%.9f"), SpreadBudget, Transferred);
         }
 #endif
 
@@ -3562,7 +3620,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
                     DisjointStock += Grid.Food[Index];
                 }
             }
-            UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Food Boundary] Region=%s Total=%.9f Outside=%.9f OutsideCapacity=%.9f Cells=%d OutsideCells=%d Disjoint=%.9f DisjointCells=%d"),
+            UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[Eco Food Boundary] Region=%s Total=%.9f Outside=%.9f OutsideCapacity=%.9f Cells=%d OutsideCells=%d Disjoint=%.9f DisjointCells=%d"),
                 *G.RegionId.ToString(), Grid.Total(), OutsideStock, OutsideCapacity, StockedCells, OutsideCells, DisjointStock, DisjointCells);
         }
 		if (Ecology)
@@ -3582,7 +3640,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
                 Field->SurfaceHalfExtentCm = float(Config.WorldSize * EcoRepertoireV3::kUnitCm * .5);
                 Field->ConfigureGrid(Ctx->Sim.Food.Cell * EcoRepertoireV3::kUnitCm, Ctx->SizeCm(), int32(Config.Seed));
                 Field->FinishSpawning(FTransform(Origin));
-                UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoVegetation] Food grass enabled in %s (soil=%d natural=%d)"), *G.RegionId.ToString(), Config.Vegetation.bEnabled, NaturalProfile != nullptr);
+                UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoVegetation] Food grass enabled in %s (soil=%d natural=%d)"), *G.RegionId.ToString(), Config.Vegetation.bEnabled, NaturalProfile != nullptr);
             }
             else if (Config.Vegetation.bEnabled)
             {
@@ -3594,7 +3652,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
                 UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoVegetation] Visual field unavailable in %s"), *G.RegionId.ToString());
             }
 		}
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_LOG(LogEcoPolicyV3I, Verbose,
 			   TEXT("[EcoV3I] 지역 무대 %s (지역 번호 %d): 원점 (%.0f, %.0f, %.0f), 한 변 %.0f m | 사슴 %d 늑대 %d | 은신처 %d (레벨 %d + v3 %d, v3 반경 %.0f m, ")
 				   TEXT("학습 범위 밖이라 뺀 레벨 은신처 %d) | t=%lld"),
 			   *G.RegionId.ToString(), RegionIndex, Origin.X, Origin.Y, Origin.Z, Half * 2.0 / 100.0, G.Herbivores, G.Wolves,
@@ -3605,7 +3663,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			const double MPerUnit = EcoRepertoireV3::kUnitCm / 100.0;
 			if (Sw.Config.Weather.bEnabled)
 			{
-				UE_LOG(LogEcoPolicyV3I, Log,
+				UE_LOG(LogEcoPolicyV3I, Verbose,
 					   TEXT("[EcoV3I] %s 날씨 | %s %.2f%s — 사슴 위협 탐지 %.1f → %.1f m (낮) · 늑대 시야 %.1f → %.1f m · 사슴 청각 × %.2f · 사슴 이동 × %.2f · 늑대 이동 × %.2f · ")
 						   TEXT("관측 visibility × %.2f (eco.IntegratedV3.Weather 1)"),
 					   *G.RegionId.ToString(), UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Sw.WeatherKind)), Sw.WeatherIntensity,
@@ -3615,14 +3673,14 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			}
 			else
 			{
-				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 날씨 | 끔 (eco.IntegratedV3.Weather 0)"), *G.RegionId.ToString());
+				UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] %s 날씨 | 끔 (eco.IntegratedV3.Weather 0)"), *G.RegionId.ToString());
 			}
 		}
 		for (const FString& Why : UEcoPolicyV3Subsystem::CheckTrainingRange(Config))
 		{
 			if (bIsland)
 			{
-				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 지역 %s 학습 범위 밖: %s (섬 무대 — 언리얼 전용 시험 무대, 알고 쓴다)"), *G.RegionId.ToString(), *Why);
+				UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 지역 %s 학습 범위 밖: %s (섬 무대 — 언리얼 전용 시험 무대, 알고 쓴다)"), *G.RegionId.ToString(), *Why);
 			}
 			else
 			{
@@ -3721,7 +3779,7 @@ void UEcoPolicyV3IntegratedSubsystem::CheckClockDrift()
 	const int64 TeamT = FMath::RoundToInt64(TeamClock->GetServerTime().ServerTimeSeconds / EcoPolicyV3IntegratedImpl::kStepSeconds);
 	if (FMath::Abs(TeamT - GlobalT) > 4)
 	{
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 전역 스텝을 팀 시계에 다시 맞춘다 (v3 %lld → 팀 %lld)"), static_cast<long long>(GlobalT),
+		UE_LOG(LogEcoPolicyV3I, Verbose, TEXT("[EcoV3I] 전역 스텝을 팀 시계에 다시 맞춘다 (v3 %lld → 팀 %lld)"), static_cast<long long>(GlobalT),
 			   static_cast<long long>(TeamT));
 		GlobalT = TeamT;
 		for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
@@ -4074,6 +4132,10 @@ void UEcoPolicyV3IntegratedSubsystem::NotifyNightStep(FEcoV3RegionContext& Ctx, 
 		Ctx.bPrevDark = bDark;
 		Ctx.bDarkKnown = true;
 	}
+	if (EcoPolicyV3IntegratedImpl::CVarDebugLog.GetValueOnGameThread() == 0)
+	{
+		return;
+	}
 	for (int32 m = 0; m < NumWolves; ++m)
 	{
 		const EcoWorldV3::FThreatAgent& A = *Threats[m];
@@ -4169,12 +4231,13 @@ void UEcoPolicyV3IntegratedSubsystem::TallyTeamWolfVisuals()
 
 void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 {
+	const bool bLogContext = EcoPolicyV3IntegratedImpl::CVarDebugLog.GetValueOnGameThread() != 0;
 	using namespace EcoV3Integrated;
 	const EcoWorldV3::FWorldStats& S = Ctx.Sim.Stats;
 	const EcoWorldV3::FWorldStats& P = Ctx.LastLogStats;
 	const double Seconds = static_cast<double>(Ctx.Sim.T) * EcoRepertoireV3::kStepSeconds;
 	if(Ctx.Sim.Config.bProtectedRefuges)
-		UE_LOG(LogEcoPolicyV3I,Log,TEXT("[EcoRefuge] NetMode=%d Region=%s Step=%lld ProtectedPreySteps=%lld Deflections=%lld Recoveries=%lld InsidePredatorSteps=%lld CaptureViolations=%lld"),
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,TEXT("[EcoRefuge] NetMode=%d Region=%s Step=%lld ProtectedPreySteps=%lld Deflections=%lld Recoveries=%lld InsidePredatorSteps=%lld CaptureViolations=%lld"),
 			int32(GetWorld()->GetNetMode()),*Ctx.RegionId.ToString(),static_cast<long long>(Ctx.Sim.T),
 			static_cast<long long>(S.RefugeProtectedPreySteps),static_cast<long long>(S.RefugeConstrainedMoves),static_cast<long long>(S.RefugeRecoveries),
 			static_cast<long long>(S.RefugeInsidePredatorSteps),static_cast<long long>(S.RefugeCaptureViolations));
@@ -4237,7 +4300,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		S.FoodEaten - P.FoodEaten, Ctx.AteDeerInterval, GrazeSteps > 0 ? 100.0 * static_cast<double>(AteSteps) / static_cast<double>(GrazeSteps) : 0.0,
 		static_cast<long long>(AteSteps), static_cast<long long>(GrazeSteps), 100.0 * Ctx.FoodFraction(), 100.0 * Ctx.MeanEnergy, Ctx.StarvingDeer,
 		static_cast<long long>(S.Reproduced - P.Reproduced));
-	UE_LOG(LogEcoPolicyV3I, Log,
+	UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 		   TEXT("[EcoV3I] %s | %.1f초 %s d=%.2f (%s) | 사슴 산 %d/%d | 지금 행동:%s | 구간 사용(개체·스텝):%s | 늑대 %d:%s%s | ")
 			   TEXT("포획 %lld (누적 %lld) 굶음 %lld (누적 %lld) | %s | 지형 검사 이동 %lld, 막힘 사슴 %lld 늑대 %lld | 피식EMA %.3f | 마스크 위반 %lld | ")
 			   TEXT("허용 행동(%s) 모두 씀=%s | 결정 스텝 CPU(모든 지역) 평균 %.2f ms/스텝, 최대 %.1f ms/프레임"),
@@ -4263,7 +4326,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		{
 			PerWolf += FString::Printf(TEXT(" %lld:%d"), static_cast<long long>(Id), Ctx.WolfCatchesById.FindRef(Id));
 		}
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 얼기·식사 | %.1f초 | 얼기 %s: 구간 실행 %lld (누적 %lld) · 얼기 칸이 열린 결정 구간 %lld (누적 %lld) | ")
 				   TEXT("늑대 식사 %.2f초(%d 스텝) %s: 구간 포획 %lld (누적 %lld) · 식사 중 늑대·스텝 %lld, 그중 움직임 %lld · 돌진 %lld, 그중 이어 사냥(앞 포획 뒤 3초 안) %lld · ")
 				   TEXT("식사 끝 3초 안 %lld · 앞 포획이 있는 포획 %lld, 그중 식사 끝 3초 안 %lld · 팀 화면 식사 깃발 늑대·프레임 %lld (먹는 중 동작 %lld, 걷기·뛰기 %lld) | ")
@@ -4301,7 +4364,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		const FString Rule = K.bEnabled ? FString::Printf(TEXT("도주 반사 켬 (경계 %.0f m · 도주 %.0f m · 안전 %.0f m)"), K.AlertR * MPerUnit,
 														  K.FlightR * MPerUnit, K.SafeR * MPerUnit)
 										: FString(TEXT("끔 (두뇌 그대로)"));
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 경계 거리 | %.1f초 | %s | 구간 경계(멀어짐) 시작 %lld · 도망 시작 %lld · 은신처 웅크림 시작 %lld | ")
 				   TEXT("덮기 개체·스텝 경계 %lld 도망 %lld 웅크림 %lld (두뇌 %lld) | 끝난 도망 %lld (은신처에서 %lld), 평균 %.1f초 · 도망 중 죽음 %lld | ")
 				   TEXT("잡힌 사슴 %lld: 경계 중 %lld · 도망 중 %lld · 웅크림 중 %lld · 덮기 밖 %lld | ")
@@ -4320,7 +4383,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		if (K.bRestKeep)
 		{
 			// 10-27 거리 두기(쉬는 늑대) 줄 — '<지역> 거리 두기 |' 꼴 (compare_unreal.py 의 첫 줄·경계 거리 줄 정규식에 걸리지 않는다)
-			UE_LOG(LogEcoPolicyV3I, Log,
+			UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 				   TEXT("[EcoV3I] %s 거리 두기 | %.1f초 | 쉬는 늑대 시야 + %.0f m 밖까지 물러남 · 다가가지 않기 띠 %.0f m | 구간 시작 %lld · 끝 %lld · ")
 					   TEXT("개체·스텝 %lld · 그 중 잡힘 %lld | 띠가 방향을 바꾼 개체·스텝 %lld (멈춤 %lld) | 지금 거리 두기 %d"),
 				   *Ctx.RegionId.ToString(), Seconds, K.RestKeepMargin * MPerUnit, K.RestKeepBand * MPerUnit,
@@ -4334,7 +4397,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			const int64 LiveN = Ctx.RestViewLiveSteps - Ctx.LastLogRestViewLiveSteps;
 			const int64 InView = Ctx.RestViewDeerSteps - Ctx.LastLogRestViewDeerSteps;
 			const int64 Stop = Ctx.RestViewStopSteps - Ctx.LastLogRestViewStopSteps;
-			UE_LOG(LogEcoPolicyV3I, Log,
+			UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 				   TEXT("[EcoV3I] %s 쉬는 늑대 시야 | %.1f초 | 거리 두기 %s | 구간 산 사슴·스텝 %lld 중 쉬는 늑대 시야 안 %lld (%.2f%%) · 그중 멈춤 %lld (%.2f%%) | ")
 					   TEXT("누적 %lld 중 시야 안 %lld (%.2f%%) · 멈춤 %lld (%.2f%%)"),
 				   *Ctx.RegionId.ToString(), Seconds, K.bRestKeep ? TEXT("켬") : TEXT("끔"), static_cast<long long>(LiveN), static_cast<long long>(InView),
@@ -4371,7 +4434,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 												  WolfN > 0 ? 100.0 * static_cast<double>(S.WolfSatedSteps - P.WolfSatedSteps) / static_cast<double>(WolfN) : 0.0,
 												  WolfN > 0 ? 100.0 * static_cast<double>(S.WolfEatingSteps - P.WolfEatingSteps) / static_cast<double>(WolfN) : 0.0,
 												  static_cast<long long>(S.WolfKills - P.WolfKills), static_cast<long long>(S.WolfKills));
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 야생 | %.1f초 | %s | %s"), *Ctx.RegionId.ToString(), Seconds, *Reserve, *Sat);
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 야생 | %.1f초 | %s | %s"), *Ctx.RegionId.ToString(), Seconds, *Reserve, *Sat);
 	}
 	// 다섯째 줄: 야생 2단계 기록 (10-17, 늘 적는다). 사냥 성공률(world.py hunt_update 와 같은 정의, 누적), 은신처 안 사슴 시간, 은신처 둘레 밖 잡힘.
 	//   (results/v3/mirror/compare_unreal.py·results/v3/wild1/compare_unreal_wild.py 의 정규식은 '<지역> 사냥·은신처 |' 꼴에 걸리지 않는다 — 앞 네 줄 그대로)
@@ -4383,7 +4446,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		auto Rate = [](int64 Num, int64 Den) { return Den > 0 ? 100.0 * static_cast<double>(Num) / static_cast<double>(Den) : 0.0; };
 		const int64 LiveN = S.LiveDeerSteps - P.LiveDeerSteps;
 		const int64 InN = S.ShelterDeerSteps - P.ShelterDeerSteps;
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 사냥·은신처 | %.1f초 | 사냥 누적: 시작 %lld · 끝 %lld · 성공 %lld · 사냥 밖 포획 %lld · 성공률 %.1f%% ")
 				   TEXT("(추격형 시작 %lld 끝 %lld 성공 %lld · 잠행형 시작 %lld 끝 %lld 성공 %lld) · 구간 시작 %lld 끝 %lld 성공 %lld | ")
 				   TEXT("은신처 안 사슴·스텝: 구간 %lld/%lld (%.1f%%) · 누적 %lld/%lld (%.1f%%) | 은신처 둘레 밖 잡힘 누적: 2 m 안 %lld · 4 m 안 %lld | ")
@@ -4405,7 +4468,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	{
 		const int64 Wn = S.PackWolfSteps;
 		auto Pc = [Wn](int64 X) { return Wn > 0 ? 100.0 * static_cast<double>(X) / static_cast<double>(Wn) : 0.0; };
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 늑대 무리 | %.1f초 | 늑대 %d | 누적 늑대·스텝 %lld: 앞장 %lld (%.1f%%) · 돕기 %lld (%.1f%%) · 기다림 %lld · 은신처 문 %lld | ")
 				   TEXT("늑대 포획 누적 %lld · 협동 포획 %lld (다른 앞장 늑대도 쫓던 사슴)"),
 			   *Ctx.RegionId.ToString(), Seconds, Ctx.Wolves, static_cast<long long>(Wn), static_cast<long long>(S.PackLeadSteps), Pc(S.PackLeadSteps),
@@ -4418,7 +4481,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	{
 		const EcoWorldV3::FObstacleConfig& Ob = Ctx.Sim.Config.Obstacles;
 		auto Pc = [](int64 X, int64 N) { return N > 0 ? 100.0 * static_cast<double>(X) / static_cast<double>(N) : 0.0; };
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 장애물 | %.1f초 | 원판 %d (%s, 몸 %.0f cm, 눈길 가림 %s, 먹이 줄임 %s) | 누적 사슴·스텝 %lld: 닿음 %lld (%.2f%%) · 물러남 %lld | ")
 				   TEXT("늑대·스텝 %lld: 닿음 %lld (%.2f%%) · 되돌림 %lld · 돌아섬 %lld | 원판 밖으로 옮김 %lld (못 옮김 %lld)%s"),
 			   *Ctx.RegionId.ToString(), Seconds, Ob.Num(),
@@ -4458,7 +4521,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			Bands += FString::Printf(TEXT("%s%s m %lld/%lld (%.1f%%)"), b == 0 ? TEXT("") : TEXT(" · "), BandNames[b], static_cast<long long>(S.SenseSeen[b]),
 									 static_cast<long long>(S.SensePairs[b]), Pc(S.SenseSeen[b], S.SensePairs[b]));
 		}
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 날씨 | %.1f초 | %s | 날씨 스텝 누적 맑음 %lld · 비 %lld · 눈 %lld | 감지 누적(산 사슴 × 깨어 있는 늑대 쌍): %s | ")
 				   TEXT("들어서만 안 사슴·스텝 %lld/%lld (%.2f%%)"),
 			   *Ctx.RegionId.ToString(), Seconds, *WxNow, static_cast<long long>(S.WeatherSteps[EcoWorldV3::kWeatherClear]),
@@ -4481,7 +4544,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		};
 		// 이 구간 안에서 바꿨으면 (스텝 LastLogT 뒤·지금 앞의 경계) 앞 두뇌도 적는다 — 구간 몫이 두 두뇌에 걸친다
 		const bool bMixed = LastBrainSwapStep > Ctx.LastLogT && LastBrainSwapStep < Ctx.Sim.T;
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 두뇌 | %.1f초 | 두뇌 %s%s | 구간 두뇌 스텝(도주 반사 밖) %lld: %s | 그중 늑대를 앎 %lld: %s | 반사 스텝 %lld (늑대를 앎 %lld)"),
 			   *Ctx.RegionId.ToString(), Seconds, *GetActiveBrain().Id,
 			   bMixed ? *FString::Printf(TEXT(" (구간 중 바꿈: 전역 스텝 %lld 에 %s →)"), static_cast<long long>(LastBrainSwapStep), *LastBrainSwapFrom) : TEXT(""),
@@ -4496,7 +4559,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	{
 		const FEcoV3RouteSum Tot = FEcoV3RouteSum::Of(S.Route);
 		const FEcoV3RouteSum Iv = Tot.Minus(FEcoV3RouteSum::Of(P.Route));
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 길 | %.1f초 | %s | 구간 %s | 누적 %s · 도주 시작 %lld · 바꿈 %lld"), *Ctx.RegionId.ToString(), Seconds,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 길 | %.1f초 | %s | 구간 %s | 누적 %s · 도주 시작 %lld · 바꿈 %lld"), *Ctx.RegionId.ToString(), Seconds,
 			   Ctx.RouteOn() ? (Ctx.Sim.bFleeGate ? TEXT("두 길 켬 (판 5 — 반사 밖 도망 막음)") : TEXT("두 길 켬 (판 4)")) : TEXT("두 길 끔 (앞 두뇌가 센 누적)"),
 			   *Iv.Text(), *Tot.Text(), static_cast<long long>(Tot.Onsets), static_cast<long long>(Tot.Switches));
 	}
@@ -4519,7 +4582,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		}
 		const EcoWorldV3::FFlightReport Tot = EcoWorldV3::FlightReportOf(S.Flight, Ctx.FlightOpen);
 		const int64 TotEnded = Tot.Started - Tot.Num[EcoWorldV3::kFlightTruncated];
-		UE_LOG(LogEcoPolicyV3I, Log,
+		UE_CLOG(bLogContext, LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 도망 | %.1f초 | 구간 시작 %lld · 끝 %lld (스스로: %s) · 평균 %.1f초 · 스스로 벗어난 도망 %lld번 쫓긴 %.1f초 | %s | ")
 				   TEXT("누적 시작 %lld · 끝 %lld · 열린 %lld · 스스로 벗어남 %lld (%.1f%%) 쫓긴 %.1f초 · 은신처 원 안에서 끝 %lld · 반사 스텝 %lld/%lld · ")
 					   TEXT("쫓긴 도망 %lld 중 숨음 %lld (지켜보는 중 %lld) · 숨은 뒤 10초 안 잡힘 %lld·굶음 %lld · ")
@@ -4617,13 +4680,6 @@ void UEcoPolicyV3IntegratedSubsystem::UpdateViewEnvironment()
 	{
 		return;
 	}
-	if (!bMigrationDebugHidden)
-	{
-		UEcoRuntimeSettings* RuntimeSettings = GetMutableDefault<UEcoRuntimeSettings>();
-		bSavedMigrationDebug = RuntimeSettings->bDrawMigrationDebug;
-		RuntimeSettings->bDrawMigrationDebug = false;   // 기본 객체만 바꾼다. SaveConfig 를 부르지 않는다
-		bMigrationDebugHidden = true;
-	}
 	// 매 프레임 부르므로 찾기는 한 번만 (엔진이 FindConsoleObject 반복 호출 경고를 남긴다)
 	static IConsoleVariable* const Limit = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DebugSafeZone.MaxDebugTextStringsPerActor"));
 	// 그릴 수 없는 실행(-NullRHI 헤드리스)에서는 한도를 풀지 않는다: HUD 가 그려지지 않아 엔진이 디버그 글자 목록(AHUD::DebugTextList)을
@@ -4645,11 +4701,6 @@ void UEcoPolicyV3IntegratedSubsystem::UpdateViewEnvironment()
 
 void UEcoPolicyV3IntegratedSubsystem::RestoreViewEnvironment()
 {
-	if (bMigrationDebugHidden)
-	{
-		GetMutableDefault<UEcoRuntimeSettings>()->bDrawMigrationDebug = bSavedMigrationDebug;
-		bMigrationDebugHidden = false;
-	}
 	if (bTextLimitRaised)
 	{
 		if (IConsoleVariable* Limit = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DebugSafeZone.MaxDebugTextStringsPerActor")))
@@ -4662,41 +4713,46 @@ void UEcoPolicyV3IntegratedSubsystem::RestoreViewEnvironment()
 
 void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 {
-	using namespace EcoV3Integrated;
 	UWorld* World = GetWorld();
 	if (!World)
 	{
 		return;
 	}
-	const double Now = World->GetTimeSeconds();
-	const bool bScreen = GEngine && Now >= NextScreenTally;
-	if (bScreen)
-	{
-		NextScreenTally = Now + 1.0;
-	}
+	using namespace EcoPolicyV3IntegratedImpl;
+	const bool bRegions = IsDebugLayerEnabled(CVarDebugRegions);
+	const bool bShelters = IsDebugLayerEnabled(CVarDebugShelters);
+	const bool bObstacles = IsDebugLayerEnabled(CVarDebugObstacles);
+	const bool bAgents = IsDebugLayerEnabled(CVarDebugAgents);
 	for (const TUniquePtr<FEcoV3RegionContext>& Ptr : Contexts)
 	{
 		const FEcoV3RegionContext& Ctx = *Ptr;
-		const double Half = 0.5 * Ctx.SizeCm();
-		const FVector Center = Ctx.OriginCm + FVector(Half, Half, 300.0);
-		DrawDebugBox(World, Center, FVector(Half, Half, 0.0), FColor(30, 30, 30), false, -1.0f, 0, 20.0f);
-		const FColor CoverColor(85, 102, 170);
-		for (int32 k = 0; k < static_cast<int32>(Ctx.Sim.Config.Covers.size()); ++k)
+		if (bRegions)
 		{
-			const EcoObservationV3::FCoverInput& C = Ctx.Sim.Config.Covers[static_cast<size_t>(k)];
-			const double Z = Ctx.CoverGroundZ.IsValidIndex(k) ? Ctx.CoverGroundZ[k] : Ctx.OriginCm.Z;
-			const FVector P = Ctx.UnitsToCm(C.X, C.Y, Z + 60.0);
-			const float R = static_cast<float>(C.Radius * EcoRepertoireV3::kUnitCm);
-			DrawDebugCircle(World, P, R, 48, CoverColor, false, -1.0f, 0, 10.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
-			if (C.Radius > 0.0 && Ctx.Sim.Config.ShelterWolfMargin > 0.0)
+			const double Half = 0.5 * Ctx.SizeCm();
+			const FVector Center = Ctx.OriginCm + FVector(Half, Half, 300.0);
+			DrawDebugBox(World, Center, FVector(Half, Half, 0.0), FColor(30, 30, 30), false, -1.0f, 0, 20.0f);
+		}
+		if (bShelters)
+		{
+			const FColor CoverColor(85, 102, 170);
+			for (int32 k = 0; k < static_cast<int32>(Ctx.Sim.Config.Covers.size()); ++k)
 			{
-				// 늑대 몸 여유 둘레 (10-17): 늑대 중심은 이 원 밖에 머문다 (가는 선)
-				const float Rw = static_cast<float>((C.Radius + Ctx.Sim.Config.ShelterWolfMargin) * EcoRepertoireV3::kUnitCm);
-				DrawDebugCircle(World, P, Rw, 48, FColor(60, 60, 90), false, -1.0f, 0, 3.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+				const EcoObservationV3::FCoverInput& C = Ctx.Sim.Config.Covers[static_cast<size_t>(k)];
+				const double Z = Ctx.CoverGroundZ.IsValidIndex(k) ? Ctx.CoverGroundZ[k] : Ctx.OriginCm.Z;
+				const FVector P = Ctx.UnitsToCm(C.X, C.Y, Z + 60.0);
+				const float R = static_cast<float>(C.Radius * EcoRepertoireV3::kUnitCm);
+				DrawDebugCircle(World, P, R, 48, CoverColor, false, -1.0f, 0, 10.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+				if (C.Radius > 0.0 && Ctx.Sim.Config.ShelterWolfMargin > 0.0)
+				{
+					// 늑대 몸 여유 둘레 (10-17): 늑대 중심은 이 원 밖에 머문다 (가는 선)
+					const float Rw = static_cast<float>((C.Radius + Ctx.Sim.Config.ShelterWolfMargin) * EcoRepertoireV3::kUnitCm);
+					DrawDebugCircle(World, P, Rw, 48, FColor(60, 60, 90), false, -1.0f, 0, 3.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+				}
 			}
 		}
 		// 야생 2단계 3 세로 장애물 원판 (갈색 = 나무·바위 둘레, 옅은 선 = 몸 여유 둘레 — 사슴·늑대 중심이 들지 않는 원). 가져온 원판(측정 전용)은 주황,
 		// 무대 나무 줄기 원판(10-17 실행 중 나무·10-18 레벨 나무 줄기 막이)은 초록
+		if (bObstacles)
 		{
 			const EcoWorldV3::FObstacleConfig& Ob = Ctx.Sim.Config.Obstacles;
 			const FColor ObColor = Ctx.bObstaclesImported ? FColor(230, 140, 40) : FColor(120, 80, 40);
@@ -4711,99 +4767,11 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 								FVector(1, 0, 0), FVector(0, 1, 0), false);
 			}
 		}
-		for (const FEcoV3IntegratedCatchMark& M : Ctx.RecentCatches)
+		if (bAgents)
 		{
-			DrawDebugSphere(World, M.Location + FVector(0, 0, 150.0), 350.0f, 12, FColor::Orange, false, -1.0f, 0, 8.0f);
-		}
-		FString Tally;
-		for (int32 b = 0; b < EcoRepertoireV3::kSleep; ++b)
-		{
-			// 얼기를 막았으면 '얼기(막힘) 0' — 늘 0 이어야 한다 (사람 결정 10-15 (A))
-			Tally += FString::Printf(TEXT(" %s%s %d"), BehaviorNameKo(b), Ctx.Sim.Allowed[b] == 0 ? TEXT("(막힘)") : TEXT(""), Ctx.BehaviorNow[b]);
-		}
-		FString Wolves;
-		for (int32 w = 0; w < static_cast<int32>(EWolfState::Count); ++w)
-		{
-			if (Ctx.WolvesNow[w] > 0)
+			for (const FEcoV3IntegratedCatchMark& M : Ctx.RecentCatches)
 			{
-				Wolves += FString::Printf(TEXT(" %s %d"), WolfStateNameKo(static_cast<EWolfState>(w)), Ctx.WolvesNow[w]);
-			}
-		}
-		if (Ctx.Sim.ThreatCfg.bRealismNight)
-		{
-			Wolves += TEXT(" (밤잠 서서히)");
-		}
-		// 늑대 식사 규칙: '늑대 식사 5초 제자리' (사람 결정 10-15 (B)), 옛 규칙이면 '늑대 식사 0.7초 배회'
-		const int32 EatCd = Ctx.Sim.ThreatCfg.PredEatCd;
-		Wolves += FString::Printf(TEXT(" | 늑대 식사 %s초 %s"),
-								  *FString::SanitizeFloat(FMath::RoundToDouble(10.0 * EatCd * EcoRepertoireV3::kStepSeconds) / 10.0),
-								  Ctx.Sim.ThreatCfg.bEatInPlace ? TEXT("제자리") : TEXT("배회"));
-		// 사슴 경계 거리 (사람 결정 10-15 (C)): 지금 덮기 수
-		if (Ctx.Sim.Config.WildFlight.bEnabled)
-		{
-			Tally += FString::Printf(TEXT(" | 경계(멀어짐) %d 도망(안전해질 때까지) %d 숨기(은신처·경계) %d"), Ctx.KeepNow[EcoWorldV3::kKeepAlert],
-									 Ctx.KeepNow[EcoWorldV3::kKeepPanic], Ctx.KeepNow[EcoWorldV3::kKeepShelter]);
-			if (Ctx.Sim.Config.WildFlight.bRestKeep)
-			{
-				Tally += FString::Printf(TEXT(" 거리 두기(쉬는 늑대) %d"), Ctx.KeepNow[EcoWorldV3::kKeepRest]);   // 10-27
-			}
-		}
-		// 지역 날씨 (10-18): 첫 줄 낮밤 옆에 '비 1.00' (끄거나 맑으면 '맑음')
-		const FString WxTag = Ctx.Sim.Config.Weather.bEnabled && Ctx.Sim.WeatherKind != EcoWorldV3::kWeatherClear
-								  ? FString::Printf(TEXT(" %s %.2f"), UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Ctx.Sim.WeatherKind)), Ctx.Sim.WeatherIntensity)
-								  : FString(TEXT(" 맑음"));
-		// 두뇌 (10-18 두뇌 바꾸기): 내장이면 'R1b−F'(얼기 막음)·'R1b', 파일 두뇌면 모델 이름. 바뀐 뒤 늑대를 알 때 숨기 몫 (FEcoV3BrainTally)
-		const FEcoV3Brain& Brain = GetActiveBrain();
-		// 10-24 두 길 두뇌면 '두뇌 <이름> 두 길' (판 5 는 '두 길·반사 밖 도망 막음'). 10-29 기본 두뇌면 '기본 R7e 두 길·반사 밖 도망 막음'
-		const TCHAR* const RouteTag = Ctx.RouteOn() ? (Ctx.Sim.bFleeGate ? TEXT(" 두 길·반사 밖 도망 막음") : TEXT(" 두 길")) : TEXT("");
-		const FString BrainTag = Brain.bBuiltin	  ? FString(Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"))
-								 : Brain.bDefault ? FString::Printf(TEXT("기본 %s%s"), *Brain.Label, RouteTag)
-												  : FString::Printf(TEXT("두뇌 %s%s"), *Brain.ModelName, RouteTag);
-		const FEcoV3BrainTally& Since = Ctx.SinceSwapBrainTally;
-		const int64 KnowN = Since.KnowTotal();
-		const FString Line = FString::Printf(TEXT("v3 %s %s | %s%s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld | 이 두뇌로 늑대를 알 때 숨기 %.1f%% (%lld 스텝)"),
-											 *BrainTag, *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), *WxTag, Ctx.Sim.Dark,
-											 Ctx.AliveDeer, Ctx.AdoptedDeer, *Tally, *Wolves,
-											 static_cast<long long>(Ctx.Sim.Stats.Caught), static_cast<long long>(Ctx.Sim.Stats.Starved),
-											 KnowN > 0 ? 100.0 * static_cast<double>(Since.KnowSteps[EcoRepertoireV3::kHide]) / static_cast<double>(KnowN) : 0.0,
-											 static_cast<long long>(KnowN));
-		// 둘째 줄: 먹기 되먹임 (v3 먹이 격자 — 팀 지역 FoodAmount 가 아니다)
-		FString FoodLine = FString::Printf(TEXT("먹이 %s | 무대 먹이 처음의 %.0f%% | 최근 10초 먹은 양 %.1f | 사슴 에너지 평균 %.0f%% | 굶주림(15%% 아래) %d"),
-										   *Ctx.RegionId.ToString(), 100.0 * Ctx.FoodFraction(), Ctx.RecentEatenSum(),
-										   100.0 * Ctx.MeanEnergy, Ctx.StarvingDeer);
-		// 야생 (w1) 지방 비축 (켠 세계만): 비축 평균·배 비어 비축으로 사는 사슴·비축 바닥 가까움·약함
-		if (Ctx.Sim.Config.WildReserve.bEnabled)
-		{
-			FoodLine += FString::Printf(TEXT(" | 지방 비축 평균 %.0f%% · 비축으로 사는 사슴 %d · 비축 %.0f%% 밑 %d · 약함(느림) %d"), 100.0 * Ctx.MeanReserve,
-										Ctx.OnReserveDeer, 100.0 * EcoV3Integrated::kLowReserve, Ctx.LowReserveDeer, Ctx.WeakDeer);
-		}
-		// 셋째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — EcoV3FlightTally.h): 최근 60 초 창과 두뇌 판 비교 (쫓긴 = 스스로 벗어난 도망의 쫓긴
-		// 시간, 10-24 쫓긴 사건 중 숨음·잡힘 = 관문 1차 사건 숨음 비율·지킴 GH 와 같은 몫 — 닫힌 사건)
-		const FString FlightLine = Ctx.FlightOn() ? FString::Printf(TEXT("도망 %s | %s | %s"), *Ctx.RegionId.ToString(),
-																	 *EcoV3Flight::SummaryText(Ctx.FlightTally.Window()),
-																	 *EcoV3Flight::CompareText(Ctx.FlightTally))
-												  : FString();
-		// 넷째 줄: 10-24 두 길 두뇌 (이식 계획서 8-3 — 길을 켠 세계만): 최근 60 초 실행한 반사 길 몫·길 결정·은신처 고름·무효, 사슴 머리 위 글자는
-		// '도주(트인 쪽)'(연노랑)·'도주(은신처)'(하늘색) — EcoV3Integrated::DeerLabel
-		const FString RouteLine = Ctx.RouteOn() ? FString::Printf(TEXT("길 %s | 최근 %.0f초: %s | 지금 도주 트인 쪽 %d · 은신처 %d"), *Ctx.RegionId.ToString(),
-																   static_cast<double>(Ctx.RouteTally.WindowSteps()) * EcoRepertoireV3::kStepSeconds,
-																   *Ctx.RouteTally.Window().Text(), Ctx.RouteNow[0], Ctx.RouteNow[1])
-												: FString();
-		DrawDebugString(World, Center + FVector(0, 0, 600.0),
-						Line + TEXT("\n") + FoodLine + (FlightLine.IsEmpty() ? FString() : TEXT("\n") + FlightLine) + (RouteLine.IsEmpty() ? FString() : TEXT("\n") + RouteLine),
-						nullptr, FColor::White, 0.0f, true, 1.4f);
-		if (bScreen)
-		{
-			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(730000 + Ctx.Index), 1.5f, FColor(180, 230, 180), Line);
-			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(731000 + Ctx.Index), 1.5f, FColor(230, 210, 150), FoodLine);
-			if (!FlightLine.IsEmpty())
-			{
-				// 키 733000 + 지역 (732000~732004 는 두뇌 알림·상태 줄)
-				GEngine->AddOnScreenDebugMessage(static_cast<uint64>(733000 + Ctx.Index), 1.5f, FColor(255, 190, 140), FlightLine);
-			}
-			if (!RouteLine.IsEmpty())
-			{
-				GEngine->AddOnScreenDebugMessage(static_cast<uint64>(734000 + Ctx.Index), 1.5f, FColor(140, 225, 255), RouteLine);
+				DrawDebugSphere(World, M.Location + FVector(0, 0, 150.0), 350.0f, 12, FColor::Orange, false, -1.0f, 0, 8.0f);
 			}
 		}
 	}
@@ -4892,6 +4860,12 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 		PollAutoWatch();
 	}
 	const bool bCanDraw = EcoV3Brain::NoticeEnabled() && GEngine && FApp::CanEverRender();
+	if (!bCanDraw && GEngine && NextNoticeLine > 0.0)
+	{
+		for (uint64 Key = kNoticeKeyBrain; Key <= kNoticeKeyStatus; ++Key)
+			GEngine->RemoveOnScreenDebugMessage(Key);
+		NextNoticeLine = 0.0;
+	}
 	// 미뤄 둔 화면 찍기 (eco.V3Brain.NoticeShot — 바꾸기·되돌리기 알림 1.5 초 뒤, 게임 화면만)
 	if (PendingShotAt >= 0.0 && Now >= PendingShotAt)
 	{

@@ -1608,8 +1608,6 @@ private:
 	 * - 엔진은 한 액터에 디버그 글자를 128개까지만 그린다(r.DebugSafeZone.MaxDebugTextStringsPerActor). 우리 글자는 모두 WorldSettings 에
 	 *   붙으므로 eco.V3Debug 를 켠 동안만 한도를 푼다(0 = 한도 없음). 그릴 수 없는 실행(-NullRHI)에서는 풀지 않는다 — HUD 가 그려지지
 	 *   않아 엔진이 글자 목록을 비우지 않으므로, 한도가 없으면 목록이 끝없이 늘어 프레임이 점점 느려진다.
-	 * - 팀 이주 디버그 글자('ID n Forest Resident')는 v3 모드에서 이주를 꺼 두므로 뜻이 없고 행동 글자를 가린다. v3 모드 동안만
-	 *   UEcoRuntimeSettings 기본 객체의 bDrawMigrationDebug 를 끈다. 설정 파일에는 쓰지 않는다.
 	 */
 	void UpdateViewEnvironment();
 	void RestoreViewEnvironment();
@@ -1737,7 +1735,4 @@ private:
 
 	bool bTextLimitRaised = false;
 	int32 SavedTextLimit = 128;
-	bool bMigrationDebugHidden = false;
-	bool bSavedMigrationDebug = true;
-	double NextScreenTally = 0.0;
 };

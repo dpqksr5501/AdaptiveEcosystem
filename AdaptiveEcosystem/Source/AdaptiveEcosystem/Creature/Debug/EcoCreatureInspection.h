@@ -37,7 +37,6 @@ public:
 private:
 #if !UE_BUILD_SHIPPING
     void DrawGrassInspection();
-    bool bGrassInspection = false;
     FName GrassRegion;
     double NextGrassRead = 0;
     FString GrassReadout;

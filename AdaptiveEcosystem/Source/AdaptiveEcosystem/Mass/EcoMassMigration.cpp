@@ -10,9 +10,13 @@
 #include "AdaptiveEcosystem.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
+#include "HAL/IConsoleManager.h"
 
 namespace
 {
+	static TAutoConsoleVariable<int32> CVarEcoMigrationTransitionsLog(TEXT("eco.Migration.Log"), -1,
+		TEXT("Write legacy migration transitions to the Output Log. -1: use project default, 0: off, 1: on."));
+
 	FVector ArrivalFor(const FEcoRegionSpatialSnapshot& Space, int64 Id, float Spread)
 	{
 		// Stable ID produces a repeatable disk offset, independent of chunk/query ordering.
@@ -270,7 +274,9 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 			View.GetFragmentData<FMassDesiredMovementFragment>().DesiredVelocity = FVector::ZeroVector;
 			View.GetFragmentData<FMassVelocityFragment>().Value = FVector::ZeroVector;
 		}
-		if (Settings.bPrintTransitions && (Before.State != A.Travel.State || Before.TargetRegionIndex != A.Travel.TargetRegionIndex || A.bArrived))
+		const int32 LogMode = CVarEcoMigrationTransitionsLog.GetValueOnGameThread();
+		if ((LogMode < 0 ? Settings.bPrintTransitions : LogMode != 0)
+			&& (Before.State != A.Travel.State || Before.TargetRegionIndex != A.Travel.TargetRegionIndex || A.bArrived))
 			UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Migration] Epoch=%d Step=%lld Time=%.3f Observed=%.3f ID=%lld From=%s Region=%s Target=%s State=%s Arrived=%d Reason=%s NextFeed=%.3f"),
 				Time.WorldEpoch, StepId, Time.ServerTimeSeconds, ActualTime, A.Identity.StableAgentId, *From.ToString(), *A.Region.CurrentRegionId.ToString(),
 				*A.Travel.TargetRegionId.ToString(), A.Travel.State == EEcoResidenceState::Resident ? TEXT("Resident") :

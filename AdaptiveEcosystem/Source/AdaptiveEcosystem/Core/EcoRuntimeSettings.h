@@ -28,7 +28,7 @@ public:
 	FEcoMigrationSettings Migration;
 	/** Read-only region summaries on host/client; authoritative agent IDs and arrows on host. */
 	UPROPERTY(Config, EditAnywhere, Category="M3|Editor Test")
-	bool bDrawMigrationDebug = true;
+	bool bDrawMigrationDebug = false;
 	UEcoRuntimeSettings()
 	{
 		DayFoodEvent.bEnabled = false;
@@ -43,22 +43,22 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="M3|Resources")
 	FEcoFoodEventSettings NightFoodEvent;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Resources")
-	bool bPrintResourceChanges = true;
+	bool bPrintResourceChanges = false;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Population")
 	bool bEnableSpawnWaves = true;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Population")
-	bool bPrintDailyPopulation = true;
+	bool bPrintDailyPopulation = false;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Population")
-	bool bPrintDailyPopulationToScreen = true;
+	bool bPrintDailyPopulationToScreen = false;
 	/** Fixed-cycle fallback; a registered server day-cycle provider can replace phase evaluation. */
 	UPROPERTY(Config, EditAnywhere, Category="M3|Clock", meta=(ClampMin="0.25"))
 	double DayDurationSeconds = 60.0;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Clock", meta=(ClampMin="0.25"))
 	double NightDurationSeconds = 60.0;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Clock")
-	bool bPrintServerTime = true;
+	bool bPrintServerTime = false;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Clock")
-	bool bPrintServerTimeToScreen = true;
+	bool bPrintServerTimeToScreen = false;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Clock", meta=(ClampMin="0.25"))
 	double ServerTimePrintInterval = 1.0;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Population", meta=(ClampMin="1"))

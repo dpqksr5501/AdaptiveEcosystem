@@ -88,8 +88,8 @@ namespace EcoV3BrainImpl
 		ECVF_Default);
 	// 실시간 두뇌 교체 화면 (10-21, LIVE_ADAPT_SPEC.md 5.4 — 통합 서브시스템이 그린다)
 	TAutoConsoleVariable<int32> CVarNotice(
-		TEXT("eco.V3Brain.Notice"), 1,
-		TEXT("두뇌 바꾸기·되돌리기·파일 거부·환경 바뀜·스냅숏 화면 알림과 적응 고리 상태 줄 (1 = 켬, 기본 — eco.V3Debug 와 따로). 그리는 화면이 있는 서버·단독만. ")
+		TEXT("eco.V3Brain.Notice"), 0,
+		TEXT("두뇌 바꾸기·되돌리기·파일 거부·환경 바뀜·스냅숏 화면 알림과 적응 고리 상태 줄 (기본 0, 1 = 켬). 그리는 화면이 있는 서버·단독만. ")
 			TEXT("0 = 화면에 안 띄움 (기록 '[EcoV3I] 알림 |' 은 늘 남긴다)."),
 		ECVF_Default);
 	TAutoConsoleVariable<int32> CVarNoticeShot(

@@ -50,5 +50,7 @@ namespace EcoHerdMigrationDebug
     ADAPTIVEECOSYSTEM_API bool ToJson(const FEcoHerdMigrationDebugSnapshot& Snapshot,FString& Out);
     int32 Mode(UWorld& World);
     void Toggle(UWorld& World);
-    void Draw(AHUD& HUD,APlayerController& Player,FVector2D Size,const FEcoHerdMigrationDebugSnapshot& Snapshot,int64 FocusPlan,int32 Mode);
+    const FEcoMigrationDebugRegion* FindNearbyRegion(const FEcoHerdMigrationDebugSnapshot& Snapshot, const FVector& PlayerPosition);
+    void Draw(AHUD& HUD, APlayerController& Player, FVector2D Size, const FEcoHerdMigrationDebugSnapshot& Snapshot,
+        const FEcoMigrationDebugRegion& Region, int64 FocusPlan, int32 Mode);
 }

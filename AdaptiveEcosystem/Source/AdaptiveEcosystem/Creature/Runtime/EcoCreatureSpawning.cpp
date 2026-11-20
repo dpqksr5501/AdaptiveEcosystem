@@ -215,8 +215,6 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 		const FVector Position = Positions[I];
 		EM.GetFragmentDataChecked<FTransformFragment>(Entities[I]).GetMutableTransform() = FTransform(FRotator(0, FMath::RadiansToDegrees(A), 0), Position);
 		Owned.Add(Entities[I]);
-		UE_LOG(LogTemp, Log, TEXT("[Eco Integration][Spawn] Id=%lld Region=%s Species=%s Ground=%s"),
-			Id.StableAgentId, *RegionId.ToString(), *Species.ToString(), *Position.ToCompactString());
 	}
 	Creation.Reset();
     // Initial social bonds do not invent genetic parents. Natural births receive their actual mother below.

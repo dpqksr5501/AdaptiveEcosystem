@@ -42,8 +42,6 @@ private:
 	double NextSummaryTime = 0.0;
 	int32 SummaryRevision = 0;
 	bool bSpawnWaves = true;
-	bool bReportDaily = true;
-	bool bReportDailyToScreen = true;
 	int64 StepId = 0;
 	int64 LastReportedCycle = -1;
 	TMap<FName, int32> PreviousDawnPopulation;

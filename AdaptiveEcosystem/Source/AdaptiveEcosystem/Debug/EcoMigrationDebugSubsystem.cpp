@@ -11,8 +11,13 @@
 #include "MassExecutionContext.h"
 #include "MassCommonFragments.h"
 #include "DrawDebugHelpers.h"
-#include "Engine/Engine.h"
+#include "HAL/IConsoleManager.h"
 #include "Engine/World.h"
+
+static TAutoConsoleVariable<int32> CVarLegacyMigrationDebug(TEXT("eco.Migration.Debug"), -1,
+    TEXT("Show region and travel labels. -1: use project default, 0: off, 1: on."));
+static TAutoConsoleVariable<int32> CVarSurvivalDebug(TEXT("eco.Survival.Debug"), -1,
+    TEXT("Show health and energy labels. -1: use project default, 0: off, 1: on."));
 
 bool UEcoMigrationDebugSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
@@ -23,42 +28,40 @@ bool UEcoMigrationDebugSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 
 void UEcoMigrationDebugSubsystem::Tick(float DeltaTime)
 {
-	if (!GetDefault<UEcoRuntimeSettings>()->bDrawMigrationDebug) return;
+	const auto* Settings = GetDefault<UEcoRuntimeSettings>();
+	const int32 MigrationMode = CVarLegacyMigrationDebug.GetValueOnGameThread();
+	const int32 SurvivalMode = CVarSurvivalDebug.GetValueOnGameThread();
+	const bool bShowMigration = MigrationMode < 0 ? Settings->bDrawMigrationDebug : MigrationMode != 0;
+	const bool bShowSurvival = SurvivalMode < 0 ? Settings->bDrawSurvivalDebug : SurvivalMode != 0;
+	if (!bShowMigration && !bShowSurvival) return;
 	UWorld* World = GetWorld();
 	const AEcoGameState* State = World->GetGameState<AEcoGameState>();
 	const UEcologyWorldSubsystem* Geography = World->GetSubsystem<UEcologyWorldSubsystem>();
-	if (!State || !Geography) return;
-	const FEcoCompletedWorldSummary Summary = State->GetEcologySummary();
-	if (Summary.StepId == 0) return;
-	TArray<FName> RegionOrder;
-	for (const auto& Row : Summary.Regions) RegionOrder.Add(Row.RegionId);
-	TArray<FEcoRegionSpatialSnapshot> Spaces;
-	if (!Geography->BuildSpatialSnapshots(RegionOrder, Spaces)) return;
-	const TCHAR* Role = World->GetNetMode() == NM_Client ? TEXT("Client") : TEXT("Authority");
-	for (int32 I = 0; I < Summary.Regions.Num(); ++I)
+	if (bShowMigration && State && Geography)
 	{
-		const auto& Row = Summary.Regions[I];
-		const auto& Space = Spaces[I];
-		const FColor Color = Row.FoodAmount > 0.0f ? FColor::Green : FColor::Red;
-		DrawDebugBox(World, Space.BoundsTransform.GetLocation(), Space.BoundsExtent * Space.BoundsTransform.GetScale3D().GetAbs(),
-			Space.BoundsTransform.GetRotation(), Color, false, -1.0f, 0, 3.0f);
-		const FString Label = FString::Printf(TEXT("%s Food %.1f/%.1f Pop %d Resident %d Out %d In %d Projected %d/%d C %.2f S %.2f Starved %lld"),
-			*Row.RegionId.ToString(), Row.FoodAmount, Row.FoodCapacity, Row.Population, Row.ResidentCount,
-			Row.OutboundCount, Row.IncomingCount, Row.ProjectedPopulation, Row.EcologicalComfortPopulation,
-			Row.CrowdingRatio, Row.FoodSatisfaction, Row.StarvationDeaths);
-		DrawDebugString(World, Space.ArrivalPosition + FVector(0, 0, 180), Label, nullptr, Color, 0.0f, true);
-		if (GEngine)
-			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(HashCombine(GetUniqueID(), GetTypeHash(Row.RegionId))),
-				0.1f, Color, FString::Printf(TEXT("[Eco %s %s] %s"), Role, *World->GetName(), *Label));
+		const FEcoCompletedWorldSummary Summary = State->GetEcologySummary();
+		TArray<FName> RegionOrder;
+		for (const auto& Row : Summary.Regions) RegionOrder.Add(Row.RegionId);
+		TArray<FEcoRegionSpatialSnapshot> Spaces;
+		if (Summary.StepId != 0 && Geography->BuildSpatialSnapshots(RegionOrder, Spaces))
+		{
+			for (int32 Index = 0; Index < Summary.Regions.Num(); ++Index)
+			{
+				const auto& Row = Summary.Regions[Index];
+				const auto& Space = Spaces[Index];
+				const FColor Color = Row.FoodAmount > 0.0f ? FColor::Green : FColor::Red;
+				DrawDebugBox(World, Space.BoundsTransform.GetLocation(), Space.BoundsExtent * Space.BoundsTransform.GetScale3D().GetAbs(),
+					Space.BoundsTransform.GetRotation(), Color, false, -1.0f, 0, 3.0f);
+				const FString Label = FString::Printf(TEXT("%s Food %.1f/%.1f Pop %d Resident %d Out %d In %d Projected %d/%d C %.2f S %.2f Starved %lld"),
+					*Row.RegionId.ToString(), Row.FoodAmount, Row.FoodCapacity, Row.Population, Row.ResidentCount,
+					Row.OutboundCount, Row.IncomingCount, Row.ProjectedPopulation, Row.EcologicalComfortPopulation,
+					Row.CrowdingRatio, Row.FoodSatisfaction, Row.StarvationDeaths);
+				DrawDebugString(World, Space.ArrivalPosition + FVector(0, 0, 180), Label, nullptr, Color, 0.0f, true);
+			}
+		}
 	}
-	if (GEngine)
-		GEngine->AddOnScreenDebugMessage(static_cast<uint64>(HashCombine(GetUniqueID(), 0xEC033u)), 0.1f, FColor::Cyan,
-			FString::Printf(TEXT("[Eco %s %s] Epoch %d Step %lld Rev %d Day %lld %s Remaining %.1fs (completed snapshot)"),
-				Role, *World->GetName(), Summary.Time.WorldEpoch, Summary.StepId, Summary.Revision, Summary.Time.DayCycle.CycleId + 1,
-				Summary.Time.DayCycle.Phase == EEcoDayPhase::Day ? TEXT("Day") : TEXT("Night"),
-				Summary.Time.DayCycle.PhaseEndSeconds - Summary.Time.ServerTimeSeconds));
 	// Optional read-only survival labels. Client reads transport snapshots, never logical vitals.
-	if (GetDefault<UEcoRuntimeSettings>()->bDrawSurvivalDebug)
+	if (bShowSurvival)
 	{
 		if (UMassSpawnerSubsystem* Mass = World->GetSubsystem<UMassSpawnerSubsystem>())
 		{
@@ -108,7 +111,7 @@ void UEcoMigrationDebugSubsystem::Tick(float DeltaTime)
 		}
 	}
 	// Clients have only relevance-filtered proxies. Full agent diagnostics are authority-only.
-	if (World->GetNetMode() == NM_Client) return;
+	if (!bShowMigration || World->GetNetMode() == NM_Client) return;
 	UMassSpawnerSubsystem* Mass = World->GetSubsystem<UMassSpawnerSubsystem>();
 	if (!Mass) return;
 	FMassEntityManager& Manager = Mass->GetEntityManagerChecked();
