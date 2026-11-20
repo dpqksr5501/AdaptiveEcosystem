@@ -567,6 +567,7 @@ struct FEcoEcosystemCheckpoint
         E->ResourceEpoch=NewEpoch;E->PendingSpawns.Reset();E->ResourceLedger.Reset();E->bResourceStepOpen=false;E->bFeedingResolved=false;
         Clock->Current=Time;Clock->Current.WorldEpoch=NewEpoch;Clock->bRunning=true;
         N->GlobalT=GlobalT;N->Clock=NativeClock;N->ClockPhase=Phase;
+        N->PendingStaticTangents.Reset();N->ReservedStaticTangents.Reset();
         for(auto& R:Regions){auto* C=N->FindContext(R.Id);C->Sim=MoveTemp(R.Sim);C->ResourceReceiptSequence=R.Sequence;C->StartFood=R.StartFood;C->MovementTraces=MoveTemp(R.Traces);
             C->KnownHumanDanger=R.HumanDanger;
             C->AdoptedDeer=R.AdoptedDeer;C->AdoptedWolves=R.AdoptedWolves;

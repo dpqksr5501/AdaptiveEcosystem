@@ -1,4 +1,6 @@
 #include "Creature/Debug/EcoCreatureInspection.h"
+#include "Debug/EcoMoveTestSubsystem.h"
+#include "Debug/EcoCameraMassDebug.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
@@ -42,6 +44,8 @@ static TAutoConsoleVariable<int32> CVarInspectorVisible(TEXT("eco.Inspector.Visi
     TEXT("Show the creature detail panel. 0: hidden, 1: visible."));
 static TAutoConsoleVariable<int32> CVarGrassInspection(TEXT("eco.Grass.Debug"), 0,
     TEXT("Show the grass inspection panel. 0: hidden, 1: visible. Alt+G toggles."));
+static TAutoConsoleVariable<int32> CVarMoveTestHud(TEXT("eco.MoveTest.Hud"), 0,
+    TEXT("Show the status of a requested movement diagnostic. 0: hidden, 1: visible."));
 bool UEcoCreatureInspectionLibrary::InspectFaunaWater(UObject* Context, FName RegionId, FVector Point,
     float Clearance, FVector2D& BottomAndSurface, FVector& Current)
 {
@@ -66,6 +70,16 @@ bool AEcoCreatureInspectorHUD::SelectAgentForInspection(int64 AgentId)
     for(TActorIterator<AEcoCreatureRepresentationActor> It(GetWorld());It;++It)
         if(It->bBound&&!It->IsHidden()&&It->VisualState.StableAgentId==AgentId){Selected=*It;SelectedId=AgentId;return true;}
     return false;
+}
+
+int64 AEcoCreatureInspectorHUD::GetSelectedAgentId() const
+{
+#if !UE_BUILD_SHIPPING
+    if (const UWorld* World = GetWorld())
+        if (const auto* Debug = World->GetSubsystem<UEcoCameraMassDebug>(); Debug && Debug->IsEnabled())
+            return Debug->InspectionAgentId();
+#endif
+    return SelectedId;
 }
 
 TArray<int64> UEcoCreatureInspectionLibrary::GetAuthorityAgentIds(UObject* Context){
@@ -633,6 +647,12 @@ void AEcoCreatureInspectorHUD::DrawHUD()
     Super::DrawHUD();if(!Canvas||!PlayerOwner)return;
 #if !UE_BUILD_SHIPPING
     DrawGrassInspection();
+    if (const auto* MoveTest = GetWorld()->GetSubsystem<UEcoMoveTestSubsystem>();
+        MoveTest && CVarMoveTestHud.GetValueOnGameThread() != 0)
+    {
+        const FString Status = MoveTest->ScreenStatus();
+        if (!Status.IsEmpty()) DrawText(Status, FLinearColor(.4f, .9f, 1.f), 25, Canvas->SizeY - 45, nullptr, 1.f);
+    }
 #endif
     if (const auto* State=PlayerOwner->GetPlayerState<AEcoPlayerState>())
         DrawText(FString::Printf(TEXT("HP %.0f%s"),State->GetHealth(),State->IsAlive()?TEXT(""):TEXT("  DEFEATED")),
@@ -683,25 +703,69 @@ void AEcoCreatureInspectorHUD::DrawHUD()
                 *Region, Index != INDEX_NONE ? MigrationFocus : 0, MigrationMode);
         }
     }
-    if(!CVarInspectorVisible.GetValueOnGameThread())return;
+    const int64 PanelAgentId = GetSelectedAgentId();
+    if (bRecording && PanelAgentId > 0 && GetWorld()->GetTimeSeconds() >= NextRecord) {
+        NextRecord = GetWorld()->GetTimeSeconds() + 1;
+        FString Json;
+        if (UEcoCreatureInspectionLibrary::CaptureAgent(this, PanelAgentId, Json)) {
+            Json += TEXT("\n");
+            FFileHelper::SaveStringToFile(Json, *RecordPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM,
+                &IFileManager::Get(), FILEWRITE_Append);
+        }
+    }
+    bool bCameraInspection = false;
+#if !UE_BUILD_SHIPPING
+    if (const auto* Debug = GetWorld()->GetSubsystem<UEcoCameraMassDebug>()) bCameraInspection = Debug->IsEnabled();
+#endif
+    if(!CVarInspectorVisible.GetValueOnGameThread() && !bCameraInspection)return;
+    const AEcoCreatureRepresentationActor* PanelActor = Selected.Get();
+    if (bCameraInspection)
+    {
+        const auto* Match = Actors.FindByPredicate([PanelAgentId](const auto* Actor)
+        {
+            return Actor->VisualState.StableAgentId == PanelAgentId;
+        });
+        PanelActor = Match ? *Match : nullptr;
+    }
+    if (PanelAgentId != InspectionDetailAgentId)
+    {
+        InspectionDetailAgentId = PanelAgentId;
+        NextInspection = 0;
+        InspectionDetail.Reset();
+        InspectionJson.Reset();
+    }
     const bool Preview=Actors.ContainsByPredicate([](const AEcoCreatureRepresentationActor* Actor){return Actor->ActorHasTag(TEXT("JYU.VisualAudit"));});
     if(Preview){
-        const float PreviewY=Selected.IsValid()?480.f:410.f;
+        const float PreviewY=PanelAgentId>0?480.f:410.f;
         DrawRect(FLinearColor(.25f,.1f,.01f,.95f),15,PreviewY,620,55);
         DrawText(TEXT("POSE / IK PREVIEW: comparison deer have NO AI."),FLinearColor::Yellow,25,PreviewY+10,nullptr,.9f);
         DrawText(TEXT("Play ends after the comparison. Start Play again for ecology."),FLinearColor::White,25,PreviewY+31,nullptr,.8f);
     }
-    DrawRect(FLinearColor(.02f,.025f,.035f,.85f),15,15,640,Selected.IsValid()?FMath::Min(620.f,Canvas->SizeY-30.f):65.f);
-    DrawText(TEXT("ECO INSPECTOR | Tab: cycle  Middle mouse: pick  R: record"),FLinearColor::White,25,25,nullptr,.85f);
-    if(!Selected.IsValid()){DrawText(TEXT("Select a visible creature. Shift: run  Ctrl: sneak"),FLinearColor(.6f,.8f,1),25,50,nullptr,.85f);return;}
-    const auto& S=Selected->VisualState;
-    const FString Text=FString::Printf(TEXT("%s #%lld  Region: %s\nActivity: %s\nSense: %s  Focus yaw: %.0f\nHealth: %.0f%%  Energy: %.0f%%  Speed: %.0f cm/s\n%s"),
-        *S.SpeciesId.ToString(),SelectedId,*S.RegionId.ToString(),*UEnum::GetValueAsString(S.Activity),*UEnum::GetValueAsString(S.SenseSource),
-        S.FocusYawDegrees,S.NormalizedHealth*100,S.NormalizedEnergy*100,S.Velocity.Size2D(),bRecording?TEXT("Recording 1 Hz JSONL"):TEXT("Read-only presentation"));
+    DrawRect(FLinearColor(.02f,.025f,.035f,.85f),15,15,640,PanelAgentId>0?FMath::Min(620.f,Canvas->SizeY-30.f):65.f);
+    DrawText(bCameraInspection ? TEXT("ECO INSPECTOR | Camera subject  , / .: cycle  R: record")
+        : TEXT("ECO INSPECTOR | Tab: cycle  Middle mouse: pick  R: record"),FLinearColor::White,25,25,nullptr,.85f);
+    if (PanelAgentId <= 0)
+    {
+        DrawText(bCameraInspection ? TEXT("Follow a live creature with 1 or 2.")
+            : TEXT("Select a visible creature. Shift: run  Ctrl: sneak"), FLinearColor(.6f,.8f,1), 25, 50, nullptr, .85f);
+        return;
+    }
+    FString Text;
+    if (PanelActor)
+    {
+        const auto& S = PanelActor->VisualState;
+        Text = FString::Printf(TEXT("%s #%lld  Region: %s\nActivity: %s\nSense: %s  Focus yaw: %.0f\nHealth: %.0f%%  Energy: %.0f%%  Speed: %.0f cm/s\n%s"),
+            *S.SpeciesId.ToString(),PanelAgentId,*S.RegionId.ToString(),*UEnum::GetValueAsString(S.Activity),*UEnum::GetValueAsString(S.SenseSource),
+            S.FocusYawDegrees,S.NormalizedHealth*100,S.NormalizedEnergy*100,S.Velocity.Size2D(),bRecording?TEXT("Recording 1 Hz JSONL"):TEXT("Read-only presentation"));
+    }
+    else
+    {
+        Text = FString::Printf(TEXT("#%lld  Waiting for a visible representation"), PanelAgentId);
+    }
     DrawText(Text,FLinearColor(.75f,.9f,1),25,55,nullptr,1);
     if(GetWorld()->GetTimeSeconds()>=NextInspection) {
         NextInspection=GetWorld()->GetTimeSeconds()+.5;InspectionDetail.Reset();InspectionJson.Reset();
-        if(UEcoCreatureInspectionLibrary::CaptureAgent(this,SelectedId,InspectionJson)) {
+        if(UEcoCreatureInspectionLibrary::CaptureAgent(this,PanelAgentId,InspectionJson)) {
             TSharedPtr<FJsonObject> J;auto Reader=TJsonReaderFactory<>::Create(InspectionJson);
             if(FJsonSerializer::Deserialize(Reader,J)&&J.IsValid()) {
                 for(const TCHAR* Key:{TEXT("decision_reason"),TEXT("migration_state"),TEXT("migration_reason"),TEXT("migration_destination"),TEXT("migration_arrived"),TEXT("social_signal_source"),TEXT("request"),TEXT("executed"),TEXT("last_intake"),TEXT("flight_override"),TEXT("refuge_protected_here"),TEXT("hide_arrived"),TEXT("nearest_wolf_reason"),TEXT("alarm_strength"),TEXT("social_override"),TEXT("shelter_state"),TEXT("wolf_hunting"),TEXT("wolf_sated"),TEXT("wolf_asleep")}) {
@@ -722,11 +786,4 @@ void AEcoCreatureInspectorHUD::DrawHUD()
     }
     DrawText(InspectionDetail,FLinearColor(.7f,.85f,.7f),25,155,nullptr,.8f);
 
-    if(bRecording&&GetWorld()->GetTimeSeconds()>=NextRecord){
-        NextRecord=GetWorld()->GetTimeSeconds()+1;
-        FString Json;
-        if(UEcoCreatureInspectionLibrary::CaptureAgent(this,SelectedId,Json)){
-            Json+=TEXT("\n");FFileHelper::SaveStringToFile(Json,*RecordPath,FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM,&IFileManager::Get(),FILEWRITE_Append);
-        }
-    }
 }

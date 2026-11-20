@@ -18,6 +18,17 @@ namespace EcoLifeMotion
         }
         return Repulsion;
     }
+
+    // Caller has already found a nonzero repulsion and allowed movement for this behavior.
+    inline FVec2 ApplySeparation(FVec2 Velocity, FVec2 Repulsion, double WalkSpeed, bool bGraze)
+    {
+        namespace R = EcoRepertoireV3;
+        const double Existing = std::hypot(Velocity.X, Velocity.Y);
+        if (!bGraze && Existing > 1.e-8)
+            Repulsion = PassingAvoidance(Repulsion, R::Normalize(Velocity));
+        return R::ClampMagnitude(R::Add(Velocity, R::Scale(R::ClampMagnitude(Repulsion, 1), WalkSpeed * 2.5)),
+            std::max(Existing, WalkSpeed));
+    }
     inline bool AllowsMotion(FVec2 From,FVec2 To,FVec2 Other,double Clearance)
     {
         const auto Delta=EcoRepertoireV3::Sub(To,From),Away=EcoRepertoireV3::Sub(From,Other);

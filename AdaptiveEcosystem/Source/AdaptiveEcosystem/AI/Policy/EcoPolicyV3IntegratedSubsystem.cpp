@@ -13,6 +13,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/Volume.h"
 #include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
@@ -39,6 +40,7 @@
 #include "UnrealClient.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "World/EcologyRegion.h"
+#include "World/EcologyWorldSubsystem.h"
 #include "World/EcoVegetationField.h"
 #include "World/EcoNaturalHabitatProfile.h"
 #include "HAL/PlatformMemory.h"
@@ -48,6 +50,16 @@ DEFINE_LOG_CATEGORY(LogEcoPolicyV3I);
 
 namespace EcoPolicyV3IntegratedImpl
 {
+	TAutoConsoleVariable<int32> CVarStaticMeshContact(TEXT("eco.IntegratedV3.StaticMeshContact"), 0,
+		TEXT("0: legacy baseline. 1: body sweep and on-contact tangent for integrated Native deer. Imported discs keep baseline movement."));
+	TAutoConsoleVariable<int32> CVarStaticTangentCandidates(TEXT("eco.IntegratedV3.StaticMeshContact.Candidates"), 24,
+		TEXT("Maximum optional tangent candidates per authority world frame."));
+	TAutoConsoleVariable<int32> CVarStaticTangentSweeps(TEXT("eco.IntegratedV3.StaticMeshContact.Sweeps"), 64,
+		TEXT("Maximum optional tangent body sweeps per authority world frame."));
+	TAutoConsoleVariable<float> CVarStaticNear(TEXT("eco.IntegratedV3.StaticMeshContact.NearCm"), 2500.f,
+		TEXT("Promote to every-contact tangent attempts within this distance from a server viewer."));
+	TAutoConsoleVariable<float> CVarStaticMiddle(TEXT("eco.IntegratedV3.StaticMeshContact.MiddleCm"), 8800.f,
+		TEXT("Spread tangent attempts over Native steps within this distance. Far deer retry after sustained stalls."));
 	static TAutoConsoleVariable<int32> CVarIntegratedVersion(
 		TEXT("eco.IntegratedPolicyVersion"),
 		1,
@@ -1922,6 +1934,41 @@ namespace EcoPolicyV3IntegratedImpl
 		return Mesh.GetBounds().GetBox().TransformBy(Xf);
 	}
 
+	bool GetObstacleFootprint(const UStaticMesh& Mesh, const FTransform& Xf, FVector& OutCenterCm,
+							  double& OutRadiusCm, double& OutHeightCm)
+	{
+		const UBodySetup* Body = Mesh.GetBodySetup();
+		if (Body && Body->GetCollisionTraceFlag() != CTF_UseComplexAsSimple
+			&& Body->AggGeom.SphylElems.Num() == 1 && Body->AggGeom.GetElementCount() == 1)
+		{
+			const FKSphylElem& Capsule = Body->AggGeom.SphylElems[0];
+			if (!CollisionEnabledHasQuery(Capsule.GetCollisionEnabled()))
+			{
+				return false;
+			}
+
+			// Chaos와 같은 인스턴스 스케일을 적용한다. 회피 원에는 캡슐의 중심과 반지름을 직접 쓴다.
+			const FKSphylElem ScaledCapsule = Capsule.GetFinalScaled(Xf.GetScale3D(), FTransform::Identity);
+			const FVector Axis = Xf.TransformVectorNoScale(ScaledCapsule.Rotation.RotateVector(FVector::UpVector));
+			OutCenterCm = Xf.TransformPositionNoScale(ScaledCapsule.Center);
+			OutRadiusCm = ScaledCapsule.Radius;
+			OutHeightCm = 2.0 * OutRadiusCm + ScaledCapsule.Length * FMath::Abs(Axis.Z);
+			return true;
+		}
+
+		const FBox Box = ObstacleCollisionBox(Mesh, Xf);
+		if (!Box.IsValid)
+		{
+			return false;
+		}
+
+		const FVector Ext = Box.GetExtent();
+		OutCenterCm = Box.GetCenter();
+		OutRadiusCm = 0.5 * (Ext.X + Ext.Y);
+		OutHeightCm = 2.0 * Ext.Z;
+		return true;
+	}
+
 	/** 레벨 읽기가 원판으로 보는 컴포넌트 조건 = 팀 이동 제약(ConstrainStep: WorldStatic 채널로 쓸어 봄)이 막는 조건: 쿼리 충돌 켬 ∧ WorldStatic 막음. */
 	bool BlocksTeamMovement(const UPrimitiveComponent& C)
 	{
@@ -1974,12 +2021,13 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 				{
 					continue;
 				}
-				const FBox Box = EcoPolicyV3IntegratedImpl::ObstacleCollisionBox(*Mesh, Xf);
-				if (!Box.IsValid)
+				FVector Ctr;
+				double Rcm;
+				double HeightCm;
+				if (!EcoPolicyV3IntegratedImpl::GetObstacleFootprint(*Mesh, Xf, Ctr, Rcm, HeightCm))
 				{
 					continue;
 				}
-				const FVector Ctr = Box.GetCenter();
 				const double X = Ctr.X - OriginCm.X;
 				const double Y = Ctr.Y - OriginCm.Y;
 				if (X < 0.0 || Y < 0.0 || X > SizeCm || Y > SizeCm)
@@ -1998,14 +2046,12 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 					++Out.NoCollisionByMesh.FindOrAdd(Mesh->GetName());
 					continue;
 				}
-				const FVector Ext = Box.GetExtent();
-				const double Rcm = 0.5 * (Ext.X + Ext.Y);   // 가로 반지름 = 충돌 상자 가로 반폭의 평균 (둥근 줄기·바위에 맞춘 어림)
 				if (Rcm < FEcoV3ObstacleScan::kMinRadiusCm)
 				{
 					++Out.Tiny;
 					continue;
 				}
-				if (2.0 * Ext.Z < FEcoV3ObstacleScan::kMinHeightCm)
+				if (HeightCm < FEcoV3ObstacleScan::kMinHeightCm)
 				{
 					++Out.Low;
 					continue;
@@ -2308,7 +2354,7 @@ bool UEcoPolicyV3IntegratedSubsystem::LevelTrunkTransform(const EcoTreeLayoutV3:
 														  const UStaticMesh& Cylinder, FTransform& Out)
 {
 	using EcoRepertoireV3::kUnitCm;
-	// 레벨 읽기와 같은 상자 (단순 충돌 상자, 없으면 그리기 상자) — 메시 공간
+	// 원기둥의 메시 공간 충돌 상자 (단순 충돌이 없으면 그리기 상자).
 	const FBox Local = EcoPolicyV3IntegratedImpl::ObstacleCollisionBox(Cylinder, FTransform::Identity);
 	const FVector Ext = Local.GetExtent();
 	if (!Local.IsValid || !(Ext.X > 0.0) || !(Ext.Y > 0.0) || !(Ext.Z > 0.0))
@@ -2347,18 +2393,14 @@ void UEcoPolicyV3IntegratedSubsystem::GatherLevelTrunks(UWorld& World, TArray<FV
 			{
 				continue;
 			}
-			const FBox Box = EcoPolicyV3IntegratedImpl::ObstacleCollisionBox(*Mesh, C->GetComponentTransform());
-			if (!Box.IsValid)
+			FVector Ctr;
+			double Rcm;
+			double HeightCm;
+			if (!EcoPolicyV3IntegratedImpl::GetObstacleFootprint(*Mesh, C->GetComponentTransform(), Ctr, Rcm, HeightCm)
+				|| Rcm < FEcoV3ObstacleScan::kMinRadiusCm || HeightCm < FEcoV3ObstacleScan::kMinHeightCm)
 			{
 				continue;
 			}
-			const FVector Ext = Box.GetExtent();
-			const double Rcm = 0.5 * (Ext.X + Ext.Y);
-			if (Rcm < FEcoV3ObstacleScan::kMinRadiusCm || 2.0 * Ext.Z < FEcoV3ObstacleScan::kMinHeightCm)
-			{
-				continue;
-			}
-			const FVector Ctr = Box.GetCenter();
 			OutCm.Add(FVector(Ctr.X, Ctr.Y, Rcm));
 		}
 	}
@@ -4638,7 +4680,8 @@ FString UEcoPolicyV3IntegratedSubsystem::CaptureStepPerformance() const
     FString Out;FJsonSerializer::Serialize(J,TJsonWriterFactory<>::Create(&Out));return Out;
 }
 
-bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling, float BodyRadiusCm) const
+bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ,
+	bool bTraveling, float BodyRadiusCm, EcoCreatureMovement::FGroundMoveStats* Stats) const
 {
 	OutZ = FMath::IsFinite(FromCm.Z) ? FromCm.Z : 0;
 	UWorld* World = GetWorld();
@@ -4662,7 +4705,7 @@ bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& F
 	{
 		const double A = static_cast<double>(k) / static_cast<double>(Pieces);
 		FVector Next(FMath::Lerp(FromCm.X, ToCm.X, A), FMath::Lerp(FromCm.Y, ToCm.Y, A), Cur.Z);
-		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, bTraveling, Cur, Next, BodyRadiusCm,NaturalGround?float(FMath::Cos(FMath::DegreesToRadians(GroundRules.MaxSlopeDegrees))):.65f))
+		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, bTraveling, Cur, Next, BodyRadiusCm,NaturalGround?float(FMath::Cos(FMath::DegreesToRadians(GroundRules.MaxSlopeDegrees))):.65f,Stats))
 		{
 			return false;
 		}
@@ -4672,6 +4715,206 @@ bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& F
 	}
 	OutZ = Cur.Z;
 	return true;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::UsesStaticMeshContact(const FEcoV3RegionContext& Context) const
+{
+	// Authored stage-tree fixtures may have only logical discs and deliberately nonblocking visuals.
+	return UsesTerrain() && !Context.bObstaclesImported && Context.Trees.Discs.empty()
+		&& EcoPolicyV3IntegratedImpl::CVarStaticMeshContact.GetValueOnGameThread() == 1;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::IsObstacleDebugEnabled() const
+{
+	return EcoPolicyV3IntegratedImpl::IsDebugLayerEnabled(EcoPolicyV3IntegratedImpl::CVarDebugObstacles);
+}
+
+FEcoV3StaticMeshPath UEcoPolicyV3IntegratedSubsystem::TraceStaticMeshPath(const FEcoV3RegionContext& Context,
+	const FVector& From, const FVector& To, bool bTraveling, float Radius,
+	TFunctionRef<bool(const FVector&, const FVector&)> AllowsAgentContact, EcoCreatureMovement::FGroundMoveStats* Stats,
+	int32* RemainingSweeps) const
+{
+	using namespace EcoCreatureMovement;
+	FEcoV3StaticMeshPath Result;
+	Result.End = From;
+	UWorld* World = GetWorld();
+	const auto* Regions = World ? World->GetSubsystem<UEcologyWorldSubsystem>() : nullptr;
+	const auto* Region = Regions ? Regions->GetRegion(Context.RegionId) : nullptr;
+	const double Distance = FVector::Dist2D(From, To);
+	constexpr double SubStep = EcoPolicyV3IntegratedImpl::kSubStepCm;
+	if (!Region || World->GetNetMode() == NM_Client || From.ContainsNaN() || To.ContainsNaN()
+		|| !FMath::IsFinite(Distance) || Distance > SubStep * 1024 || !FMath::IsFinite(Radius) || Radius < 20.f || Radius > 40.f)
+	{
+		Result.Block = EStepBlock::Invalid;
+		return Result;
+	}
+	if (Distance <= UE_SMALL_NUMBER) return Result;
+	const int32 Pieces = FMath::CeilToInt32(Distance / SubStep);
+	const auto& Config = Context.Sim.Config;
+	const auto& Rules = Config.NaturalGround;
+	const float NormalZ = Config.bNaturalHabitats ? float(FMath::Cos(FMath::DegreesToRadians(Rules.MaxSlopeDegrees))) : .65f;
+	const auto EndpointBlock = [&](const FVector& Next)
+	{
+		if (!bTraveling)
+		{
+			const auto P = Context.CmToUnits(Next);
+			if (!Region->ContainsPosition(Next) || P.X < -UE_KINDA_SMALL_NUMBER || P.Y < -UE_KINDA_SMALL_NUMBER
+				|| P.X > Config.WorldSize + UE_KINDA_SMALL_NUMBER || P.Y > Config.WorldSize + UE_KINDA_SMALL_NUMBER)
+				return EStepBlock::Region;
+		}
+		if (Config.Island && Config.Island->Valid())
+		{
+			const auto P = Context.CmToUnits(Next);
+			if (!Config.Island->IsOpen(P.X, P.Y)) return EStepBlock::Island;
+		}
+		return EStepBlock::None;
+	};
+	const auto Walkability = [&](const FVector& Next)
+	{
+		const auto Block = EndpointBlock(Next);
+		if (Block != EStepBlock::None) return Block;
+		if (Config.bNaturalHabitats)
+		{
+			if (!Rules.AllowsHeight(Result.End.Z, Next.Z, FVector::Dist2D(Result.End, Next))) return EStepBlock::StepHeight;
+			if (!IsWadeableGround(*World, Next, float(Rules.WadingDepthCm))) return EStepBlock::Water;
+		}
+		return AllowsAgentContact(Result.End, Next) ? EStepBlock::None : EStepBlock::AgentContact;
+	};
+	for (int32 Piece = 1; Piece <= Pieces; ++Piece)
+	{
+		const double Alpha = double(Piece) / Pieces;
+		FVector Next(FMath::Lerp(From.X, To.X, Alpha), FMath::Lerp(From.Y, To.Y, Alpha), Result.End.Z);
+		Result.Block = EndpointBlock(Next);
+		if (Result.Block != EStepBlock::None) break;
+		if (RemainingSweeps && *RemainingSweeps <= 0)
+		{
+			Result.Block = EStepBlock::SweepBudget;
+			break;
+		}
+		if (RemainingSweeps) --*RemainingSweeps;
+		Result.Block = QueryGroundStep(*World, Result.End, Next, Radius, NormalZ, 0.f, -1.f, Result.Hit, Stats);
+		if (Result.Block == EStepBlock::None)
+		{
+			Result.Block = Walkability(Next);
+			if (Result.Block != EStepBlock::None) break;
+			Result.End = Next;
+			continue;
+		}
+		if (Result.Block == EStepBlock::StaticMesh && Result.Hit.Time > 0.f)
+		{
+			Result.bStaticContact = true;
+			// Hit.Time is the swept body's center fraction. ImpactPoint belongs to the mesh surface.
+			FVector Safe = FMath::Lerp(Result.End, Next, Result.Hit.Time);
+			const auto Projection = ProjectGroundStep(*World, Result.End, Safe, NormalZ, -1.f, Stats);
+			if (Projection != EStepBlock::None) Result.Block = Projection;
+			else if (const auto PrefixBlock = Walkability(Safe); PrefixBlock != EStepBlock::None) Result.Block = PrefixBlock;
+			else Result.End = Safe;
+		}
+		else if (Result.Block == EStepBlock::StaticMesh) Result.bStaticContact = true;
+		break;
+	}
+	return Result;
+}
+
+void UEcoPolicyV3IntegratedSubsystem::BeginStaticMeshFrame()
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	if (StaticMeshFrame == GFrameCounter) return;
+	StaticMeshFrame = GFrameCounter;
+	StaticSweepLimit = FMath::Clamp(CVarStaticTangentSweeps.GetValueOnGameThread(), 0, 4096);
+	StaticSweepCredits = StaticSweepLimit;
+	StaticCandidateLimit = FMath::Clamp(CVarStaticTangentCandidates.GetValueOnGameThread(), 0, 1024);
+	StaticCandidateCredits = StaticCandidateLimit;
+	ReservedStaticTangents.Reset();
+	StaticMeshViewers.Reset();
+	StaticMeshNearDistance = FMath::Max(0.f, CVarStaticNear.GetValueOnGameThread());
+	StaticMeshMiddleDistance = FMath::Max(StaticMeshNearDistance, double(CVarStaticMiddle.GetValueOnGameThread()));
+	for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+	{
+		const APlayerController* PC = It->Get();
+		if (!PC || (!PC->IsLocalController() && (!PC->GetNetConnection() || !PC->GetViewTarget()))) continue;
+		FVector View;
+		FRotator Rotation;
+		PC->GetPlayerViewPoint(View, Rotation);
+		if (!View.ContainsNaN()) StaticMeshViewers.Add(View);
+	}
+
+	// Requests denied by a busy frame get first claim on the next frame, across all contexts.
+	TArray<int64> Order;
+	for (auto It = PendingStaticTangents.CreateIterator(); It; ++It)
+	{
+		if (GlobalT < It.Value().LastRequestStep || GlobalT - It.Value().LastRequestStep > 3) It.RemoveCurrent();
+		else Order.Add(It.Key());
+	}
+	Order.Sort([&](int64 A, int64 B)
+	{
+		const uint64 First = PendingStaticTangents[A].QueuedFrame;
+		const uint64 Second = PendingStaticTangents[B].QueuedFrame;
+		return First == Second ? A < B : First < Second;
+	});
+	for (const int64 Id : Order)
+	{
+		if (StaticCandidateCredits == 0 || StaticSweepCredits == 0) break;
+		const int32 Count = FMath::Min(StaticSweepCredits, PendingStaticTangents[Id].Sweeps);
+		ReservedStaticTangents.Add(Id, Count);
+		--StaticCandidateCredits;
+		StaticSweepCredits -= Count;
+	}
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::WantsStaticMeshTangent(FEcoV3StaticMeshMemory& Memory,
+	const FVector& Position, int64 Step, int64 Id) const
+{
+	double DistanceSq = MAX_dbl;
+	for (const FVector& View : StaticMeshViewers) DistanceSq = FMath::Min(DistanceSq, FVector::DistSquared(View, Position));
+	const bool bWasNear = Step <= Memory.NearUntilStep;
+	const double NearRange = bWasNear ? 1.1 * StaticMeshNearDistance : StaticMeshNearDistance;
+	if (DistanceSq <= FMath::Square(NearRange)) Memory.NearUntilStep = Step + 8;
+	if (Step <= Memory.NearUntilStep) return true;
+	if (PendingStaticTangents.Contains(Id)) return true;
+	if (DistanceSq <= FMath::Square(StaticMeshMiddleDistance))
+		return Memory.LastTangentStep < 0 ? (Step + Id % 4) % 4 == 0 : Step - Memory.LastTangentStep >= 4;
+	return Memory.BlockedSinceStep >= 0 && Step - Memory.BlockedSinceStep >= 8
+		&& (Memory.LastTangentStep < 0 || Step - Memory.LastTangentStep >= 12);
+}
+
+int32 UEcoPolicyV3IntegratedSubsystem::ReserveStaticMeshTangent(int64 Id, double Distance)
+{
+	const int32 Pieces = FMath::CeilToInt32(Distance / EcoPolicyV3IntegratedImpl::kSubStepCm);
+	int32 Reserved = 0;
+	if (ReservedStaticTangents.RemoveAndCopyValue(Id, Reserved))
+	{
+		PendingStaticTangents.Remove(Id);
+		const int32 Allowed = FMath::Min(Pieces, Reserved);
+		StaticSweepCredits += Reserved - Allowed;
+		return Allowed;
+	}
+	if (StaticCandidateCredits > 0 && StaticSweepCredits > 0)
+	{
+		--StaticCandidateCredits;
+		const int32 Allowed = FMath::Min(Pieces, StaticSweepCredits);
+		StaticSweepCredits -= Allowed;
+		PendingStaticTangents.Remove(Id);
+		return Allowed;
+	}
+	if (StaticSweepLimit > 0 && StaticCandidateLimit > 0)
+	{
+		auto& Pending = PendingStaticTangents.FindOrAdd(Id, {StaticMeshFrame, GlobalT, Pieces});
+		Pending.LastRequestStep = GlobalT;
+		Pending.Sweeps = Pieces;
+	}
+	return 0;
+}
+
+void UEcoPolicyV3IntegratedSubsystem::CancelStaticMeshTangent(int64 Id)
+{
+	if (!PendingStaticTangents.Remove(Id)) return;
+	int32 Reserved = 0;
+	if (ReservedStaticTangents.RemoveAndCopyValue(Id, Reserved))
+	{
+		++StaticCandidateCredits;
+		StaticSweepCredits += Reserved;
+	}
 }
 
 void UEcoPolicyV3IntegratedSubsystem::UpdateViewEnvironment()
@@ -4763,7 +5006,7 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 				const float R = static_cast<float>(Ob.Discs[3 * k + 2] * EcoRepertoireV3::kUnitCm);
 				const bool bTree = Ctx.ObstacleIsTree.IsValidIndex(k) && Ctx.ObstacleIsTree[k] != 0;
 				DrawDebugCircle(World, P, R, 16, bTree ? FColor(60, 200, 80) : ObColor, false, -1.0f, 0, 6.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
-				DrawDebugCircle(World, P, R + static_cast<float>(Ob.BodyR * EcoRepertoireV3::kUnitCm), 16, FColor(90, 70, 50), false, -1.0f, 0, 1.5f,
+				if (!UsesStaticMeshContact(Ctx)) DrawDebugCircle(World, P, R + static_cast<float>(Ob.BodyR * EcoRepertoireV3::kUnitCm), 16, FColor(90, 70, 50), false, -1.0f, 0, 1.5f,
 								FVector(1, 0, 0), FVector(0, 1, 0), false);
 			}
 		}

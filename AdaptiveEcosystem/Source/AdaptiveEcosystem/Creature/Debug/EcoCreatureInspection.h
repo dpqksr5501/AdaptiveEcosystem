@@ -32,6 +32,7 @@ class ADAPTIVEECOSYSTEM_API AEcoCreatureInspectorHUD : public AHUD
     GENERATED_BODY()
 public:
     virtual void DrawHUD() override;
+    int64 GetSelectedAgentId() const;
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection") bool SelectAgentForInspection(int64 AgentId);
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection") void FocusMigrationPlan(int64 PlanId) { MigrationFocus=PlanId; }
 private:
@@ -54,6 +55,7 @@ private:
     double NextRecord=0;
     FString RecordPath;
     double NextInspection=0;
+    int64 InspectionDetailAgentId=0;
     FString InspectionJson;
     FString InspectionDetail;
 };

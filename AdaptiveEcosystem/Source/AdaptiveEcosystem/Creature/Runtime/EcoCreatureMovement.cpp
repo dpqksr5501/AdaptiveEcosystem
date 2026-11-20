@@ -6,6 +6,7 @@
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
 #include "Components/BoxComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "EngineUtils.h"
 #include "NavModifierVolume.h"
 #include "NavAreas/NavArea_Null.h"
@@ -44,34 +45,75 @@ bool EcoCreatureMovement::ProjectSpawnPoint(UWorld& World, const FVector& Hint, 
 }
 
 bool EcoCreatureMovement::ConstrainStep(UWorld& World, FName RegionId, bool bTraveling,
-    const FVector& Position, FVector& Destination, float BodyRadiusCm,float MinGroundNormalZ)
+    const FVector& Position, FVector& Destination, float BodyRadiusCm,float MinGroundNormalZ, FGroundMoveStats* Stats)
 {
     if (Position.ContainsNaN() || Destination.ContainsNaN()||!FMath::IsFinite(BodyRadiusCm)||BodyRadiusCm<20||BodyRadiusCm>40) return false;
     const auto* Regions = World.GetSubsystem<UEcologyWorldSubsystem>();
     const auto* Region = Regions ? Regions->GetRegion(RegionId) : nullptr;
     if (!Region || (!bTraveling && !Region->ContainsPosition(Destination))) return false;
-    return ConstrainGroundStep(World,Position,Destination,BodyRadiusCm,MinGroundNormalZ)
+    return ConstrainGroundStep(World,Position,Destination,BodyRadiusCm,MinGroundNormalZ,0.f,-1.f,Stats)
         &&(bTraveling||Region->ContainsPosition(Destination));
 }
 
 bool EcoCreatureMovement::ConstrainGroundStep(UWorld& World,const FVector& Position,FVector& Destination,
-    float BodyRadiusCm,float MinGroundNormalZ,float SweepHeightCm,float MaxRiseCm)
+    float BodyRadiusCm,float MinGroundNormalZ,float SweepHeightCm,float MaxRiseCm, FGroundMoveStats* Stats)
+{
+    FHitResult Hit;
+    return QueryGroundStep(World,Position,Destination,BodyRadiusCm,MinGroundNormalZ,SweepHeightCm,MaxRiseCm,Hit,Stats)
+        == EStepBlock::None;
+}
+
+EcoCreatureMovement::EStepBlock EcoCreatureMovement::QueryGroundStep(UWorld& World, const FVector& Position, FVector& Destination,
+    float BodyRadiusCm, float MinGroundNormalZ, float SweepHeightCm, float MaxRiseCm, FHitResult& BodyHit, FGroundMoveStats* Stats)
 {
     if(Position.ContainsNaN()||Destination.ContainsNaN()||!FMath::IsFinite(BodyRadiusCm)||BodyRadiusCm<1||BodyRadiusCm>120
         ||!FMath::IsFinite(SweepHeightCm)||SweepHeightCm<0||!FMath::IsFinite(MaxRiseCm)
-        ||!FMath::IsFinite(MinGroundNormalZ)||MinGroundNormalZ<.65f||MinGroundNormalZ>1)return false;
-    FHitResult Hit;
+        ||!FMath::IsFinite(MinGroundNormalZ)||MinGroundNormalZ<.65f||MinGroundNormalZ>1)return EStepBlock::Invalid;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoCreatureStep), false);
     const FVector Lift(0,0,SweepHeightCm > 0.f ? FMath::Max(BodyRadiusCm + 1.f, SweepHeightCm)
         : FMath::Max(65.f, BodyRadiusCm + 35.f));
-    if (World.SweepSingleByChannel(Hit, Position + Lift, Destination + Lift, FQuat::Identity,
-        ECC_WorldStatic, FCollisionShape::MakeSphere(BodyRadiusCm), Params)) return false;
+    const double Start = Stats ? FPlatformTime::Seconds() : 0.;
+    const bool bBlocked = World.SweepSingleByChannel(BodyHit, Position + Lift, Destination + Lift,
+        FQuat::Identity, ECC_WorldStatic, FCollisionShape::MakeSphere(BodyRadiusCm), Params);
+    if (Stats)
+    {
+        ++Stats->Sweeps;
+        Stats->SweepSeconds += FPlatformTime::Seconds() - Start;
+    }
+    if (bBlocked)
+    {
+        if (BodyHit.bStartPenetrating) return EStepBlock::InitialOverlap;
+        if (BodyHit.ImpactNormal.Z >= MinGroundNormalZ) return EStepBlock::Slope;
+        return Cast<UStaticMeshComponent>(BodyHit.GetComponent()) ? EStepBlock::StaticMesh : EStepBlock::Geometry;
+    }
+    return ProjectGroundStep(World, Position, Destination, MinGroundNormalZ, MaxRiseCm, Stats);
+}
+
+EcoCreatureMovement::EStepBlock EcoCreatureMovement::ProjectGroundStep(UWorld& World, const FVector& Position,
+    FVector& Destination, float MinGroundNormalZ, float MaxRiseCm, FGroundMoveStats* Stats)
+{
+    FHitResult Hit;
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoCreatureStep), false);
     const FVector ProbeStart(Destination.X, Destination.Y, MaxRiseCm < 0 ? Destination.Z + 200. : Position.Z + MaxRiseCm + 1.);
-    if (!World.LineTraceSingleByObjectType(Hit, ProbeStart, Destination - FVector(0,0,300), FCollisionObjectQueryParams(ECC_WorldStatic), Params)
-        || Hit.ImpactNormal.Z < MinGroundNormalZ) return false;
+    const double Start = Stats ? FPlatformTime::Seconds() : 0.;
+    const bool bHasGround = World.LineTraceSingleByObjectType(Hit, ProbeStart, Destination - FVector(0,0,300),
+        FCollisionObjectQueryParams(ECC_WorldStatic), Params);
+    if (Stats)
+    {
+        ++Stats->GroundProbes;
+        Stats->GroundSeconds += FPlatformTime::Seconds() - Start;
+    }
+    if (!bHasGround) return EStepBlock::NoGround;
+    if (Hit.ImpactNormal.Z < MinGroundNormalZ) return EStepBlock::Slope;
     Destination.Z = Hit.ImpactPoint.Z;
-    if (CrossesExcludedArea(World, Position, Destination)) return false;
-    return true;
+    const double ExclusionStart = Stats ? FPlatformTime::Seconds() : 0.;
+    const bool bExcluded = CrossesExcludedArea(World, Position, Destination);
+    if (Stats)
+    {
+        ++Stats->ExclusionChecks;
+        Stats->ExclusionSeconds += FPlatformTime::Seconds() - ExclusionStart;
+    }
+    return bExcluded ? EStepBlock::ExcludedArea : EStepBlock::None;
 }
 bool EcoCreatureMovement::IsWadeableGround(UWorld& World,const FVector& Ground,float MaxDepthCm)
 {

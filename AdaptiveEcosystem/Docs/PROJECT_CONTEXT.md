@@ -2,6 +2,8 @@
 
 **Unreal MCP 팀 사용.** [Unreal MCP 팀 운영 안내](Team/UNREAL_MCP_TEAM_PLAN_20261118.md)에서 개인 클라이언트 설정 적용, 조회 전용 연결, 소유 맵 패키지 겹침 검사를 실행한다.
 
+**조향·회피 후속 개발.** [사용자 콘솔 검증을 포함한 통합 계획](Performance/MassMovement/09_AVOIDANCE_INTEGRATION_SPEC_20261112.md)을 따른다. 첫 구현은 v3 사슴의 행동·목표·실제 변위를 사용자가 하나의 명령으로 기록하는 기능이다. 이후 기능도 같은 진입점에서 재현·비교하고, 다음 개선은 사용자가 생성한 보고서로 결정한다.
+
 **팀 섬 지형 복사본의 다종 적용.** 최신 작업용 맵 `/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`는 송해찬 담당 `/Game/Map/LV_SHC_IslandEcosystem1_WP`에서 가져온 지형과 물길에 수초·먹이·수생동물을 연결한다. 초지와 고원에는 지형에 맞춘 개체군과 마른 보금자리를 배치했다. 기본 시작·세션 맵은 `/Game/JWJ/Integration_JwJ`다. [최신 로컬 섬의 적용과 인계](Team/JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#2026-11-14-로컬-섬-마무리)
 
 **공유 기준과 후속 이슈.** [PR #19](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/19)의 검증 기준은 `fa0c04dd`다. 최신 팀 통합 브랜치는 직접 빌드와 자동화 332건, 최신 섬에서 초기 16종 118마리와 210 게임초 실행을 별도로 확인했다. 밍크 입수·상륙, 스트리밍, 경사 접지, 플레이어 개입과 장시간 비교는 [담당별 후속 이슈](Team/FAUNA_TEAM_REQUESTS_20261113.md#pr-19-후속-이슈)에서 이어간다.

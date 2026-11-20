@@ -12,6 +12,7 @@
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Debug/DebugDrawService.h"
+#include "Debug/EcoCameraMassDebug.h"
 #include "EcoPolicyV3Fragments.h"
 #include "EcoPolicyV3IntegratedFragments.h"
 #include "EcoPolicyV3IntegratedSubsystem.h"
@@ -45,11 +46,13 @@ namespace EcoV3ObserverCameraImpl
 {
 	static TAutoConsoleVariable<int32> CVarCamEnable(
 		TEXT("eco.Cam.Enable"), 1,
-		TEXT("관찰 카메라 (EcoV3ObserverCamera.h): 1 = 단축키 1~5·0·, .·- =·휠·G·H(자유 카메라는 W A S D·Q E·Shift·마우스)와 오른쪽 위 화면 글, ")
+		TEXT("관찰 카메라 (EcoV3ObserverCamera.h): 1 = 단축키 1~5·0·, .·- =·휠·G·H(자유 카메라는 W A S D·Q E·Shift·마우스), ")
 			TEXT("0 = 끔 (원래 카메라로 돌아가고 플레이어 이동 막기를 풀며 키·글·eco.Cam 명령을 받지 않는다). 보기만 바꾼다 — 시뮬레이션에 쓰지 않는다."));
 	static TAutoConsoleVariable<float> CVarCamHudScale(
 		TEXT("eco.Cam.HudScale"), 1.0f,
 		TEXT("관찰 카메라 오른쪽 위 글 배율 (기본 1 — 화면 높이에 맞춘 배율에 곱한다, 0.5~3)."));
+	static TAutoConsoleVariable<int32> CVarCamHud(TEXT("eco.Cam.Hud"), 0,
+		TEXT("Show the observation camera status and keys. 0: hidden, 1: visible."));
 	static TAutoConsoleVariable<int32> CVarCamBlockMove(
 		TEXT("eco.Cam.BlockMove"), 1,
 		TEXT("관찰 카메라로 보는 동안(1~5 모드·자유 카메라) 플레이어 폰 이동 입력 막기: 1 = 막음 (기본 — 안 보이는 폰이 걸어 발소리 Player.Footstep 를 사슴이 듣지 않게, ")
@@ -2481,7 +2484,14 @@ void UEcoV3ObserverCameraSubsystem::DrawPanel(UCanvas* Canvas, APlayerController
 	{
 		return;
 	}
-	if (!bHasCreatures && Mode == EEcoV3CamMode::Player)
+	const bool bShowCameraHud = CVarCamHud.GetValueOnGameThread() != 0;
+#if !UE_BUILD_SHIPPING
+	const auto* MassDebug = GetWorld()->GetSubsystem<UEcoCameraMassDebug>();
+	const bool bShowMassHud = MassDebug && MassDebug->IsEnabled();
+#else
+	constexpr bool bShowMassHud = false;
+#endif
+	if ((!bShowCameraHud && !bShowMassHud) || (!bHasCreatures && Mode == EEcoV3CamMode::Player && !bShowMassHud))
 	{
 		return;   // 통합 개체가 없는 레벨 — 볼 것이 없다 (개체가 생기면 1 초 안에 다시 보인다)
 	}
@@ -2502,19 +2512,31 @@ void UEcoV3ObserverCameraSubsystem::DrawPanel(UCanvas* Canvas, APlayerController
 		bool bGapBefore = false;
 	};
 	TArray<FLine> Lines;
-	Lines.Add({bShowKeys ? FString(TEXT("관찰 카메라      H  단축키 숨기기")) : FString(TEXT("관찰 카메라      H  단축키 보이기")),
-			   FLinearColor(FColor(255, 215, 110)), false});
-	if (bShowKeys)
+	if (bShowCameraHud)
 	{
-		for (const FString& L : KeyHelpLines())
+		Lines.Add({bShowKeys ? FString(TEXT("관찰 카메라      H  단축키 숨기기")) : FString(TEXT("관찰 카메라      H  단축키 보이기")),
+				   FLinearColor(FColor(255, 215, 110)), false});
+		if (bShowKeys)
 		{
-			Lines.Add({L, FLinearColor(FColor(240, 240, 240)), false});
+			for (const FString& L : KeyHelpLines())
+			{
+				Lines.Add({L, FLinearColor(FColor(240, 240, 240)), false});
+			}
+		}
+		for (int32 i = 0; i < StatusLines.Num(); ++i)
+		{
+			Lines.Add({StatusLines[i], FLinearColor(StatusColors.IsValidIndex(i) ? StatusColors[i] : FColor::White), i == 0});
 		}
 	}
-	for (int32 i = 0; i < StatusLines.Num(); ++i)
+#if !UE_BUILD_SHIPPING
+	if (bShowMassHud)
 	{
-		Lines.Add({StatusLines[i], FLinearColor(StatusColors.IsValidIndex(i) ? StatusColors[i] : FColor::White), i == 0});
+		TArray<FString> DebugLines;
+		MassDebug->Describe().ParseIntoArrayLines(DebugLines);
+		for (FString& Line : DebugLines)
+			Lines.Add({MoveTemp(Line), FLinearColor(.55f, .9f, 1.f), false});
 	}
+#endif
 	float LineH = 0.0f;
 	float MaxW = 0.0f;
 	for (const FLine& L : Lines)
