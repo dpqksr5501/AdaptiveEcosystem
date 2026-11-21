@@ -20,7 +20,8 @@
 
 static TAutoConsoleVariable<int32> CVarEcoDrawFacing(TEXT("eco.Creature.DrawFacing"), 0,
 	TEXT("Draw actual velocity (green) and calibrated mesh forward (cyan). Visual-only."));
-static TAutoConsoleVariable<int32> CVarEcoIdentityLabels(TEXT("eco.Creature.Labels"),1,TEXT("Show representation identity labels. Visual-only; disable for scene captures."));
+static TAutoConsoleVariable<int32> CVarEcoIdentityLabels(TEXT("eco.Creature.Labels"), 0,
+	TEXT("Show representation identity labels. 0: hidden, 1: visible."));
 static TAutoConsoleVariable<int32> CVarEcoFacingAudit(TEXT("eco.Creature.FacingAudit"), 0,
 	TEXT("Log moving representation facing error once per second, including client proxies."));
 
@@ -86,6 +87,7 @@ AEcoCreatureRepresentationActor::AEcoCreatureRepresentationActor()
 	IdentityLabel->SetRelativeLocation(FVector(0, 0, 200));
 	IdentityLabel->SetWorldSize(55);
 	IdentityLabel->SetHorizontalAlignment(EHTA_Center);
+	IdentityLabel->SetVisibility(false);
 }
 
 void AEcoCreatureRepresentationActor::OnConstruction(const FTransform& Transform)

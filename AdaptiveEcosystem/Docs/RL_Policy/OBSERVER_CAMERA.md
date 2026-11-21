@@ -191,7 +191,17 @@
 | `eco.Cam.Free` | 자유 카메라 — 지금 보는 자리·방향 그대로 (관찰 중 `0` 과 같다. 원래 카메라에서도 된다. 이미 자유 카메라면 아무 일 없음) |
 | `eco.Cam.Speed <m/s>` | 자유 카메라 이동 속도 (1~150, 처음 12 — 키 `-` `=` 휠) |
 | `eco.Cam.Status` | 지금 상태 한 줄을 기록에 적는다 (자유 카메라면 자리·방위·숙임·속도·지역) |
+| `eco.Cam.MassDebug 1` / `0` | 현재 추적 개체의 ECO INSPECTOR 설명, 이동 표시, Mass 선택을 켜거나 끈다 |
+| `eco.Cam.MassDebug.Open` | 에디터 프로세스에서 PIE 중 Mass Debugger 탭을 연다 |
 | `eco.Cam.Help` | 단축키 목록 숨기기/보이기 + 키 표·지금 상태를 기록에 적는다 (`H`) |
+
+현재 레벨을 연 상태에서 Play 메뉴의 **Selected Viewport**로 실행한다. 뷰포트를 클릭하고 `2`로 사슴을 따라간 뒤 콘솔에 `eco.Cam.MassDebug 1`을 입력한다. 콘솔을 닫으면 왼쪽 ECO INSPECTOR에 같은 ID의 상세 설명이 나온다. `.` 또는 `,`로 추적 대상을 바꾸면 설명과 이동 표시가 함께 바뀐다. `0` 인수로 기능을 끄면 기존 수동 선택으로 복귀한다.
+
+초록은 실제 속도, 청록은 최근 위치 궤적이다. 통합 v3 사슴의 Native 표본이 들어오면 노랑은 이동 보정 전 요청, 파랑은 이동 적용 직전 요청, 자홍색은 현재 목적지의 XY 평면 위치를 나타낸다. 클라이언트에서는 대상의 수신 표현으로 만든 속도와 궤적을 확인할 수 있다.
+
+Mass Debugger에서 추적 대상을 보려면 `eco.Cam.MassDebug.Open`을 입력한다. 탭 상단 **Eco Camera** 줄에 현재 PIE World, Stable ID, Mass Entity 핸들이 표시되고 추적 대상을 바꾸면 갱신된다. 탭을 에디터 메뉴로 열었다면 게임 콘솔에서 `eco.Cam.MassDebug 1`을 다시 입력해 이 줄을 연결한다.
+
+Fragment 값은 Mass Debugger의 **Pick Environment**에서 같은 PIE World를 선택한 뒤 확인한다. 탭의 목록이 오래됐으면 **Refresh**를 누르고 게임 콘솔에서 `eco.Cam.MassDebug 1`을 다시 실행한다. **Archetypes → Show Entities**를 열고 상단과 같은 **Entity Handle** 행의 Fragment 열을 확인한다.
 
 | 콘솔 변수 | 기본 | 뜻 |
 |---|---|---|

@@ -2,6 +2,16 @@
 #include "Ecology/EcoFoodAllocation.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "AdaptiveEcosystem.h"
+#include "HAL/IConsoleManager.h"
+
+static TAutoConsoleVariable<int32> CVarEcoResourceLog(TEXT("eco.Resources.Log"), -1,
+	TEXT("Write resource transactions to the Output Log. -1: use project default, 0: off, 1: on."));
+
+static bool ShouldLogEcoResourceChanges(bool bProjectDefault)
+{
+	const int32 Mode = CVarEcoResourceLog.GetValueOnGameThread();
+	return Mode < 0 ? bProjectDefault : Mode != 0;
+}
 
 bool UEcologySimulationSubsystem::StartResourceSimulation(int32 Epoch, const FEcoFoodEventSettings& Day,
 	const FEcoFoodEventSettings& Night, bool bLogChanges)
@@ -114,7 +124,7 @@ bool UEcologySimulationSubsystem::BeginResourceStep(const FEcoServerTimeSnapshot
 		Ledger.EventLoss += ActualLoss;
 		Ledger.bEvent = true;
 		LastCycle = Time.DayCycle.CycleId;
-		if (bPrintResourceChanges)
+		if (ShouldLogEcoResourceChanges(bPrintResourceChanges))
 			UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Food Event] Epoch=%d Step=%lld Cycle=%lld Phase=%s Region=%s Due=%.3f Requested=%.3f ActualLoss=%.3f"),
 				ResourceEpoch, ResourceStepId, Time.DayCycle.CycleId, bDay ? TEXT("Day") : TEXT("Night"),
 				*Event.RegionId.ToString(), Due, Event.FoodLoss, ActualLoss);
@@ -225,7 +235,7 @@ bool UEcologySimulationSubsystem::CompleteResourceStep()
 			UE_LOG(LogAdaptiveEcosystem, Error, TEXT("[Eco Food] Resource conservation failed: Region=%s Step=%lld"), *RegionIds[I].ToString(), ResourceStepId);
 			return false;
 		}
-		if (bPrintResourceChanges && (Ledger.bEvent || Ledger.Requests > 0 || Ledger.Supplied > 0))
+		if (ShouldLogEcoResourceChanges(bPrintResourceChanges) && (Ledger.bEvent || Ledger.Requests > 0 || Ledger.Supplied > 0))
 			UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Food] Epoch=%d Step=%lld Time=%.3f Region=%s Before=%.6f Supplied=%.6f EventLoss=%.6f Consumed=%.6f Rounding=%.9f After=%.6f Requests=%d Population=%d Depleted=%d"),
 				ResourceEpoch, ResourceStepId, ResourceTime, *RegionIds[I].ToString(), Ledger.Before, Ledger.Supplied, Ledger.EventLoss,
 				Ledger.Granted, Snapshot.RoundingAdjustment, State.FoodAmount, Ledger.Requests, State.Population, Snapshot.bDepleted);

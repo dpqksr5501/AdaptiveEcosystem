@@ -6,6 +6,18 @@
 class UWorld;
 namespace EcoCreatureMovement
 {
+enum class EStepBlock : uint8
+{
+    None, Invalid, Region, NoGround, Slope, StepHeight, ExcludedArea, Water, Island,
+    AgentContact, Geometry, StaticMesh, InitialOverlap, SweepBudget
+};
+
+struct FGroundMoveStats
+{
+    int32 Sweeps = 0, GroundProbes = 0, ExclusionChecks = 0;
+    double SweepSeconds = 0., GroundSeconds = 0., ExclusionSeconds = 0.;
+};
+
 /** Selection only: no Transform ownership and no mutation of the raw policy action. */
 inline FVector SelectVelocity(const FVector& Position, FVector PolicyVelocity, float Speed, float Delta,
     double Now, const FEcoTravelFragment* Travel, const FEcoSocialMovementRequestFragment* Request,
@@ -35,13 +47,21 @@ inline FVector SelectVelocity(const FVector& Position, FVector PolicyVelocity, f
 }
 /** Authoritative movement boundary: region containment, blocking geometry and ground projection. */
 ADAPTIVEECOSYSTEM_API bool ConstrainStep(UWorld& World, FName RegionId, bool bTraveling,
-    const FVector& Position, FVector& Destination, float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f);
+    const FVector& Position, FVector& Destination, float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f,
+    FGroundMoveStats* Stats=nullptr);
 /** Ground and clearance probe for authored spawn/arrival points; never changes logical state. */
 ADAPTIVEECOSYSTEM_API bool ProjectSpawnPoint(UWorld& World, const FVector& Hint, FVector& OutGround,
     bool bIgnoreWaterSurface = false);
 /** Shared physical ground constraint, also used by read-only copied-map route authoring. */
 ADAPTIVEECOSYSTEM_API bool ConstrainGroundStep(UWorld& World,const FVector& Position,FVector& Destination,
-    float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f,float SweepHeightCm=0.f,float MaxRiseCm=-1.f);
+    float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f,float SweepHeightCm=0.f,float MaxRiseCm=-1.f,
+    FGroundMoveStats* Stats=nullptr);
+/** Shared ground query with a separate body hit, so a caller can validate the safe prefix. */
+EStepBlock QueryGroundStep(UWorld& World, const FVector& Position, FVector& Destination,
+    float BodyRadiusCm, float MinGroundNormalZ, float SweepHeightCm, float MaxRiseCm, FHitResult& BodyHit,
+    FGroundMoveStats* Stats=nullptr);
+EStepBlock ProjectGroundStep(UWorld& World, const FVector& Position, FVector& Destination,
+    float MinGroundNormalZ, float MaxRiseCm, FGroundMoveStats* Stats=nullptr);
 /** Conservative bounds of unconditional NavArea_Null volumes, including agent clearance. */
 ADAPTIVEECOSYSTEM_API bool CrossesExcludedArea(UWorld& World, const FVector& Start, const FVector& End);
 /** Explicit authored water only. Never infers hydraulic connectivity from a blue mesh. */

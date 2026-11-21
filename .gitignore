@@ -81,3 +81,15 @@ DerivedDataCache/
 # Local Python tooling caches
 __pycache__/
 *.pyc
+
+# Personal Unreal MCP client settings
+/.mcp.json
+/.codex/config.toml
+/.cursor/mcp.json
+/.gemini/settings.json
+/.vscode/mcp.json
+/AdaptiveEcosystem/.mcp.json
+/AdaptiveEcosystem/.codex/config.toml
+/AdaptiveEcosystem/.cursor/mcp.json
+/AdaptiveEcosystem/.gemini/settings.json
+/AdaptiveEcosystem/.vscode/mcp.json

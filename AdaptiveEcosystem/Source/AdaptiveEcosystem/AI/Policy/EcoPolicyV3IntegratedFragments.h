@@ -8,6 +8,7 @@
 #include "CoreMinimal.h"
 #include "MassEntityTypes.h"
 #include "EcoLifeHistoryV3.h"
+#include "EcoV3StaticMeshMovement.h"
 
 #include "EcoPolicyV3IntegratedFragments.generated.h"
 
@@ -63,6 +64,8 @@ struct FEcoIntegratedV3Fragment : public FMassFragment
 
 	/** 지난 결정 스텝 위치의 지면 높이 (cm). 화면 보간 전용. */
 	double PrevGroundZ = 0.0;
+
+	FEcoV3StaticMeshMemory StaticMeshMovement;
 
 	/** 지형·장애물에 막혀 이동 전 자리에 남은 결정 스텝 수 (기록). */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|PolicyV3")
