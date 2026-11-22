@@ -46,5 +46,7 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<float> ContactHeights;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0",ClampMax="40")) float MaxFootCorrectionCm = 12;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0",ClampMax="20")) float FootClearanceCm = .5f;
+    /** Optional planar hold for rigs with calibrated contact markers. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0",ClampMax="15")) float MaxPlantCorrectionCm = 0.f;
     bool IsValidProfile() const;
 };

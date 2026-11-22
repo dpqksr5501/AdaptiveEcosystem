@@ -317,6 +317,58 @@ UE 5.8 직접 빌드와 자동화 318건을 통과했다. 일반 성공 316건, 
 
 재현은 [모션 검증 스크립트](../../Tools/Editor/audit_jyu_fauna_motion.py)의 `-FaunaRestSupport=Flat`, `Uphill`, `CrossSlope`를 사용한다. 돼지 전용은 `-FaunaMotionPig -FaunaSupportVerify`, 조기 안착 입력은 돼지 오르막 조건에 `-FaunaSupportEarlySettle`을 추가한다. 보행 회귀는 기존과 신규 소유 맵에서 `-FaunaMotionPhysicalSlope`로 별도 실행한다. 발 마커가 없는 밍크·검독수리는 지상 자세의 몸통 기준과 사체 유지로 확인하고, 물고기 세 종은 기존 수영·사망 표현 시험에 포함한다.
 
+### 2026-11-20 관절 급회전 대조
+
+16종의 현재 표현 Blueprint를 60fps로 재생했다. 평지에서 고정 12° 경사로 넘어가는 보행과 선회·급반전·제동·재가속에서 부모 뼈 기준 회전의 인접 프레임 차이를 기록했다. 종별 원래 프로필과 발 IK만 끈 임시 프로필을 같은 입력으로 시험했다. 두 그룹의 기본 자세·방향 검사는 통과했다. 아래 관절 값은 발 접촉 검사만으로 드러나지 않았던 항목이다.
+
+| 종·관절 | IK 켠 최대 변화 | 같은 관절의 IK 끈 최대 변화 |
+| --- | ---: | ---: |
+| 쥐 오른쪽 정강이 변형 뼈 | 179.91° | 2.39° |
+| 쥐 오른쪽 허벅지 변형 뼈 | 51.54° | 51.54° |
+| 물소 오른쪽 앞다리 전완 | 152.68° | 63.11° |
+| 물소 왼쪽 허벅지 | 42.01° | 23.20° |
+| 산토끼 왼쪽 앞다리 전완 | 179.79° | 26.74° |
+| 말 오른쪽 앞다리 전완 | 36.68° | 9.17° |
+| 밍크 꼬리 기부 | 57.50° | 57.50° |
+
+쥐·물소·산토끼의 큰 회전은 발 IK를 켜면 재현되며, 쥐 허벅지와 밍크 꼬리의 급회전은 발 IK를 끈 상태에서도 나온다. 개별 클립과 Blend Space 중 어느 쪽이 후자의 원인인지까지는 판정하지 않았다. 표범은 급반전 중 발 마커가 지면 아래 1.07cm까지 내려갔다. 큰뿔양은 접촉 높이 부근에서 발 마커의 수평 이동을 보였으며 소켓 오프셋과 실제 디딤 구간을 대조해야 미끄러짐을 정량화할 수 있다. 밍크와 검독수리는 땅에 있을 때도 발 접촉 사슬이 설정되어 있지 않다. [Two Bone IK의 목표점과 관절 기준](https://dev.epicgames.com/documentation/unreal-engine/animation-blueprint-two-bone-ik-in-unreal-engine?lang=en-US)
+
+재현은 `-FaunaMotionPhysicalSlope -FaunaMotionJoints -benchmark -fps=60`을 사용하고, 신규 8종 그룹에는 `-FaunaMotionExpanded`, 대조에는 `-FaunaMotionNoIK`를 추가한다. 원본은 `Saved/FaunaAudit/LegCheckFixed{On,Off}Metrics.json`, `LegCheckMore{On,Off}Metrics.json`, 집계는 `AnimationJointComparison.json`이다. 이번 점검은 런타임 코드나 에셋을 수정하지 않았다.
+
+저장 섬 시드 20000의 렌더링 PIE 두 세션에서 16종의 실제 이동 표본을 확보했다. 처음에 휴식만 잡힌 여우와 검독수리는 별도 이동 관찰에서 각각 최대 133.98cm/s와 55.51cm/s 보행을 확인했다. 어류 3종은 수중 근접 렌더를 확인했고 조류의 이륙·비행·착지는 별도 고정 입력에서 검사했다. 밍크 ID 112는 강변 육상 이동 중에도 몸이 지면에 대부분 가려졌다. 몸통 기준 뼈는 측정된 지면보다 0.22~0.85cm 낮았다. 해당 개체의 증상은 재현됐으며 메시 오프셋과 지형을 따로 통제하는 원인 대조는 남아 있다. 관찰은 PIE의 카메라와 플레이어 관찰 위치만 이동했다. 네트워크 지연, 원거리 LOD 전환, 전 종의 새끼 메시와 경사 사망은 이번 검증 범위 밖이다. 원본은 `Saved/FaunaAudit/IslandAnimationFocused` 및 `IslandAnimationMoving`에 있다. [섬 관찰 스크립트](../../Tools/Editor/audit_island_animation.py)
+
+### 2026-11-20 애니메이션과 접지 보정
+
+공통 발 IK는 애니메이션의 굽힘 평면을 새 목표 축에 맞춰 옮긴다. 허벅지와 무릎에 더하는 회전을 각 뼈의 로컬 공간에서 제한하고 시간에 따라 이어 준다. 보정 한계에 닿으면 원래 발 방향을 유지하며 부족한 수직 거리만 보정한다. 샘플을 잃은 발의 이전 보정은 초기화한다. 시스템은 시각 표현에 적용하며 권위 이동, 충돌, 생태 기록, 학습 두뇌와 위협·우호 규칙은 기존 경로를 쓴다. [공통 발 IK](../../Source/AdaptiveEcosystem/Creature/Representation/EcoGroundFeetNode.cpp)
+
+| 종 | 동일한 60fps 경사 시험의 수정 전 → 수정 후 |
+| --- | --- |
+| 쥐 | 정강이 179.91° → 7.32°, 오른쪽 허벅지 51.54° → 29.32° |
+| 물소 | 오른쪽 앞다리 전완 152.68° → 37.40°, 왼쪽 허벅지 42.01° → 17.30° |
+| 산토끼 | 왼쪽 앞다리 전완 179.79° → 25.29° |
+| 말 | 오른쪽 앞다리 전완 36.68° → 14.28° |
+| 표범 | 급반전 발 마커 최저값 지면 아래 1.07cm → 지면 위 0.43cm |
+| 밍크 | 꼬리 기부 57.50° → 15.05°. 실제 섬의 같은 112번 개체가 강변 지표 위로 보임 |
+| 돼지 | 직선 제동 후 재가속의 발 마커 최저값 지면 아래 0.58cm → 지면 위 0.13cm |
+
+쥐는 소유 걸음·질주 클립의 허벅지 키와 Blend Space의 시작 가중치를, 물소는 소유 걸음·속보의 팔다리 키를 보정했다. 밍크는 뒤집혀 들어온 리그의 시각 축을 맞추고, 지상 시작 클립으로부터 연결부와 바닥 높이를 보정한 순환 클립을 만들었다. 수중 시작·유영·상륙의 자세 선택은 기존 검사를 통과했다. 검독수리에는 외형을 변형하는 실제 FK 발톱 사슬 두 개를 연결했다. 경사 보행에서 두 접촉을 유지했고 이륙·비행·급강하·착지 중에는 접지가 0이었다. 벤더 원본 에셋은 보존했다. 생성용 기본 설정을 실행해 Blend Space나 AnimBP를 재생성한 경우 `-EcoApplyFaunaMotionRepairs`로 보정을 다시 적용할 수 있다. [에셋 반영 도구](../../Tools/Editor/author_fauna_motion_repairs.py)
+
+큰뿔양만 접지 사슬에 12cm 이내의 월드 기준 발 고정을 사용한다. 지면에 닿을 수 있는 자세에서만 고정하고 발을 들거나 가동 범위를 넘으면 풀어 준다. 같은 프레임에서 보행 시작 오른쪽 앞발의 수평 이동은 7.82cm에서 3.26cm로 줄었다. 기존 접촉 높이 허용 범위에 들어온 보행 표본의 중앙값은 6.74cm에서 6.66cm로 거의 같았다. 급반전·달리기의 접촉 높이 표본에서 미끄러짐이 남아 있다. 원본은 `FootStabilityEagleGroundMetrics.json`과 `FaunaMotionFinalVerifiedMetrics.json`이다.
+
+자동 비교는 `-FaunaMotionPhysicalSlope -FaunaMotionJoints -FaunaMotionLimbRegression -benchmark -fps=60`을 사용한다. 원본은 `Saved/FaunaAudit/FootStabilityRatEaseMetrics.json`, `FaunaMotionFinalVerifiedMetrics.json`, `FootStabilityPigStraightMetrics.json`, 실제 섬 표본은 `FootStabilityIsland`와 `FootStabilityEagleIsland`다. UE 5.8 직접 Editor 빌드와 `AdaptiveEcosystem.Fauna` 자동화 45건이 통과했다. 빌드에는 기존 StructUtils 지원 중단 안내가 표시됐다.
+
+전용 서버의 섬에서 두 클라이언트가 약 36.3초 중첩 접속했고 두 클라이언트의 권위 개체는 0이었다. 두 클라이언트에서 물소·말의 애니메이션 인스턴스를 받았으며 근거리 표현 91·102개 표본과 성장 체격 비교를 통과했다. 늦게 접속한 쪽의 관찰 시간을 80초로 늘린 실행에서도 그쪽 교류 응답 표본을 확보하지 못해, 교류까지 포함하는 네트워크 감시 도구의 전체 판정은 실패로 남았다. 네트워크에서 관절 각도는 프레임 단위로 판정하지 않았다. 원본은 `Saved/FaunaMotionNetworkLong/Relevance.json`이다.
+
+### 2026-11-20 큰뿔양 보폭과 늦은 접속 교류 검증
+
+큰뿔양 전용 발 고정만 적용한 115cm/s 보행에서 낮은 왼쪽 뒷발 표본에 약 72cm/s의 전방 이동이 남았다. 발을 뒤로 보내는 속도가 몸의 전진을 충분히 상쇄하지 못한 구간이다. 소유 Blend Space의 보행·질주·좌우 선회에 여섯 순환 클립을 연결했다. 발이 닿아 있는 동안 135·570cm/s의 기존 샘플 속도가 반대 방향의 발 이동에 반영된다. 좌우 선회에서도 같은 디딤 위상을 쓰며, 발이 떨어지고 다시 닿는 순간의 곡선 끝 속도가 이어진다. 기존 리그 길이 안에서 발 목표를 만들고, 디딤 기준과 발소리 Notify를 같은 위상에서 기록했다. 이동 속도나 훈련 파일은 기존 값을 쓴다. 생성은 `-EcoApplyFaunaMotionRepairs -EcoFaunaMotionSpecies=Bighorn`을 사용하며 저장된 클립의 재표본 검사는 `audit_bighorn_footfall.py`로 실행한다. [보행 클립 생성](../../Tools/Editor/bighorn_footfall_gait.py) · [Unreal Blend Space 속도 분석](https://dev.epicgames.com/documentation/en-us/unreal-engine/automatic-blend-space-creation-in-unreal-engine)
+
+Blend Space에서 쓰는 대기 클립의 길이는 보행 주기와 맞춰 중간 속도의 혼합이 걸음 주기를 늦추는 현상을 줄였다. 저장된 여섯 클립의 120Hz 디딤 표본에서 이동을 상쇄한 뒤 남은 최대 오차는 보행 0.141cm, 질주 0.655cm였다. 60fps 경사 시험에서 접촉 높이 부근 보행 발 마커의 프레임당 수평 이동 중앙값은 6.66cm에서 2.22cm로 줄었다. 같은 기준의 급반전에는 수평 이동이 남는다. 실제 섬에서는 개체 99의 이동 애니메이션을 렌더했다. 원본은 `Saved/FaunaAudit/BighornFootfallClips.json`, `BighornExpandedCalibratedMetrics.json`, `BighornIslandCalibrated`다.
+
+이전 멀티의 두 번째 접속 뒤 서버에서는 교류 응답이 28개 시간 표본에 기록됐다. 해당 응답자 중 시간상 가까운 클라이언트 표본의 표현 목록에 있었던 개체는 없었다. 지역별 최소 ID를 따라가던 검사 동선이 실제 교류 쌍을 지나치고 있었고, 기존 클라이언트 검사는 1초 주기였다. `-LateJoinSocial`은 실제 교류 가능 위치에 잠시 관찰 플레이어만 배치하고 0.17초 주기로 수신 상태를 모은다. 화면에 렌더링된 응답의 StableAgentId와 서버 시각을 양쪽 권위 완료 기록에 맞춘 뒤, 상대의 제안 수신과 응답자 표시 해제까지 확인한다. 기존 근거리 표현·동시 접속·성장 상태 판정도 실행된다. 실제 교류의 발행, 복제 데이터, 학습 두뇌, 팀원의 위협·우호 기능은 기존 경로를 사용한다. [관찰 도구](../../Tools/Editor/observe_island_social.py) · [네트워크 실행 도구](../../Tools/Editor/test_vegetation_network.ps1)
+
+UE 5.8 직접 Editor 빌드와 저장 섬의 전용 서버 재검증을 통과했다. 두 클라이언트의 동시 접속 표본 범위는 36.34초였고 각 클라이언트의 권위 개체는 0이었다. 늦게 접속한 ClientB에서 말 40의 제안, 말 41의 화면 응답, 응답 해제를 각각 서버 기준 50.73초, 51.12초, 52.19초에 확인했다. 서버의 두 방향 완료 기록은 51게임초다. 근거리 표현과 늦은 접속 때의 개체 성장 수신도 통과했다. 서버와 클라이언트 두 대가 정상 종료했다. 원본은 `Saved/BighornLateJoinCalibrated/Relevance.json`과 `NetworkProcesses.json`이다.
+
 ### 재질·발소리·생태 재점검
 
 - 기본 표현 17개, 재질 슬롯 28개에 텍스처 참조가 있다. 기존·신규 D3D11 검증 로그에서 재질 컴파일 또는 기본 재질 대체 오류가 없었다. 팀 통합 레벨의 전체 조명과 성장별 교체 메시까지 대조한 실행은 아니다. `Saved/FaunaAudit/BoundMaterials.json`.

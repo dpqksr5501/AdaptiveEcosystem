@@ -46,6 +46,8 @@
 #include "StaticMeshAttributes.h"
 #include "MeshDescription.h"
 #include "Misc/PackageName.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #endif
 
 TArray<FName> UEcoCreatureAnimationBuilder::GetSkeletalBoneNames(USkeletalMesh* Mesh)
@@ -392,9 +394,18 @@ AActor* UEcoCreatureAnimationBuilder::SpawnVisualAuditActor(UObject* Context,TSu
 {
 #if WITH_EDITOR
     UWorld* W=GEngine?GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull):nullptr;
-    if(!W||W->WorldType!=EWorldType::PIE||W->GetNetMode()!=NM_Standalone||!W->GetPathName().StartsWith(TEXT("/Game/JYU/Maps/"))||!ActorClass)return nullptr;
-    if(!ActorClass->IsChildOf(AEcoCreatureRepresentationActor::StaticClass())&&!ActorClass->IsChildOf(AStaticMeshActor::StaticClass())&&!ActorClass->IsChildOf(ACameraActor::StaticClass()))return nullptr;
+    if (!W || !ActorClass) return nullptr;
+    const bool bIslandClientCamera = W->GetNetMode() == NM_Client && ActorClass == ACameraActor::StaticClass()
+        && W->GetOutermost()->GetName() == TEXT("/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed")
+        && (FParse::Param(FCommandLine::Get(), TEXT("VegetationAllIslandSocial"))
+            || FParse::Param(FCommandLine::Get(), TEXT("VegetationLateJoinSocial")));
+    const bool bStandaloneVisual = W->WorldType == EWorldType::PIE && W->GetNetMode() == NM_Standalone
+        && W->GetPathName().StartsWith(TEXT("/Game/JYU/Maps/"))
+        && (ActorClass->IsChildOf(AEcoCreatureRepresentationActor::StaticClass())
+            || ActorClass->IsChildOf(AStaticMeshActor::StaticClass()) || ActorClass->IsChildOf(ACameraActor::StaticClass()));
+    if (!bIslandClientCamera && !bStandaloneVisual) return nullptr;
     FActorSpawnParameters Params;Params.SpawnCollisionHandlingOverride=ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    if (bIslandClientCamera) Params.ObjectFlags |= RF_Transient;
     return W->SpawnActor<AActor>(ActorClass,Transform,Params);
 #else
     return nullptr;

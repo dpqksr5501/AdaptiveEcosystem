@@ -21,6 +21,7 @@ prefix = run_name.group(1) if run_name else "FlexibleMotion"
 expanded = "-FaunaMotionExpanded" in unreal.SystemLibrary.get_command_line()
 physical_slope = "-FaunaMotionPhysicalSlope" in unreal.SystemLibrary.get_command_line()
 pig_only = "-FaunaMotionPig" in unreal.SystemLibrary.get_command_line()
+shared_pig = "-FaunaMotionSharedPig" in unreal.SystemLibrary.get_command_line()
 straight_brake = "-FaunaMotionStraightBrake" in unreal.SystemLibrary.get_command_line()
 support_match = re.search(r"-FaunaRestSupport=(Flat|Uphill|CrossSlope)", unreal.SystemLibrary.get_command_line())
 support_case = support_match.group(1) if support_match else None
@@ -28,12 +29,18 @@ early_settle = "-FaunaSupportEarlySettle" in unreal.SystemLibrary.get_command_li
 verify_support = "-FaunaSupportVerify" in unreal.SystemLibrary.get_command_line()
 continuity = "-FaunaMotionContinuity" in unreal.SystemLibrary.get_command_line()
 verify_continuity = "-FaunaContinuityVerify" in unreal.SystemLibrary.get_command_line()
+joint_audit = "-FaunaMotionJoints" in unreal.SystemLibrary.get_command_line()
+joint_control = joint_audit and "-FaunaMotionNoIK" in unreal.SystemLibrary.get_command_line()
+limb_regression = joint_audit and "-FaunaMotionLimbRegression" in unreal.SystemLibrary.get_command_line()
 species = ("Bighorn", "Jackrabbit", "Horse", "Mink", "GoldenEagle", "AriakeCatfish", "CommonCarp", "UnidentifiedFish") if expanded else (
     "Rat", "Fox", "Pig", "Leopard", "Crow", "Buffalo", "Deer", "Wolf")
 asset_root = "/Game/JYU/ExpandedFauna" if expanded else "/Game/JYU/Fauna"
 map_name = "LV_JYU_ExpandedFauna" if expanded else "LV_JYU_Fauna"
 if pig_only:
     species, asset_root, map_name = ("Pig",), "/Game/JYU/Pig", "LV_JYU_Pig"
+elif shared_pig:
+    species = ("Pig",)
+pig_focus = pig_only or shared_pig
 cases = ("flat", "walk", "turn", "reverse", "brake", "run", "feed") + (("chew",) if pig_only else ()) + ("special", "fly") + (
     ("dive",) if expanded else ()) + ("land", "death", "settled")
 if support_case:
@@ -82,7 +89,7 @@ def setup(world):
         support(ramp_center, unreal.Vector(14., 26., .3), 12.)
     else:
         plate = support(center, unreal.Vector(16., 24., .3))
-    camera_position = center + (unreal.Vector(550., -620., 290.) if pig_only else unreal.Vector(1150., -1300., 570.))
+    camera_position = center + (unreal.Vector(550., -620., 290.) if pig_focus else unreal.Vector(1150., -1300., 570.))
     camera = spawn(world, unreal.CameraActor, camera_position)
     camera.set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(camera_position, center + unreal.Vector(0., 0., 100.)), False)
     pawn = player.get_controlled_pawn()
@@ -91,13 +98,34 @@ def setup(world):
     pawn.set_actor_location(camera_position, False, False)
     player.set_view_target_with_blend(camera, 0.)
     state["camera"] = camera
-    if pig_only:
+    if pig_focus:
         unreal.SystemLibrary.execute_console_command(world, "showhud")
     for index, kind in enumerate(species):
         cls = unreal.load_class(None, f"{asset_root}/{kind}/BP_{kind}.BP_{kind}_C")
-        position = center + unreal.Vector(-75. if physical_slope else -340., 0. if pig_only else 265. * (index - 3), 15.)
+        position = center + unreal.Vector(-75. if physical_slope else -340., 0. if pig_focus else 265. * (index - 3), 15.)
         actor = spawn(world, cls, position)
-        state["fixtures"].append((kind, actor, actor.get_editor_property("animation_profile"), position))
+        profile = actor.get_editor_property("animation_profile")
+        if joint_control:
+            control = unreal.EcoCreatureAnimationProfile()
+            for name in ("locomotion", "alarm_sound", "poses", "stationary_speed", "minimum_pose_hold_seconds",
+                         "foot_bones", "ik_end_bones", "body_bone", "alert_head_bone", "turn_head_bone", "morph_bone",
+                         "morph_scale", "age_driven_morph", "contact_heights", "max_foot_correction_cm", "foot_clearance_cm",
+                         "max_plant_correction_cm"):
+                control.set_editor_property(name, profile.get_editor_property(name))
+            control.set_editor_property("enable_ground_ik", False)
+            profile = control
+        state["fixtures"].append((kind, actor, profile, position))
+        if joint_audit:
+            mesh = actor.get_editor_property("creature_mesh")
+            bones = {str(mesh.get_bone_name(index)) for index in range(mesh.get_num_bones())}
+            tracked = {bone for bone in bones if re.search(
+                r"thigh|femur|upleg|upperleg|hip|knee|calf|shin|wing|tail|pelvis|flipper", bone, re.I)}
+            if kind in ("AriakeCatfish", "CommonCarp", "UnidentifiedFish"):
+                tracked = bones - {"None"}
+            for end in profile.get_editor_property("ik_end_bones"):
+                middle = mesh.get_parent_bone(end)
+                tracked.update(map(str, (end, middle, mesh.get_parent_bone(middle))))
+            state.setdefault("joints", {})[kind] = sorted(tracked & bones)
     state["plate"] = plate
 
 
@@ -243,6 +271,13 @@ def drive(world, now, case, fraction, dt):
         frame[kind]["support_x_cm"] = round(position.x, 2)
         frame[kind]["support_z_cm"] = round(ground, 2)
         frame[kind]["input_speed_cm_s"] = round(math.hypot(velocity.x, velocity.y), 2)
+        if joint_audit:
+            mesh = actor.get_editor_property("creature_mesh")
+            frame[kind]["joint_rotations"] = {}
+            for bone in state["joints"][kind]:
+                transform = mesh.get_socket_transform(bone, unreal.RelativeTransformSpace.RTS_PARENT_BONE_SPACE)
+                rotation = transform.rotation
+                frame[kind]["joint_rotations"][bone] = [round(getattr(rotation, axis), 5) for axis in "xyzw"]
         if support_case:
             frame[kind]["corpse_requested"] = action == activity.CORPSE_SETTLED
     state["frames"].setdefault(case, []).append({"time": round(now, 4), "animals": frame})
@@ -260,7 +295,10 @@ def finish(result):
             report["support"] = support_metrics()
         if continuity and "pitchflip" in state["frames"]:
             report["continuity"] = continuity_metrics()
-        (output / f"{prefix}Metrics.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        if limb_regression and "run" in state["frames"]:
+            report["limb_regression"] = collect_limb_regression()
+        serialized = json.dumps(report, separators=(",", ":")) if joint_audit else json.dumps(report, indent=2)
+        (output / f"{prefix}Metrics.json").write_text(serialized, encoding="utf-8")
         unreal.log("FAUNA_MOTION_" + result)
     except Exception as error:
         unreal.log_error(f"FAUNA_MOTION_FAILED writing metrics: {error}")
@@ -322,6 +360,37 @@ def support_metrics():
     return result
 
 
+def collect_limb_regression():
+    tracked = {
+        "Rat": ("DEF-shin_R_001", "DEF-front_foot_R", "DEF-thigh_R"),
+        "Buffalo": ("bip01_r_forearm", "bip01_r_calf", "bip01_l_thigh"),
+        "Jackrabbit": ("LeftForeArm", "RightForeArm"),
+        "Horse": ("RightForeArm",),
+        "Mink": ("Tail01",),
+    }
+    result = {}
+    for kind, bones in tracked.items():
+        if kind not in species:
+            continue
+        angles = {bone: 0. for bone in bones}
+        for case in ("walk", "turn", "reverse", "brake", "run"):
+            frames = state["frames"][case]
+            for before, after in zip(frames, frames[1:]):
+                previous, current = [item["animals"][kind]["joint_rotations"] for item in (before, after)]
+                for bone in bones:
+                    a, b = previous[bone], current[bone]
+                    denominator = math.sqrt(sum(x*x for x in a) * sum(x*x for x in b))
+                    dot = abs(sum(x*y for x, y in zip(a, b))) / denominator
+                    angles[bone] = max(angles[bone], 2. * math.degrees(math.acos(min(1., dot))))
+        result[kind] = {bone: round(angle, 2) for bone, angle in angles.items()}
+    if "Leopard" in species:
+        result["Leopard"] = {"turn_min_marker_cm": min(gap for row in state["frames"]["reverse"]
+                         for gap in row["animals"]["Leopard"]["marker_gap_cm"] if gap is not None)}
+    if "Bighorn" in species and physical_slope:
+        result["Bighorn"] = contact_drift().get("Bighorn", {})
+    return result
+
+
 def continuity_metrics():
     results = {}
     for kind in species:
@@ -347,6 +416,11 @@ def continuity_metrics():
 
 
 def verify():
+    if joint_control:
+        for case in ("walk", "turn", "reverse", "brake", "run"):
+            if any(animal["ik"] > .01 for row in state["frames"][case] for animal in row["animals"].values()):
+                raise RuntimeError("Ground IK was active in the clip-only control")
+        return
     if continuity:
         if verify_continuity:
             for kind, metrics in continuity_metrics().items():
@@ -384,7 +458,10 @@ def verify():
         stop = next(index for index, frame in enumerate(brake) if frame["input_speed_cm_s"] <= idle_speeds[kind])
         if not straight_brake and abs(brake[stop - 1]["turn_weight"]) > .02 and abs(brake[stop]["turn_weight"]) < .01:
             raise RuntimeError(f"{kind} turn weight dropped immediately at a stop")
-        expected = (4 if kind in ("Bighorn", "Jackrabbit", "Horse") else 0) if expanded else (2 if kind == "Crow" else 4)
+        if expanded:
+            expected = {"Bighorn": 4, "Jackrabbit": 4, "Horse": 4, "GoldenEagle": 2}.get(kind, 0)
+        else:
+            expected = 2 if kind == "Crow" else 4
         contacts = frames["walk"][-1]["animals"][kind]["valid_feet"]
         if contacts != expected:
             raise RuntimeError(f"{kind} unexpected slope contacts: {contacts}")
@@ -412,7 +489,7 @@ def verify():
         for case, pose in (("feed", 4), ("chew", 1), ("special", 7)):
             if frames[case][-1]["animals"]["Pig"]["pose"] != pose:
                 raise RuntimeError(f"Pig {case} pose did not play")
-    else:
+    elif not shared_pig:
         bird = "GoldenEagle" if expanded else "Crow"
         for case, pose in (("special", 9), ("fly", 10), ("land", 11)):
             crow = frames[case][-1]["animals"][bird]
@@ -427,9 +504,25 @@ def verify():
         dive = frames["dive"][-1]["animals"]["GoldenEagle"]
         if dive["pose"] != 6 or dive["body_pitch"] >= -10. or dive["valid_feet"]:
             raise RuntimeError("Eagle dive lacks the talon pose or the downward orientation")
-    settled = "Pig" if pig_only else "Jackrabbit" if expanded else "Rat"
+    settled = "Pig" if pig_focus else "Jackrabbit" if expanded else "Rat"
     if not frames["settled"][-1]["animals"][settled].get("settled"):
         raise RuntimeError(f"{settled} did not hold the completed death pose")
+    if limb_regression:
+        metrics = collect_limb_regression()
+        maximum = {"Rat": {"DEF-shin_R_001": 25., "DEF-front_foot_R": 30., "DEF-thigh_R": 40.},
+                   "Buffalo": {"bip01_r_forearm": 60., "bip01_r_calf": 65., "bip01_l_thigh": 35.},
+                   "Jackrabbit": {"LeftForeArm": 45., "RightForeArm": 45.},
+                   "Horse": {"RightForeArm": 24.}, "Mink": {"Tail01": 24.}}
+        for kind, bounds in maximum.items():
+            for bone, bound in bounds.items():
+                if kind in metrics and metrics[kind][bone] > bound:
+                    raise RuntimeError(f"{kind} {bone} exceeded the per-frame rotation limit: {metrics[kind]}")
+        if "Leopard" in metrics and metrics["Leopard"]["turn_min_marker_cm"] < -.5:
+            raise RuntimeError(f"Leopard reversal exceeds ground penetration limit: {metrics['Leopard']}")
+        if "Bighorn" in metrics:
+            walk = metrics["Bighorn"].get("walk", {})
+            if walk.get("samples", 0) < 8 or walk["median"] > 4.:
+                raise RuntimeError(f"Bighorn walk failed contact drift check: {walk}")
 
 
 def tick(_):
@@ -458,9 +551,11 @@ def tick(_):
         state["last"] = now
         drive(world, now, case, fraction, dt)
         captures = ("turn", "feed", "chew", "special", "death", "settled") if pig_only else ("turn", "feed", "fly", "death", "settled")
+        if joint_audit:
+            captures += ("walk", "brake", "run")
         if case in captures and fraction >= .75 and case not in state["captures"]:
             state["captures"].add(case)
-            if pig_only:
+            if pig_focus:
                 animal = state["fixtures"][0][1]
                 subject = animal.get_actor_location() + unreal.Vector(0., 0., 40.)
                 viewpoint = subject + unreal.Vector(280., -345., 135.)
