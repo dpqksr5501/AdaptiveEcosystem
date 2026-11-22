@@ -12,6 +12,12 @@ folder=arg('VegetationAuditFolder','Vegetation_20261023')
 duration=float(arg('VegetationClientDuration','26'))
 visual_distance=float(arg('VegetationClientVisualDistance','-1'))
 grass_travel = '-vegetationgrasstravelcheck' in cmd.lower()
+all_island_social = '-vegetationallislandsocial' in cmd.lower().split()
+late_join_social = '-vegetationlatejoinsocial' in cmd.lower().split()
+watch_fauna_alarms = '-vegetationwatchfaunaalarms' in cmd.lower().split()
+if all_island_social or late_join_social:
+    import runpy
+    sample_social = runpy.run_path(str(Path(__file__).with_name('observe_island_social.py')))['sample_client']
 if not math.isfinite(visual_distance) or not (-1 <= visual_distance <= 200000):
     raise RuntimeError('Client visual distance must be -1 (authored) or 0..200000 cm')
 if not math.isfinite(duration) or not 20<=duration<=600:raise RuntimeError('Bounded client duration required')
@@ -21,6 +27,30 @@ if map_name not in ('LV_JYU_HerdMigration','LV_JYU_Ecosystem','1102_Integration_
 out = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())) / folder
 out.mkdir(parents=True, exist_ok=True)
 state = dict(start=None, next=0, samples=[],world=None,frame_ms=[],csv=False)
+alarm_active = set()
+alarm_samples = []
+next_alarm_sample = 0.
+
+
+def sample_alarms(game, elapsed):
+    global alarm_active, next_alarm_sample
+    if elapsed < next_alarm_sample:
+        return
+    next_alarm_sample = elapsed + .20
+    clock = unreal.GameplayStatics.get_game_state(game).get_server_world_time_seconds()
+    active = set()
+    for actor in unreal.GameplayStatics.get_all_actors_of_class(game, unreal.EcoCreatureRepresentationActor):
+        if not actor.get_editor_property('bound'):
+            continue
+        visual = actor.get_editor_property('visual_state')
+        if visual.get_editor_property('fauna_alarm'):
+            key = (str(visual.get_editor_property('stable_agent_id')), str(visual.get_editor_property('species_id')))
+            active.add(key)
+            if key not in alarm_active:
+                alarm_samples.append(dict(id=key[0], species=key[1], server_time=clock))
+    alarm_active = active
+
+
 def tick(dt):
     # WorldPartition can load an inactive UWorld with the same map name. Name
     # alone is not a game-world identity; retain the world owning the local PC.
@@ -40,7 +70,15 @@ def tick(dt):
         state['visual_distance_configured'] = True
     if state['start'] is None: state['start'] = time.monotonic()
     elapsed = time.monotonic() - state['start']
-    if elapsed>5 and not state['csv']:
+    if watch_fauna_alarms:
+        sample_alarms(game, elapsed)
+    if (all_island_social or late_join_social) and not state.get('social_error'):
+        try:
+            sample_social(game, elapsed, state, out, match.group(1))
+        except Exception as error:
+            state['social_error'] = str(error)
+            unreal.log_error(f'Island rendered reply audit: {error}')
+    if not all_island_social and elapsed>5 and not state['csv']:
         unreal.SystemLibrary.execute_console_command(game,'csvprofile STARTFILE=EcosystemLife_'+folder+'_'+match.group(1)+'.csv')
         unreal.SystemLibrary.execute_console_command(game,'csvprofile START');state['csv']=True
     if elapsed>5 and math.isfinite(dt) and dt>0 and len(state['frame_ms'])<3600:state['frame_ms'].append(dt*1000)
@@ -58,16 +96,21 @@ def tick(dt):
         v=actor.get_editor_property('visual_state')
         scale=actor.get_actor_scale3d()
         mesh=actor.get_editor_property('creature_mesh');asset=mesh.get_skeletal_mesh_asset();animation=mesh.get_anim_instance()
+        proportions=mesh.get_editor_property('relative_scale3d')
         visuals.append(dict(id=str(v.get_editor_property('stable_agent_id')),
             species=str(v.get_editor_property('species_id')),
             region=str(v.get_editor_property('region_id')),activity=str(v.get_editor_property('activity')),
             coat_tone=v.get_editor_property('coat_tone'),maturity=v.get_editor_property('maturity'),adult_visible=mesh.is_visible(),young_visible=actor.get_editor_property('immature_mesh').is_visible(),
             body_scale=v.get_editor_property('body_scale'),actor_scale=[scale.x,scale.y,scale.z],appearance=v.get_editor_property('appearance'),
+            body_condition=v.get_editor_property('body_condition'),mesh_scale=[proportions.x,proportions.y,proportions.z],
+            social_signal=v.get_editor_property('social_signal'),social_yaw=v.get_editor_property('social_yaw'),
+            fauna_alarm=v.get_editor_property('fauna_alarm'),
             mesh=asset.get_path_name() if asset else None,animation=animation.get_class().get_name() if animation else None))
     camera=unreal.GameplayStatics.get_player_camera_manager(game,0)
     pawn=unreal.GameplayStatics.get_player_pawn(game,0)
     c=camera.get_camera_location() if camera else None;p=pawn.get_actor_location() if pawn else None
-    sample = dict(elapsed=elapsed, fields=rows,visuals=visuals,
+    sample = dict(elapsed=elapsed, server_time=unreal.GameplayStatics.get_game_state(game).get_server_world_time_seconds(),
+        fields=rows,visuals=visuals,
         observer_pawn=[p.x,p.y,p.z] if p else None,observer_camera=[c.x,c.y,c.z] if c else None)
     if grass_travel:
         partition = next((sub for sub in unreal.ObjectIterator(unreal.WorldPartitionSubsystem) if sub.get_outer()==game),None)
@@ -87,6 +130,13 @@ def tick(dt):
     result = dict(client=match.group(1), client_visual_distance_override_cm=visual_distance,
         authority_agents=len(ids), local_migration_subsystems=migration_subsystems,samples=state['samples'], best=best,
         observed_world=game.get_path_name(),same_named_worlds=candidates)
+    if watch_fauna_alarms:
+        result['fauna_alarm_transitions'] = alarm_samples
+    if all_island_social or late_join_social:
+        result['social_rendered_replies']=state.get('social_rendered', {})
+        result['social_render_error']=state.get('social_error')
+        result['social_client_samples']=state.get('social_client_samples', {})
+        result['social_transitions']=state.get('social_transitions', [])
     frames=sorted(state['frame_ms'])
     if frames:result['rendered_frame_time']=dict(samples=len(frames),p95_ms=frames[max(0,math.ceil(len(frames)*.95)-1)],max_ms=frames[-1])
     native=next((n for n in unreal.ObjectIterator(unreal.EcoPolicyV3IntegratedSubsystem) if n.get_outer()==game),None)
@@ -122,4 +172,5 @@ def tick(dt):
     if state['csv']:unreal.SystemLibrary.execute_console_command(game,'csvprofile STOP')
     unreal.log('VEGETATION_CLIENT_FINISHED '+json.dumps(dict(client=match.group(1),passed=result['passed'])))
     unreal.unregister_slate_post_tick_callback(handle)
+    if all_island_social: unreal.SystemLibrary.quit_editor()
 handle = unreal.register_slate_post_tick_callback(tick)
