@@ -79,6 +79,15 @@ void AEcoCreatureIntegrationSpawner::BeginPlay()
 	PostTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &AEcoCreatureIntegrationSpawner::OnWorldPostActorTick);
 	StartedAt = GetWorld()->GetTimeSeconds();
 #if WITH_DEV_AUTOMATION_TESTS
+    int32 ExperienceOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaExperience="), ExperienceOverride)
+        && ExperienceOverride >= 0 && ExperienceOverride <= 2) FaunaExperienceMode = ExperienceOverride;
+    int32 FoodVisitOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaFoodVisits="), FoodVisitOverride)
+        && FoodVisitOverride >= 0 && FoodVisitOverride <= 2) FaunaFoodVisitMode = FoodVisitOverride;
+    int32 InteractionOverride = 0;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaInteractions="), InteractionOverride)
+        && InteractionOverride >= 0 && InteractionOverride <= 2) FaunaInteractionMode = InteractionOverride;
     int32 RoutinesOverride = INDEX_NONE;
     if (FParse::Value(FCommandLine::Get(), TEXT("EcoAdaptiveRoutines="), RoutinesOverride)
         && (RoutinesOverride == 0 || RoutinesOverride == 1)) bEnableAdaptiveRoutines = RoutinesOverride != 0;
@@ -342,5 +351,9 @@ void AEcoCreatureIntegrationSpawner::EndPlay(const EEndPlayReason::Type Reason)
 			if (!Remaining.IsEmpty()) EM.BatchDestroyEntities(Remaining);
 		}
 	}
+	FaunaExperience.Reset();
+	EncounterMeals.Reset();
+    ActiveFoodVisits.Reset();
+	PendingEncounterThreats.Reset();
 	Owned.Reset(); SpeciesTotals.Reset(); Super::EndPlay(Reason);
 }

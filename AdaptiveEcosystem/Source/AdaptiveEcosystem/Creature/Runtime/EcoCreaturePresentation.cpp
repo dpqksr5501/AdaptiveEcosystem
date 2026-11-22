@@ -143,6 +143,10 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		State.SenseSource = EEcoSenseSource((Input.Visual.Flags>>4)&3);
 		State.FocusYawDegrees = float(Input.Visual.FocusYaw)/182.0389f;
         State.BodyScale=Input.Visual.BodyScale/128.f;State.Maturity=Input.Visual.Maturity/255.f;State.CoatTone=Input.Visual.CoatTone/255.f;
+        State.BodyCondition=Input.Visual.BodyCondition/128.f;
+        State.SocialSignal=uint8(EcoFaunaSocial::Signal(Input.Visual.SocialPresentation));
+        State.SocialYaw=float(EcoFaunaSocial::Yaw(Input.Visual.SocialPresentation));
+        State.bFaunaAlarm = (Input.Visual.SocialPresentation & EcoFaunaSocial::AlarmPulse) != 0;
         State.Appearance=EcoPresentationFlags::Appearance(Input.Visual.Flags);
 		State.bHasVitals = (Input.Visual.Flags & 8) != 0;
 		State.NormalizedHealth = Input.Visual.Health / 255.f; State.NormalizedEnergy = Input.Visual.Energy / 255.f;

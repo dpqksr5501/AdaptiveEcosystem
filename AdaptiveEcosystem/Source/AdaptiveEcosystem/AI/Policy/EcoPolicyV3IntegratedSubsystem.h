@@ -1508,8 +1508,15 @@ public:
 	void ReturnStaticMeshSweeps(int32 Unused) { StaticSweepCredits += Unused; }
 	bool IsObstacleDebugEnabled() const;
     /** Serialized M4 boundary for opt-in fauna sharing the Native spatial food ledger. */
+    struct FFaunaPlantMeal
+    {
+        FIntVector Cell = FIntVector::ZeroValue;
+        double StockBefore = 0.;
+        double Requested = 0.;
+        double Paid = 0.;
+    };
     bool ConsumeFaunaFood(FName RegionId, const FVector& Position, double Requested, double NutritionHeadroom,
-        double& OutNutrition);
+        double& OutNutrition, FFaunaPlantMeal* Meal = nullptr);
 
 	// ---- 시험·조정자 없이 쓰는 길 ----
 

@@ -78,7 +78,11 @@ void AEcoCreatureIntegrationSpawner::ApplyPlayerDamage(APawn& Attacker, FMassEnt
             Fauna->LastThreatPosition = GetWorld()->LineTraceTestByObjectType(Start, From,
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaHit)))
                 ? Body.GetLocation() - Body.GetRotation().GetForwardVector() * 100. : From;
-            Fauna->ThreatUntil = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds + 3.;
+            const double Now = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+            Fauna->ThreatUntil = Now + 3.;
+            const auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Best);
+            ObserveInterruptedForage(Id.StableAgentId, Id.SpeciesId,
+                EM.GetFragmentDataChecked<FEcoRegionFragment>(Best).CurrentRegionId, *Fauna, Body.GetLocation(), Now);
         }
         return;
     }

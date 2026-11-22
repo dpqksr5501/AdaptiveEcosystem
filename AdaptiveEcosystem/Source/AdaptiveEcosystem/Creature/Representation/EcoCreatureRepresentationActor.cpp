@@ -50,6 +50,8 @@ bool FEcoCreatureVisualState::IsValid() const
 {
 	return StableAgentId > 0 && !SpeciesId.IsNone() && Sequence > 0 && FMath::IsFinite(WorldTime) && WorldTime >= 0.0
         &&FMath::IsFinite(BodyScale)&&BodyScale>=.65f&&BodyScale<=1.15f&&Appearance<=3
+        &&FMath::IsFinite(BodyCondition)&&BodyCondition>=.875f&&BodyCondition<=1.125f
+        &&SocialSignal<=2&&FMath::IsFinite(SocialYaw)
         &&FMath::IsFinite(Maturity)&&Maturity>=0&&Maturity<=1&&FMath::IsFinite(CoatTone)&&CoatTone>=0&&CoatTone<=1
 		&& !Position.ContainsNaN() && !Velocity.ContainsNaN() && FMath::IsFinite(FocusYawDegrees)
         && (!bHasFacing || FMath::IsFinite(FacingYawDegrees))
@@ -215,6 +217,8 @@ void AEcoCreatureRepresentationActor::RefreshAppearance()
 	if (VisualMesh) { CreatureMesh->SetSkeletalMesh(VisualMesh); }
     if (!FMath::IsNearlyEqual(VisualMeshScale, 1.f))
         CreatureMesh->SetRelativeScale3D(FVector(VisualMeshScale));
+    if (!BaseCreatureMeshScale.IsSet()) BaseCreatureMeshScale = CreatureMesh->GetRelativeScale3D();
+    if (!BasePlaceholderScale.IsSet()) BasePlaceholderScale = PlaceholderBody->GetRelativeScale3D();
     AppliedAppearance=255;ApplyAppearance(VisualState.Appearance);
 	CreatureMesh->SetRelativeRotation(MeshRotation);
     ImmatureMesh->SetRelativeRotation(MeshRotation);
@@ -323,6 +327,10 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 		&& (bAlwaysSwimming || Activity == EEcoSpeciesActivity::EnterWater || Activity == EEcoSpeciesActivity::Swim
 			|| Activity == EEcoSpeciesActivity::ExitWater);
 	const bool bFocus = !bMoving && State.bAlive && State.SenseSource != EEcoSenseSource::None;
+	const bool bSocialLook = State.bAlive && State.SocialSignal != 0 && State.SenseSource == EEcoSenseSource::None;
+	const float MotionYaw = float(State.Velocity.Rotation().Yaw);
+	const float SocialMotionYaw = bSocialLook ? FRotator::NormalizeAxis(MotionYaw +
+		FMath::Clamp(FMath::FindDeltaAngleDegrees(MotionYaw, State.SocialYaw), -15.f, 15.f)) : MotionYaw;
 	DirectionDegrees = 0.0f;
 	if (bSoftenAbruptFacing)
 	{
@@ -330,19 +338,19 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 		{
 			VisualYawRateDegrees = ReversalDirection = 0.f;
 			if (bMoving || State.bHasFacing)
-				Facing.Yaw = bMoving ? State.Velocity.Rotation().Yaw : State.FacingYawDegrees;
+				Facing.Yaw = bMoving ? SocialMotionYaw : State.FacingYawDegrees;
 		}
 		else if (State.bAlive)
 		{
-            const bool bTrack = bMoving || bFocus;
-			const float DesiredYaw = bMoving ? State.Velocity.Rotation().Yaw : State.FocusYawDegrees;
+            const bool bTrack = bMoving || bFocus || bSocialLook;
+			const float DesiredYaw = bMoving ? SocialMotionYaw : bFocus ? State.FocusYawDegrees : State.SocialYaw;
 			float Error = bTrack ? FMath::FindDeltaAngleDegrees(PreviousYaw, DesiredYaw) : 0.f;
 			// Hold the chosen side of an about-face across the angle seam and small input changes.
 			if (!bTrack || FMath::Abs(Error) < 160.f) ReversalDirection = 0.f;
 			else if (ReversalDirection == 0.f && FMath::Abs(Error) >= 175.f)
 				ReversalDirection = FMath::Sign(FMath::Abs(VisualYawRateDegrees) > 1.f ? VisualYawRateDegrees : Error);
 			if (Error * ReversalDirection < 0.f) Error -= FMath::Sign(Error) * 360.f;
-			const float MaxRate = bFocus ? 90.f : bFlight ? 300.f : bWater ? 360.f : 540.f;
+			const float MaxRate = bFocus || (bSocialLook && !bMoving) ? 90.f : bFlight ? 300.f : bWater ? 360.f : 540.f;
 			const float Acceleration = bFlight || bWater ? 1440.f : 2160.f;
 			Facing.Yaw = AdvanceVisualAngle(PreviousYaw, Error, bTrack, AngularStep, MaxRate, Acceleration,
 				FMath::Max(0.f, TurnInterpolationSpeed), VisualYawRateDegrees);
@@ -355,20 +363,25 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 	}
 	else if (bMoving)
 	{
-		const FRotator Desired(0, State.Velocity.Rotation().Yaw, 0);
+		const FRotator Desired(0, SocialMotionYaw, 0);
 		Facing = bSnap ? Desired : FMath::RInterpTo(Facing, Desired, DeltaSeconds, FMath::Max(0.0f, TurnInterpolationSpeed));
 		const float Limit = FMath::Clamp(MaxFacingLagDegrees, 0.0f, 45.0f);
 		const float Lag = FMath::Clamp(FMath::FindDeltaAngleDegrees(Desired.Yaw, Facing.Yaw), -Limit, Limit);
 		Facing = FRotator(0, FRotator::NormalizeAxis(Desired.Yaw + Lag), 0);
-		DirectionDegrees = FMath::FindDeltaAngleDegrees(Facing.Yaw, Desired.Yaw);
+		DirectionDegrees = FMath::FindDeltaAngleDegrees(Facing.Yaw, double(MotionYaw));
 	}
 	if (!bSoftenAbruptFacing && !bMoving && State.bHasFacing && (bSnap || !State.bAlive))
         Facing=FRotator(0,State.FacingYawDegrees,0);
 	if (!bSoftenAbruptFacing && bFocus)
         Facing=FRotator(0,FMath::FixedTurn(Facing.Yaw,State.FocusYawDegrees,90.f*DeltaSeconds),0);
+	if (!bSoftenAbruptFacing && !bMoving && bSocialLook)
+		Facing.Yaw = FMath::FixedTurn(Facing.Yaw, double(State.SocialYaw), double(90.f * DeltaSeconds));
     const bool NewDirectCue=State.SenseSource!=VisualState.SenseSource&&(State.SenseSource==EEcoSenseSource::Sight||State.SenseSource==EEcoSenseSource::Hearing);
     const bool NewFlee=State.Activity!=VisualState.Activity&&State.Activity==EEcoSpeciesActivity::Flee;
-    if(!bSnap&&VisualSpeciesId==TEXT("Herbivore")&&State.bAlive&&(NewDirectCue||NewFlee)&&State.WorldTime-LastAlarmTime>=3&&GetWorld()->GetNetMode()!=NM_DedicatedServer)
+    const bool bDirectFaunaAlarm = State.bFaunaAlarm && (!VisualState.bFaunaAlarm || bSnap);
+    const bool bLegacyDeerAlarm = !bSnap && VisualSpeciesId == TEXT("Herbivore") && (NewDirectCue || NewFlee);
+    if (State.bAlive && (bDirectFaunaAlarm || bLegacyDeerAlarm) && State.WorldTime - LastAlarmTime >= 3
+        && GetWorld()->GetNetMode() != NM_DedicatedServer)
     {
         LastAlarmTime=State.WorldTime;
         GetWorld()->GetTimerManager().SetTimer(AlarmTimer,this,&AEcoCreatureRepresentationActor::PlayAlarmCue,.05f+float(State.StableAgentId%7)*.05f,false);
@@ -405,6 +418,9 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
     SetActorScale3D(FVector(State.BodyScale));
 	VisualState = State;
     ApplyAppearance(State.Appearance);
+    const FVector ConditionScale(State.BodyCondition, State.BodyCondition, 1.);
+    const FVector MeshScale = AppearanceVariants.IsValidIndex(AppliedAppearance)
+        ? AppearanceVariants[AppliedAppearance].MeshScale : BaseCreatureMeshScale.Get(FVector::OneVector);
     if(bContinuousGrowthAppearance&&State.Appearance>0){
         // Both rigs retain one logical identity. Complementary masked fades only render
         // two meshes during maturation; no gameplay, age extrapolation or actor spawning.
@@ -418,9 +434,13 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
         const float Condition=FMath::Clamp(.75f*State.NormalizedEnergy+.25f*State.NormalizedHealth,0.f,1.f);
         const FVector ConditionShape(.97f+.03f*Condition,.94f+.06f*Condition,1);
         const FVector Proportions=ConditionShape*FMath::Lerp(FVector(.90,.90,1.04),FVector::OneVector,State.Maturity);
-        if(AppearanceVariants.IsValidIndex(State.Appearance))CreatureMesh->SetRelativeScale3D(AppearanceVariants[State.Appearance].MeshScale*Proportions);
-        ImmatureMesh->SetRelativeScale3D(Proportions);
-    }else{CreatureMesh->SetVisibility(true);ImmatureMesh->SetVisibility(false);}
+        CreatureMesh->SetRelativeScale3D(MeshScale * Proportions * ConditionScale);
+        ImmatureMesh->SetRelativeScale3D(Proportions * ConditionScale);
+    }else{
+        CreatureMesh->SetVisibility(true);ImmatureMesh->SetVisibility(false);
+        CreatureMesh->SetRelativeScale3D(MeshScale * ConditionScale);
+    }
+    PlaceholderBody->SetRelativeScale3D(BasePlaceholderScale.Get(FVector::OneVector) * ConditionScale);
 	HealthBar->SetHealthNormalized(State.NormalizedHealth, State.bAlive, State.bHasVitals);
 	PlaceholderBody->SetVisibility(CreatureMesh->GetSkeletalMeshAsset() == nullptr);
 	VisualMotion = !State.bAlive ? EEcoCreatureVisualMotion::Dead

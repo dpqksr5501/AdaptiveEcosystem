@@ -111,6 +111,11 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
             continue;
         }
         const auto Child=Owned.Last();auto& ChildLife=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Child).Individual;
+        const FName ChildSpecies = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).SpeciesId;
+        for (const int64 ParentId : {P.ParentA, P.ParentB})
+            RecordFaunaExperience(ParentId, {EEcoExperienceActivity::Birth, P.Region, ChildSpecies}, Now);
+        RecordFaunaAssociation(P.ParentA, P.ParentB, Now, true);
+        RecordFaunaAssociation(P.ParentB, P.ParentA, Now, true);
         RecordGameplayReason(P.ParentA, P.Region, Now, TEXT("BirthCommitted"),
             EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId);
         ChildLife={};ChildLife.bInitialized=true;ChildLife.Genome=Genome;ChildLife.Born=Now;
@@ -141,20 +146,26 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if(Audit)UE_LOG(LogTemp,Log,TEXT("[Eco Birth Audit] Region=%s Predator=%d Event=Scan Eligible=%d EnergyOnly=%d"),
             *G.RegionId.ToString(),Predator,Candidates.Num(),EnergyOnly);
         Candidates.Sort();bool Found=false;
-        for(int32 I=0;I<Candidates.Num()&&!Found;++I)for(int32 J=I+1;J<Candidates.Num()&&!Found;++J){
-            const auto A=AgentLookup.FindChecked(Candidates[I]),B=AgentLookup.FindChecked(Candidates[J]);
+        for(int32 I=0;I<Candidates.Num()&&!Found;++I){
+            TArray<int64,TInlineAllocator<16>> Partners;
+            Partners.Append(Candidates.GetData()+I+1,Candidates.Num()-I-1);
+            RankFaunaPartners(Candidates[I], Partners, Now);
+            for(const int64 Partner:Partners){
+            const auto A=AgentLookup.FindChecked(Candidates[I]),B=AgentLookup.FindChecked(Partner);
             const auto& LA=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(A).Individual;
             const auto& LB=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(B).Individual;
             if(LA.bNaturalPopulation&&(LA.Sex==LB.Sex||LA.Sex==EcoLifeV3::ESex::Unspecified||LB.Sex==EcoLifeV3::ESex::Unspecified))continue;
             // Exclude parent/child and known full/half siblings. Unknown founders are not invented relatives.
-            if(LA.ParentA==Candidates[J]||LA.ParentB==Candidates[J]||LB.ParentA==Candidates[I]||LB.ParentB==Candidates[I]
+            if(LA.ParentA==Partner||LA.ParentB==Partner||LB.ParentA==Candidates[I]||LB.ParentB==Candidates[I]
                 ||(LA.ParentA&&(LA.ParentA==LB.ParentA||LA.ParentA==LB.ParentB))
                 ||(LA.ParentB&&(LA.ParentB==LB.ParentA||LA.ParentB==LB.ParentB)))continue;
             const auto PA=NativePosition(A),PB=NativePosition(B);
             if((PA.X-PB.X)*(PA.X-PB.X)+(PA.Y-PB.Y)*(PA.Y-PB.Y)>100)continue;
-            PendingBirths.Add({Candidates[I],Candidates[J],G.RegionId,Now+30,Predator});Found=true;
+            PendingBirths.Add({Candidates[I],Partner,G.RegionId,Now+30,Predator});Found=true;
             UE_LOG(LogTemp, Log, TEXT("[EcoLife][BirthQueued] Region=%s Predator=%d Parents=%lld,%lld Due=%.2f"),
-                *G.RegionId.ToString(), Predator, Candidates[I], Candidates[J], Now+30.);
+                *G.RegionId.ToString(), Predator, Candidates[I], Partner, Now+30.);
+            break;
+            }
         }
     }
     return true;

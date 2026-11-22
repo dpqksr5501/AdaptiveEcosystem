@@ -26,7 +26,7 @@ while($true){
     if((Get-Date) -gt $huntingDeadline){throw 'Server readiness timeout; normal exit timer left running'}
     Start-Sleep -Seconds 1
 }
-$huntingA=Start-HuntingPeer 'UnrealEditor.exe' '127.0.0.1:7787?EcoProtocol=1' 'ClientA' @('-game','-HuntingNetworkClient=ClientA')
+$huntingA=Start-HuntingPeer 'UnrealEditor.exe' '127.0.0.1:7787?EcoProtocol=3' 'ClientA' @('-game','-HuntingNetworkClient=ClientA')
 $lateJoinDeadline=(Get-Date).AddSeconds(32)
 $lateJoinOptions=@('-game','-HuntingNetworkClient=ClientB')
 while(-not $huntingServer.HasExited -and (Get-Date) -lt $lateJoinDeadline){
@@ -36,7 +36,7 @@ while(-not $huntingServer.HasExited -and (Get-Date) -lt $lateJoinDeadline){
     }
     Start-Sleep -Seconds 1
 }
-$huntingB=Start-HuntingPeer 'UnrealEditor.exe' '127.0.0.1:7787?EcoProtocol=1' 'ClientB' $lateJoinOptions
+$huntingB=Start-HuntingPeer 'UnrealEditor.exe' '127.0.0.1:7787?EcoProtocol=3' 'ClientB' $lateJoinOptions
 $huntingFailures=[System.Collections.Generic.List[string]]::new()
 foreach($huntingPeer in @(@{Name='ClientA';Process=$huntingA},@{Name='ClientB';Process=$huntingB},@{Name='Server';Process=$huntingServer})){
     while(-not $huntingPeer.Process.WaitForExit(5000)){}

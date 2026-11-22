@@ -126,8 +126,44 @@ bool AEcoCreatureIntegrationSpawner::SubmitFaunaFoodIntent(int64 AgentId, EEcoFa
 }
 
 double AEcoCreatureIntegrationSpawner::RankFaunaFood(double Score, int64 AgentId, FName Region, double Now,
-    EEcoFaunaFoodIntent Kind, int64 TargetAgentId, FName PatchId) const
+    EEcoFaunaFoodIntent Kind, int64 TargetAgentId, FName PatchId, FName PreySpecies, int32 PatchAccess, bool bViaShore,
+    EEcoEncounterMedium Medium) const
 {
+    if ((FaunaExperienceMode == 2 || FaunaFoodVisitMode == 2 || FaunaInteractionMode == 2) && Score > 0.)
+    {
+        if (Kind == EEcoFaunaFoodIntent::HabitatPatch)
+        {
+            double Preference = ExperiencePreference(AgentId, {EEcoExperienceActivity::Patch, Region, PatchId,
+                FIntVector(PatchAccess, 0, 0)}, Now);
+            if (bViaShore)
+                Preference *= ExperiencePreference(AgentId, {EEcoExperienceActivity::Shore, Region, PatchId,
+                    FIntVector(1, 0, 0)}, Now);
+            if (FindFaunaExperience(AgentId) || ActiveFoodVisits.Contains(AgentId) || FaunaInteractionMode == 2)
+                if (const auto* Patch = FaunaHabitatPatches.FindByPredicate([&](const auto& Row) { return Row.Id == PatchId; });
+                    Patch && Patch->HasForagePoint(PatchAccess))
+                    Preference *= EncounterFoodFactor(AgentId, {EEcoEncounterKind::Patch,
+                        Patch->bSubmerged ? EEcoEncounterMedium::Water : EEcoEncounterMedium::Ground, Region, PatchId},
+                        Patch->ForagePoint(PatchAccess), Now);
+            Score *= FMath::Clamp(Preference, FEcoExperienceEstimate::MinPreference, FEcoExperienceEstimate::MaxPreference);
+        }
+        else if (FaunaExperienceMode == 2 && Kind == EEcoFaunaFoodIntent::LivePrey && !PreySpecies.IsNone())
+        {
+            const auto* Memory = FindFaunaExperience(AgentId);
+            const auto* Evidence = Memory ? Memory->FindEncounter({EEcoEncounterKind::Hunt,
+                Medium, Region, PreySpecies}) : nullptr;
+            if (Evidence) Score *= Evidence->Factor(Now);
+        }
+        else if (Kind == EEcoFaunaFoodIntent::Carcass)
+        {
+            if (const auto* Carcass = FaunaCarcasses.Find(TargetAgentId))
+            {
+                const double Factor = EncounterFoodFactor(AgentId, {EEcoEncounterKind::Carrion, Medium, Region,
+                    Carcass->Species, FEcoExperienceKey::PlantCell(Carcass->Position), TargetAgentId}, Carcass->Position, Now);
+                Score *= FMath::Clamp(Factor * ExperiencePreference(AgentId, {EEcoExperienceActivity::Carrion, Region,
+                    Carcass->Species}, Now), FEcoExperienceEstimate::MinPreference, FEcoExperienceEstimate::MaxPreference);
+            }
+        }
+    }
     const auto* Intent = FaunaFoodIntents.Find(AgentId);
     if (!Intent || Intent->Region != Region || Now < Intent->IssuedAt || Now - Intent->IssuedAt >= FoodIntentLifetime
         || Intent->Kind != Kind || Intent->TargetAgentId != TargetAgentId || Intent->PatchId != PatchId) return Score;
@@ -152,9 +188,10 @@ void UEcoFaunaTrait::BuildTemplate(FMassEntityTemplateBuildContext& Context, con
 }
 
 bool UEcoPolicyV3IntegratedSubsystem::ConsumeFaunaFood(FName RegionId, const FVector& Position,
-    double Requested, double NutritionHeadroom, double& OutNutrition)
+    double Requested, double NutritionHeadroom, double& OutNutrition, FFaunaPlantMeal* Meal)
 {
     OutNutrition = 0.;
+    if (Meal) *Meal = {};
     auto* Context = FindContext(RegionId);
     auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
     if (!IsActive() || !Context || !Context->bSpatialFoodRegistered || !Ecology) return false;
@@ -166,6 +203,13 @@ bool UEcoPolicyV3IntegratedSubsystem::ConsumeFaunaFood(FName RegionId, const FVe
     const bool bNaturalVegetation = Grid.Vegetation.bHabitatDynamics && Grid.Habitats[Cell].bNatural;
     const double NutritionPerUnit = bNaturalVegetation ? Grid.VegetationCells[Cell].NutritionMultiplier() : 1.;
     const double Taken = FMath::Min3(Requested, Grid.Food[Cell], NutritionHeadroom / NutritionPerUnit);
+    if (Meal)
+    {
+        Meal->Cell = FEcoExperienceKey::SpatialResourceCell(Context->UnitsToCm(
+            (Cell % Grid.Gw + .5) * Grid.Cell, (Cell / Grid.Gw + .5) * Grid.Cell, 0.));
+        Meal->StockBefore = Grid.Food[Cell];
+        Meal->Requested = FMath::Min(Requested, NutritionHeadroom / NutritionPerUnit);
+    }
     if (Taken < EcoFaunaNutrition::MinimumMeal) return true;
     const double Before = Grid.Total();
     const auto Sequence = Context->ResourceReceiptSequence + 1;
@@ -174,6 +218,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ConsumeFaunaFood(FName RegionId, const FVe
     Grid.Food[Cell] -= Taken;
     Context->Sim.Stats.FoodEaten += Taken;
     OutNutrition = Taken * NutritionPerUnit;
+    if (Meal) Meal->Paid = Taken;
     if (bNaturalVegetation)
     {
         Grid.VegetationCells[Cell].RecordBrowse(Taken, Grid.Cap[Cell]);
@@ -553,10 +598,11 @@ bool AEcoCreatureIntegrationSpawner::InitializeFaunaHabitat()
 }
 
 const FEcoFaunaHabitatPatch* AEcoCreatureIntegrationSpawner::FindFaunaShelter(FName Region, FName Species,
-    const FVector& Position, double Range, float ApproachEyeHeight) const
+    const FVector& Position, double Range, float ApproachEyeHeight, int64 ExperienceAgent, double Now) const
 {
     const FEcoFaunaHabitatPatch* Best = nullptr;
-    double BestDistance = FMath::Square(Range);
+    const double RangeSquared = FMath::Square(Range);
+    double BestCost = TNumericLimits<double>::Max();
     for (const auto& Patch : FaunaHabitatPatches)
     {
         if (Patch.Stage > FaunaHabitatStage || Patch.RegionId != Region || Patch.ShelteredSpecies != Species
@@ -567,14 +613,17 @@ const FEcoFaunaHabitatPatch* AEcoCreatureIntegrationSpawner::FindFaunaShelter(FN
             continue;
         }
         const double Distance = FVector::DistSquared(Position, Patch.Center);
-        if (Distance < BestDistance)
+        if (Distance < RangeSquared)
         {
+            const double Cost = Distance / ExperiencePreference(ExperienceAgent,
+                {EEcoExperienceActivity::Refuge, Region, Patch.Id}, Now);
+            if (Cost >= BestCost) continue;
             if (ApproachEyeHeight > 0.f
                 && GetWorld()->LineTraceTestByObjectType(Position + FVector(0, 0, ApproachEyeHeight),
                     Patch.Center + FVector(0, 0, 5.), FCollisionObjectQueryParams(ECC_WorldStatic),
                     FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaShelterApproach)))) continue;
             Best = &Patch;
-            BestDistance = Distance;
+            BestCost = Cost;
         }
     }
     return Best;
@@ -849,6 +898,9 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             || Now < Fauna->RootingUntil || Fauna->AttackContact >= 0. || Fauna->GuardThreatId > 0) continue;
         Fauna->RootingUntil = -1.;
         const int64 AgentId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity).StableAgentId;
+        if ((Fauna->bSwimming || Species->IsAquatic()) && !DirectFaunaWaterEscape(AgentId, Region.CurrentRegionId, Now).IsNearlyZero()) continue;
+        if (const auto* Reaction = ReadFaunaReaction(AgentId, Region.CurrentRegionId, EncounterMedium(EM, Entity), Now);
+            Reaction && Reaction->bApplied) continue;
         if (!bNestling && FaunaPatchStock.IsValidIndex(Fauna->PatchTarget))
         {
             const auto& Patch = FaunaHabitatPatches[Fauna->PatchTarget];
@@ -877,6 +929,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                     FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaPatchMeal))));
             const float StockBefore = Stock;
             const float Meal = bCanFeed ? Patch.TakeMeal(Stock, Headroom) : 0.f;
+            if (bCanFeed && (RecordsFaunaExperience() || RecordsFoodVisits()))
+                ObserveSharedMeal(EM, AgentId, Species->SpeciesId, {EEcoEncounterKind::Patch,
+                    bWaterMeal ? EEcoEncounterMedium::Water : EEcoEncounterMedium::Ground, Region.CurrentRegionId, Patch.Id},
+                    Position, Now, Meal, FMath::Min(Patch.EnergyPerMeal, Headroom), StockBefore);
             if (Patch.bSubmerged && WaterPaymentAuditAgent > 0 && AgentId == WaterPaymentAuditAgent)
             {
                 const TCHAR* Gate = !bWaterCandidate ? TEXT("WaterCandidate") : !bMealSubmerged ? TEXT("MealWater")
@@ -897,13 +953,19 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             if (Meal > 0.f)
             {
                 Vitals.Energy += Meal;
+                ObserveFaunaReactionMeal(AgentId, Region.CurrentRegionId, Now, Meal);
                 Fauna->LastMeal = Now;
+                RecordFaunaExperience(AgentId, {EEcoExperienceActivity::Patch, Region.CurrentRegionId, Patch.Id,
+                    FIntVector(Access, 0, 0)}, Now);
                 RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("HabitatPatchEaten"), 0, Meal, Patch.Id);
                 Fauna->RecordForageIntake(Position, Now, Meal, FaunaPersistence.ForageMemorySeconds);
                 UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][PatchMeal] Patch=%s Species=%s Agent=%lld Amount=%.3f Remaining=%.3f Access=%d At=%.3f"),
                     *Patch.Id.ToString(), *Species->SpeciesId.ToString(), AgentId, Meal, Stock, Access, Now);
                 continue;
             }
+            if (bCanFeed && StockBefore < .2f && Headroom > 0.f)
+                RecordFaunaExperience(AgentId, {EEcoExperienceActivity::Patch, Region.CurrentRegionId, Patch.Id,
+                    FIntVector(Access, 0, 0)}, Now, EEcoExperienceOutcome::HabitatUnavailable);
         }
         const bool bInWater = Species->IsAquatic() || Fauna->bSwimming;
         const double EyeOffset = bInWater ? 0. : Species->EyeHeight;
@@ -917,12 +979,20 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaMeal)))))
         {
             const float BiteSize = Carcass->KillerId == AgentId ? Species->PredationEnergyPerMeal() : Species->CarrionEnergyPerMeal;
-            const float Meal = Carcass->Bite(AgentId, Now, FMath::Min(BiteSize, Headroom), bInWater);
+            const float Requested = FMath::Min(BiteSize, Headroom);
+            const float StockBefore = Carcass->Remaining;
+            const float Meal = Carcass->Bite(AgentId, Now, Requested, bInWater);
+            ObserveSharedMeal(EM, AgentId, Species->SpeciesId, {EEcoEncounterKind::Carrion,
+                bInWater ? EEcoEncounterMedium::Water : EEcoEncounterMedium::Ground, Region.CurrentRegionId,
+                Carcass->Species, FEcoExperienceKey::PlantCell(Carcass->Position), Fauna->CarrionTargetId}, Position, Now,
+                Meal, Requested, StockBefore, 0., Meal <= 0.f);
             if (Meal > 0.f)
             {
                 Vitals.Energy += Meal;
+                ObserveFaunaReactionMeal(AgentId, Region.CurrentRegionId, Now, Meal);
                 Fauna->LastMeal = Now;
                 Fauna->LastCarrionMeal = Now;
+                RecordFaunaExperience(AgentId, {EEcoExperienceActivity::Carrion, Region.CurrentRegionId, Carcass->Species}, Now);
                 RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("CarrionEaten"), Fauna->CarrionTargetId, Meal);
                 Fauna->RecordForageIntake(Position, Now, Meal, FaunaPersistence.ForageMemorySeconds);
                 UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Scavenge] Eater=%lld Species=%s Carcass=%lld Amount=%.3f Remaining=%.3f At=%.3f Energy=%.3f MaxEnergy=%.3f"),
@@ -957,6 +1027,9 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 Vitals.Energy += Amount;
                 Fauna->LastMeal = Now;
                 RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("ParentProvisioned"), ParentId, Amount);
+                RecordFaunaExperience(AgentId, {EEcoExperienceActivity::Provision, Region.CurrentRegionId, Species->SpeciesId}, Now);
+                RecordFaunaAssociation(AgentId, ParentId, Now, true);
+                RecordFaunaAssociation(ParentId, AgentId, Now, true);
                 if (bAuditFaunaHunts)
                     UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][ParentMeal] Species=%s Agent=%lld Amount=%.3f"),
                         *Species->SpeciesId.ToString(), AgentId, Amount);
@@ -969,13 +1042,20 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         if (Groups.ContainsByPredicate([&](const FEcoCreatureSpawnGroup& Group)
             { return Group.RegionId == Region.CurrentRegionId && Group.bRulesOnly; })) continue;
         double Nutrition = 0.;
+        UEcoPolicyV3IntegratedSubsystem::FFaunaPlantMeal Meal;
         if (!Native->ConsumeFaunaFood(Region.CurrentRegionId, Position, Species->FoodPerMeal,
-            Headroom / EcoFaunaNutrition::PlantEnergyPerUnit, Nutrition)) return false;
+            Headroom / EcoFaunaNutrition::PlantEnergyPerUnit, Nutrition,
+            (RecordsFaunaExperience() || RecordsFoodVisits()) ? &Meal : nullptr)) return false;
+        if (Meal.Requested > 0.)
+            ObservePlantMeal(AgentId, Region.CurrentRegionId, Meal.Cell, Position, Now, Meal.Paid, Meal.Requested, Meal.StockBefore);
         if (Nutrition > 0.)
         {
             const float Before = Vitals.Energy;
             Vitals.Energy = FMath::Min(Vitals.MaxEnergy, Before + float(Nutrition) * EcoFaunaNutrition::PlantEnergyPerUnit);
             const float Gained = Vitals.Energy - Before;
+            if (Gained > 0.f && RecordsFaunaExperience())
+                RecordFaunaExperience(AgentId, {EEcoExperienceActivity::Plants, Region.CurrentRegionId, NAME_None,
+                    FEcoExperienceKey::PlantCell(Position)}, Now);
             RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("PlantsEaten"), 0, Gained);
             if (bAuditFaunaHunts)
                 UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][PlantMeal] Species=%s Agent=%lld Amount=%.3f"),
@@ -1021,26 +1101,33 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             && Water.TemperatureC >= Species.SpawningTemperatureC.X && Water.TemperatureC <= Species.SpawningTemperatureC.Y
             && Water.Current.SizeSquared2D() <= FMath::Square(Species.MaxNurseryCurrent);
     };
+    const auto NurseryPreference = [&](FName Region, FName Site, int64 ParentA, int64 ParentB)
+    {
+        const FEcoExperienceKey Key{EEcoExperienceActivity::Hatch, Region, Site};
+        return .5 * (ExperiencePreference(ParentA, Key, Now) + ExperiencePreference(ParentB, Key, Now));
+    };
     const auto FindAquaticNursery = [&](FName Region, const FEcoFaunaSpecies& Species,
-        const FVector& First, const FVector& Second) -> const FEcoFaunaHabitatPatch*
+        const FVector& First, const FVector& Second, int64 ParentA, int64 ParentB) -> const FEcoFaunaHabitatPatch*
     {
         const FEcoFaunaHabitatPatch* Best = nullptr;
-        double BestDistance = FMath::Square(270.) * 2.;
+        double BestCost = TNumericLimits<double>::Max();
         for (const auto& Patch : FaunaHabitatPatches)
         {
             if (!Patch.bAquaticNursery || Patch.Stage > FaunaHabitatStage || Patch.RegionId != Region
                 || !Patch.Consumers.Contains(Species.SpeciesId)) continue;
             const double A = FVector::DistSquared(First, Patch.Center);
             const double B = FVector::DistSquared(Second, Patch.Center);
-            if (A > FMath::Square(270.) || B > FMath::Square(270.) || A + B >= BestDistance) continue;
+            if (A > FMath::Square(270.) || B > FMath::Square(270.) || A + B >= 2. * FMath::Square(270.)) continue;
+            const double Cost = (A + B) / NurseryPreference(Region, Patch.Id, ParentA, ParentB);
+            if (Cost >= BestCost) continue;
             if (!IsNurserySuitable(Patch, Species)) continue;
             Best = &Patch;
-            BestDistance = A + B;
+            BestCost = Cost;
         }
         return Best;
     };
     const auto FindBroodSite = [&](FName Region, const FEcoFaunaSpecies& Species, const FVector& First,
-        const FVector& Second, FName RequiredId = NAME_None) -> const FEcoFaunaPerch*
+        const FVector& Second, FName RequiredId, int64 ParentA, int64 ParentB) -> const FEcoFaunaPerch*
     {
         const FEcoFaunaPerch* Best = nullptr;
         double BestDistance = TNumericLimits<double>::Max();
@@ -1050,8 +1137,9 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 || (!RequiredId.IsNone() && Site.NestId != RequiredId)) continue;
             const double A = FVector::DistSquared(First, Site.Location);
             const double B = FVector::DistSquared(Second, Site.Location);
-            if (FMath::Min(A, B) > FMath::Square(125.) || FMath::Max(A, B) > FMath::Square(700.)
-                || A + B >= BestDistance) continue;
+            if (FMath::Min(A, B) > FMath::Square(125.) || FMath::Max(A, B) > FMath::Square(700.)) continue;
+            const double Cost = (A + B) / NurseryPreference(Region, Site.NestId, ParentA, ParentB);
+            if (Cost >= BestDistance) continue;
             const auto* SiteRegion = FindRegion(Site.Location);
             FVector Ground;
             if (!SiteRegion || SiteRegion->RegionId != Region
@@ -1066,7 +1154,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                     && FVector::DistSquared(Fauna->Home, Site.Location) <= FMath::Square(100.);
             })) continue;
             Best = &Site;
-            BestDistance = A + B;
+            BestDistance = Cost;
         }
         return Best;
     };
@@ -1106,6 +1194,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 || Nursery->Center.Z <= Water.Bottom || Nursery->Center.Z >= Water.Surface)
             {
                 FaunaBirths.RemoveAtSwap(Index);
+                if (Nursery)
+                    for (const int64 Parent : {Birth.ParentA, Birth.ParentB})
+                        RecordFaunaExperience(Parent, {EEcoExperienceActivity::Hatch, Birth.Region, Nursery->Id}, Now,
+                            EEcoExperienceOutcome::HabitatUnavailable);
                 for (const auto Parent : {ResidentA, ResidentB})
                 {
                     auto& Life = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Parent).Life;
@@ -1124,7 +1216,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         if (!A.IsSet() || !B.IsSet() || FVector::DistSquared(Position(A), Position(B)) > FMath::Square(1500.))
             continue;
         const auto* BroodSite = Species->NestlingSeconds > 0.f
-            ? FindBroodSite(Birth.Region, *Species, Position(A), Position(B), Birth.NestId) : nullptr;
+            ? FindBroodSite(Birth.Region, *Species, Position(A), Position(B), Birth.NestId, 0, 0) : nullptr;
         if (Species->NestlingSeconds > 0.f && !BroodSite) continue;
         FaunaBirths.RemoveAtSwap(Index);
         auto& ParentA = EM.GetFragmentDataChecked<FEcoFaunaFragment>(A).Life;
@@ -1208,6 +1300,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             continue;
         }
         const auto Child = Owned.Last();
+        for (const int64 ParentId : {Birth.ParentA, Birth.ParentB})
+            RecordFaunaExperience(ParentId, {EEcoExperienceActivity::Birth, Birth.Region, Birth.Species}, Now);
+        RecordFaunaAssociation(Birth.ParentA, Birth.ParentB, Now, true);
+        RecordFaunaAssociation(Birth.ParentB, Birth.ParentA, Now, true);
         RecordGameplayReason(Birth.ParentA, Birth.Region, Now, TEXT("BirthCommitted"),
             EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId);
         auto& Life = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Child).Life;
@@ -1236,6 +1332,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             Birth.ParentA, Birth.ParentB, Generation);
         if (Nursery)
         {
+            for (const int64 ParentId : {Birth.ParentA, Birth.ParentB})
+                RecordFaunaExperience(ParentId, {EEcoExperienceActivity::Hatch, Birth.Region, Nursery->Id}, Now);
             RecordGameplayReason(Birth.ParentA, Birth.Region, Now, TEXT("AquaticHatch"),
                 EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId);
             UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][AquaticHatch] Nursery=%s Child=%lld Species=%s"),
@@ -1244,6 +1342,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         }
         if (BroodSite)
         {
+            for (const int64 ParentId : {Birth.ParentA, Birth.ParentB})
+                RecordFaunaExperience(ParentId, {EEcoExperienceActivity::Hatch, Birth.Region, BroodSite->NestId}, Now);
             const int64 ChildId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId;
             RecordGameplayReason(Birth.ParentA, Birth.Region, Now, TEXT("NestHatch"), ChildId);
             UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][NestHatch] Nest=%s Child=%lld Species=%s HeightZ=%.1f"),
@@ -1289,34 +1389,38 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 const auto A = AgentLookup.FindChecked(Candidates[I]);
                 if (!HasBreedingFood(A, *Species)) continue;
                 const auto& LA = EM.GetFragmentDataChecked<FEcoFaunaFragment>(A).Life;
-                for (int32 J = I + 1; J < Candidates.Num(); ++J)
+                TArray<int64, TInlineAllocator<16>> Partners;
+                Partners.Append(Candidates.GetData() + I + 1, Candidates.Num() - I - 1);
+                RankFaunaPartners(Candidates[I], Partners, Now);
+                for (const int64 Partner : Partners)
                 {
-                    const auto B = AgentLookup.FindChecked(Candidates[J]);
+                    const auto B = AgentLookup.FindChecked(Partner);
                     if (!HasBreedingFood(B, *Species)) continue;
                     const auto& LB = EM.GetFragmentDataChecked<FEcoFaunaFragment>(B).Life;
-                    if (LA.Sex == LB.Sex || LA.ParentA == Candidates[J] || LA.ParentB == Candidates[J]
+                    if (LA.Sex == LB.Sex || LA.ParentA == Partner || LA.ParentB == Partner
                         || LB.ParentA == Candidates[I] || LB.ParentB == Candidates[I]
                         || (LA.ParentA && (LA.ParentA == LB.ParentA || LA.ParentA == LB.ParentB))
                         || (LA.ParentB && (LA.ParentB == LB.ParentA || LA.ParentB == LB.ParentB))
                         || FVector::DistSquared(Position(A), Position(B)) > FMath::Square(1000.)) continue;
                     const FVector APosition = Position(A);
                     const FVector BPosition = Position(B);
-                    const auto* Nursery = Species->IsAquatic() ? FindAquaticNursery(Group.RegionId, *Species, APosition, BPosition) : nullptr;
+                    const auto* Nursery = Species->IsAquatic()
+                        ? FindAquaticNursery(Group.RegionId, *Species, APosition, BPosition, Candidates[I], Partner) : nullptr;
                     if (Species->IsAquatic() && !Nursery) continue;
                     const auto* BroodSite = Species->NestlingSeconds > 0.f
-                        ? FindBroodSite(Group.RegionId, *Species, APosition, BPosition) : nullptr;
+                        ? FindBroodSite(Group.RegionId, *Species, APosition, BPosition, NAME_None, Candidates[I], Partner) : nullptr;
                     if (Species->NestlingSeconds > 0.f && !BroodSite) continue;
-                    FaunaBirths.Add({Group.RegionId, SpeciesId, Candidates[I], Candidates[J],
+                    FaunaBirths.Add({Group.RegionId, SpeciesId, Candidates[I], Partner,
                         Now + Species->Gestation, BroodSite ? BroodSite->NestId : NAME_None, Nursery ? Nursery->Id : NAME_None});
                     if (Nursery)
                         RecordGameplayReason(Candidates[I], Group.RegionId, Now, TEXT("BirthAquaticNurseryReserved"),
-                            Candidates[J], Now + Species->Gestation, Nursery->Id);
+                            Partner, Now + Species->Gestation, Nursery->Id);
                     EM.GetFragmentDataChecked<FEcoFaunaFragment>(A).Goal = BroodSite ? APosition
                         : Nursery ? Nursery->Center : FMath::Lerp(APosition, BPosition, .35);
                     EM.GetFragmentDataChecked<FEcoFaunaFragment>(B).Goal = BroodSite ? BPosition
                         : Nursery ? Nursery->Center : FMath::Lerp(APosition, BPosition, .65);
                     UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][BirthQueued] Species=%s Parents=%lld,%lld Due=%.2f Nursery=%s"),
-                        *SpeciesId.ToString(), Candidates[I], Candidates[J], Now + Species->Gestation,
+                        *SpeciesId.ToString(), Candidates[I], Partner, Now + Species->Gestation,
                         Nursery ? *Nursery->Id.ToString() : TEXT("None"));
                     bPaired = true;
                     break;

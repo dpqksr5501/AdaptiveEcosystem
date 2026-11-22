@@ -95,6 +95,8 @@ protected:
 	void RefreshAppearance();
     void ApplyAppearance(uint8 Variant);
     uint8 AppliedAppearance=255;
+    TOptional<FVector> BaseCreatureMeshScale;
+    TOptional<FVector> BasePlaceholderScale;
 	float VisualYawRateDegrees = 0.f;
 	float VisualPitchRateDegrees = 0.f;
 	float VisualRollRateDegrees = 0.f;

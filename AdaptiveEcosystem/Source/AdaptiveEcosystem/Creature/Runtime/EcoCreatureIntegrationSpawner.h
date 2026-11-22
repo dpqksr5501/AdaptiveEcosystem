@@ -13,6 +13,8 @@
 #include "Mass/EntityHandle.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Runtime/EcoFauna.h"
+#include "Creature/Runtime/EcoFaunaExperience.h"
+#include "Creature/Runtime/EcoFaunaSocial.h"
 #include "EcoCreatureIntegrationSpawner.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FEcoRuntimeSample, float, DeltaSeconds);
@@ -93,6 +95,30 @@ public:
     UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Creature|Fauna")
     bool SubmitFaunaFoodIntent(int64 AgentId, EEcoFaunaFoodIntent Kind, int64 TargetAgentId, FName PatchId);
 	UPROPERTY(EditAnywhere, Category="Creature|Config") EEcoEnabledSpecies EnabledSpecies = EEcoEnabledSpecies::Both;
+    /** 0 = off, 1 = record, 2 = record and influence eligible resource candidates. */
+    UPROPERTY(EditAnywhere, Category="Creature|Fauna", meta=(ClampMin="0", ClampMax="2"))
+    int32 FaunaExperienceMode = 0;
+    /** 0 = off, 1 = record feeding visits, 2 = also use their outcomes at eligible feeding choices. */
+    UPROPERTY(EditAnywhere, Category="Creature|Fauna", meta=(ClampMin="0", ClampMax="2"))
+    int32 FaunaFoodVisitMode = 0;
+    /** Server-side interspecies signals and local defense. 1 observes, 2 also changes eligible actions. */
+    UPROPERTY(EditAnywhere, Category="Creature|Fauna", meta=(ClampMin="0", ClampMax="2"))
+    int32 FaunaInteractionMode = 0;
+    bool BlocksFaunaCapture(int64 Hunter, int64 Prey, const FVector& Start, const FVector& End, double Now,
+        bool bCommitContact = true);
+    void RecordFaunaExperience(int64 AgentId, const FEcoExperienceKey& Key, double Now,
+        EEcoExperienceOutcome Outcome = EEcoExperienceOutcome::Completed);
+    bool RecordsFaunaExperience() const { return bAuthorityWorld && FaunaExperienceMode > 0; }
+    bool RecordsFoodVisits() const { return bAuthorityWorld && FaunaFoodVisitMode > 0; }
+    const FEcoFaunaExperience* FindFaunaExperience(int64 AgentId) const { return FaunaExperience.Find(AgentId); }
+    void RecordFaunaAssociation(int64 AgentId, int64 OtherId, double Now, bool bCareOrBirth);
+    void ObservePlantMeal(int64 AgentId, FName Region, FIntVector ResourceCell, const FVector& Position,
+        double Now, double Paid, double Requested, double StockBefore, double AllocationDemand = 0.);
+    double RankPlantEncounter(int64 AgentId, FName Region, FIntVector ResourceCell,
+        const FVector& Position, double Now) const;
+    double RankPlantVisit(int64 AgentId, FName Region, FIntVector ResourceCell, double Now) const;
+    void ObserveEncounterThreat(const FMassEntityManager& Manager, int64 PreyId, int64 HunterId,
+        FName Region, const FVector& Position, double Now);
 	UPROPERTY(EditAnywhere, Category="Creature|Config") bool bEnableSpeciesAIFixtures = false;
 	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bUseV3Policy = false;
 	UPROPERTY(EditAnywhere, Category="Creature|V3", meta=(ClampMin="1",ClampMax="128")) int32 V3DeerPerRegion = 48;
@@ -233,7 +259,7 @@ private:
     void UpdateFaunaHabitatStock(double Now);
     void PublishForageVisuals();
     const FEcoFaunaHabitatPatch* FindFaunaShelter(FName Region, FName Species, const FVector& Position, double Range,
-        float ApproachEyeHeight = 0.f) const;
+        float ApproachEyeHeight = 0.f, int64 ExperienceAgent = 0, double Now = 0.) const;
     TArray<float> FaunaPatchStock;
     TMap<FName, double> FaunaLocalSoilMoisture;
     TArray<TWeakObjectPtr<AEcoForagePatchVisual>> FaunaForageVisuals;
@@ -247,8 +273,125 @@ private:
         double IssuedAt;
     };
     TMap<int64, FFaunaFoodIntent> FaunaFoodIntents;
+    TMap<int64, FEcoFaunaExperience> FaunaExperience;
+    struct FFaunaHuntSignal
+    {
+        int64 Hunter = 0;
+        int64 Source = 0;
+        double At = -1.;
+        FName Region;
+        FName Species;
+        EEcoEncounterMedium Medium = EEcoEncounterMedium::Ground;
+        FVector Position = FVector::ZeroVector;
+        FVector Escape = FVector::ZeroVector;
+        FVector DirectEscape = FVector::ZeroVector;
+        double DirectUntil = 0.;
+    };
+    struct FFaunaReaction
+    {
+        FFaunaHuntSignal Signal;
+        double Until = -1.;
+        double ConfirmUntil = -1.;
+        FVector Escape = FVector::ZeroVector;
+        FEcoEncounterKey Key;
+        bool bApplied = false;
+        bool bConfirmed = false;
+    };
+    struct FFaunaInterposition
+    {
+        int64 Prey = 0;
+        int64 Hunter = 0;
+        FName Region;
+        FVector Position = FVector::ZeroVector;
+        double Until = 0.;
+        double CommitUntil = 0.;
+        double RestUntil = 0.;
+    };
+    TMap<int64, FFaunaHuntSignal> FaunaHuntSignals;
+    TMap<int64, FFaunaReaction> FaunaReactions;
+    TMap<int64, FFaunaInterposition> FaunaInterpositions;
+    double NextFaunaInteractionScan = 0.;
+    void UpdateFaunaInteractions(FMassEntityManager& Manager, double Now, float Darkness);
+    const FFaunaReaction* ReadFaunaReaction(int64 Agent, FName Region, EEcoEncounterMedium Medium, double Now) const;
+    void ApplyFaunaReaction(int64 Agent, double Now);
+    double ProtectionPreference(int64 Agent, int64 Neighbor, FName Region, FName NeighborSpecies, double Now) const;
+    FVector DirectFaunaWaterEscape(int64 Agent, FName Region, double Now) const;
+    double InteractionFoodFactor(int64 Agent, FName Region, EEcoEncounterMedium Medium, const FVector& Position, double Now) const;
+    void ObserveFaunaReactionMeal(int64 Agent, FName Region, double Now, double Paid);
+    void ResetFaunaInteractions();
+    struct FEncounterResource
+    {
+        EEcoEncounterKind Kind;
+        EEcoEncounterMedium Medium;
+        FName Region;
+        FName Site;
+        FIntVector Cell = FIntVector::ZeroValue;
+        int64 Instance = 0;
+        FEcoEncounterKey Against(FName OtherSpecies) const
+        {
+            return {Kind, Medium, Region, OtherSpecies, Site, Kind == EEcoEncounterKind::Carrion ? FIntVector::ZeroValue : Cell};
+        }
+        bool operator==(const FEncounterResource&) const = default;
+        friend uint32 GetTypeHash(const FEncounterResource& Key)
+        {
+            return HashCombine(HashCombine(GetTypeHash(Key.Region), GetTypeHash(Key.Site)),
+                HashCombine(GetTypeHash(Key.Cell), HashCombine(GetTypeHash(Key.Instance),
+                    uint32(Key.Kind) * uint32(EEcoEncounterMedium::Count) + uint32(Key.Medium))));
+        }
+    };
+    struct FEncounterMeal
+    {
+        int64 AgentId;
+        FName Species;
+        double At;
+        double Paid;
+        FVector Position;
+    };
+    struct FPendingEncounterThreat
+    {
+        FEcoEncounterKey Key;
+        double FinishAt;
+    };
+    TMap<FEncounterResource, TArray<FEncounterMeal, TInlineAllocator<4>>> EncounterMeals;
+    struct FFoodVisit
+    {
+        FEncounterResource Resource;
+        FEcoFoodVisitKey Key;
+        double First = 0.;
+        double Last = 0.;
+        double Requested = 0.;
+        double Paid = 0.;
+    };
+    TMap<int64, FFoodVisit> ActiveFoodVisits;
+    FEcoFoodVisitKey FoodVisitKey(const FEncounterResource& Resource, double Now) const;
+    void SampleFoodVisit(int64 AgentId, const FEncounterResource& Resource, double Now, double Paid, double Requested);
+    void FinishFoodVisit(int64 AgentId, const FFoodVisit& Visit);
+    double FoodVisitFactor(int64 AgentId, const FEncounterResource& Resource, double Now) const;
+    TMap<int64, FPendingEncounterThreat> PendingEncounterThreats;
+    EEcoEncounterMedium EncounterMedium(const FMassEntityManager& Manager, FMassEntityHandle Entity) const;
+    void RecordHuntEncounter(const FMassEntityManager& Manager, int64 HunterId, FName PreySpecies,
+        FName Region, double Now, double Yield);
+    void ResolveEncounterEvidence(const FMassEntityManager& Manager, double Now);
+    const FEncounterMeal* VisibleEncounterCompetitor(const FEncounterResource& Key, int64 AgentId, FName Species,
+        const FVector& Position, double Now, const FMassEntityManager& Manager) const;
+    void ObserveSharedMeal(const FMassEntityManager& Manager, int64 AgentId, FName Species,
+        const FEncounterResource& Key, const FVector& Position, double Now, double Paid, double Requested,
+        double StockBefore, double AllocationDemand = 0., bool bFeedingPlaceDenied = false);
+    double EncounterFoodFactor(int64 AgentId, const FEncounterResource& Key, const FVector& Destination,
+        double Now) const;
+    double EncounterPlaceFactor(const FEcoFaunaExperience& Memory, FName Region, EEcoEncounterMedium Medium,
+        const FVector& Destination, double Now) const;
+    TMap<int64, EcoFaunaSocial::FExchange> FaunaSocialOffers;
+    TMap<int64, uint16> FaunaSocialPresentation;
+    void ProcessFaunaSocial(FMassEntityManager& Manager, double Now);
+    void RankFaunaPartners(int64 Subject, TArrayView<int64> Candidates, double Now) const;
+    void ObserveInterruptedForage(int64 AgentId, FName Species, FName Region, const FEcoFaunaFragment& Fauna,
+        const FVector& Position, double Now);
+    double ExperiencePreference(int64 AgentId, const FEcoExperienceKey& Key, double Now) const;
     double RankFaunaFood(double Score, int64 AgentId, FName Region, double Now,
-        EEcoFaunaFoodIntent Kind, int64 TargetAgentId = 0, FName PatchId = NAME_None) const;
+        EEcoFaunaFoodIntent Kind, int64 TargetAgentId = 0, FName PatchId = NAME_None,
+        FName PreySpecies = NAME_None, int32 PatchAccess = 0, bool bViaShore = false,
+        EEcoEncounterMedium Medium = EEcoEncounterMedium::Ground) const;
     int32 CountFauna(FName RegionId, FName SpeciesId = NAME_None) const;
     FIntPoint CountFaunaDiets(FName RegionId) const;
     int32 SpawnFauna(FName RegionId, const FEcoFaunaSpecies& Species, const TArray<FVector>& Positions,

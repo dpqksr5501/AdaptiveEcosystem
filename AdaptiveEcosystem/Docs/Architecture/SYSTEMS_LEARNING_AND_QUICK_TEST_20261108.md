@@ -170,7 +170,7 @@ eco.HerdMigration.Test.Drought JWJ_WildlifeTest
 
 ## 6. 멀티·자동 재현을 더 하고 싶을 때
 
-수동 PIE는 New Editor Window, Players=2, NetMode=Play As Client의 Dedicated 구성을 사용한다. 로컬 접속 실패를 생태계 실패로 혼동하지 않도록 프로젝트 runner의 `-nosteam`, `EcoProtocol=1` 조건을 참고한다. Client에서는 풀/체력/위치 수신을 관찰하고 기후·생태 장부/이주 명령은 서버에서 실행한다. Client의 권위 논리 개체/Native Step은0이어야 한다. Client 표시 거리0은 로컬 거리 제한만 해제하며 network relevance와 Actor 예산은 유지한다.
+수동 PIE는 New Editor Window, Players=2, NetMode=Play As Client의 Dedicated 구성을 사용한다. 로컬 직접 접속에 사용하는 `-nosteam`과 `EcoProtocol`은 현재 실행 도구와 세션 버전을 따른다. Client에서는 풀/체력/위치 수신을 관찰하고 기후·생태 장부/이주 명령은 서버에서 실행한다. Client의 권위 논리 개체/Native Step은0이어야 한다. Client 표시 거리0은 로컬 거리 제한만 해제하며 network relevance와 Actor 예산은 유지한다. [세션 버전](../../Source/AdaptiveEcosystem/Network/Session/EcoSessionPolicy.h)
 
 재현 도구는 **기존 Unreal/UBT/dotnet/Live Coding/MSBuild/ShaderCompileWorker가 종료된 상태**에서 저장소 루트 PowerShell로 실행한다. 이 도구들은 실행 중 프로세스를 중단하지 않고 사용 중이면 거절한다. 결과 폴더 이름은 새 이름을 사용한다.
 

@@ -388,6 +388,7 @@ struct FEcoFaunaCarcass
     FVector Position = FVector::ZeroVector;
     FName Region;
     FName Species;
+    FName ProducerSpecies; // Independent of the temporary exclusive right to feed.
     double OpenAt = 0.;
     double ExpiresAt = 0.;
     double ExclusiveUntil = 0.;

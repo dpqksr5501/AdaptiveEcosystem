@@ -106,9 +106,14 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
     auto* Mass=World->GetSubsystem<UMassEntitySubsystem>();if(!Mass)return false;
     auto& Manager=Mass->GetMutableEntityManager();if(Manager.IsProcessing())return false;
     const FEcoBehaviorReasonHistory* GameplayHistory = nullptr;
+    const FEcoFaunaExperience* Experience = nullptr;
     if (World->GetNetMode() != NM_Client)
         for (TActorIterator<AEcoCreatureIntegrationSpawner> It(World); It; ++It)
-            if ((GameplayHistory = It->FindGameplayReasons(AgentId))) break;
+        {
+            GameplayHistory = It->FindGameplayReasons(AgentId);
+            Experience = It->FindFaunaExperience(AgentId);
+            if (GameplayHistory || Experience) break;
+        }
     TSharedPtr<FJsonObject> Data;
     FMassEntityQuery Query(Manager.AsShared());
     Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
@@ -123,12 +128,96 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
             Data->SetNumberField(TEXT("world_seconds"),World->GetTimeSeconds());
             Data->SetBoolField(TEXT("authority"),World->GetNetMode()!=NM_Client);
             Data->SetStringField(TEXT("position"),C.GetFragmentView<FTransformFragment>()[I].GetTransform().GetLocation().ToCompactString());
+            if (Experience)
+            {
+                TArray<TSharedPtr<FJsonValue>> Rows;
+                for (const auto& Site : Experience->Sites)
+                {
+                    auto Row = MakeShared<FJsonObject>();
+                    Row->SetStringField(TEXT("activity"), LexToString(Site.Key.Activity));
+                    Row->SetStringField(TEXT("region"), Site.Key.Region.ToString());
+                    Row->SetStringField(TEXT("site"), Site.Key.Site.ToString());
+                    Row->SetStringField(TEXT("cell"), Site.Key.Cell.ToString());
+                    Row->SetNumberField(TEXT("updated_at"), Site.UpdatedAt);
+                    Row->SetStringField(TEXT("last_outcome"), LexToString(Site.LastOutcome));
+                    Row->SetNumberField(TEXT("access_at"), Site.AccessAt);
+                    Row->SetNumberField(TEXT("success"), Site.Success);
+                    Row->SetNumberField(TEXT("failure"), Site.Failure);
+                    Row->SetNumberField(TEXT("danger_at"), Site.DangerAt);
+                    Row->SetNumberField(TEXT("danger"), Site.Danger);
+                    Row->SetNumberField(TEXT("availability_at"), Site.AvailabilityAt);
+                    Row->SetNumberField(TEXT("unavailable"), Site.Unavailable);
+                    Rows.Add(MakeShared<FJsonValueObject>(Row));
+                }
+                Data->SetArrayField(TEXT("experience"), MoveTemp(Rows));
+                constexpr const TCHAR* EncounterKinds[] = {TEXT("Hunt"), TEXT("Risk"), TEXT("Patch"), TEXT("Plants"), TEXT("Carrion"),
+                    TEXT("Alarm"), TEXT("Escape"), TEXT("Defense"), TEXT("CarrionProvision")};
+                static_assert(UE_ARRAY_COUNT(EncounterKinds) == uint8(EEcoEncounterKind::Count));
+                constexpr const TCHAR* EncounterMedia[] = {TEXT("Ground"), TEXT("Water"), TEXT("Air")};
+                TArray<TSharedPtr<FJsonValue>> Encounters;
+                for (const auto& Evidence : Experience->Encounters)
+                {
+                    auto Row = MakeShared<FJsonObject>();
+                    Row->SetStringField(TEXT("kind"), EncounterKinds[uint8(Evidence.Key.Kind)]);
+                    Row->SetStringField(TEXT("medium"), EncounterMedia[uint8(Evidence.Key.Medium)]);
+                    Row->SetStringField(TEXT("region"), Evidence.Key.Region.ToString());
+                    Row->SetStringField(TEXT("other_species"), Evidence.Key.OtherSpecies.ToString());
+                    Row->SetStringField(TEXT("site"), Evidence.Key.Site.ToString());
+                    Row->SetStringField(TEXT("cell"), Evidence.Key.Cell.ToString());
+                    Row->SetNumberField(TEXT("observed_at"), Evidence.At);
+                    Row->SetNumberField(TEXT("positive_evidence"), Evidence.Success);
+                    Row->SetNumberField(TEXT("setback_evidence"), Evidence.Setback);
+                    Encounters.Add(MakeShared<FJsonValueObject>(Row));
+                }
+                Data->SetArrayField(TEXT("interspecies"), MoveTemp(Encounters));
+                TArray<TSharedPtr<FJsonValue>> Visits;
+                for (const auto& Estimate : Experience->FoodVisits)
+                {
+                    auto Row = MakeShared<FJsonObject>();
+                    Row->SetStringField(TEXT("kind"), EncounterKinds[uint8(Estimate.Key.Kind)]);
+                    Row->SetStringField(TEXT("medium"), EncounterMedia[uint8(Estimate.Key.Medium)]);
+                    Row->SetStringField(TEXT("region"), Estimate.Key.Region.ToString());
+                    Row->SetStringField(TEXT("site"), Estimate.Key.Site.ToString());
+                    Row->SetStringField(TEXT("cell"), Estimate.Key.Cell.ToString());
+                    Row->SetBoolField(TEXT("night"), Estimate.Key.bNight);
+                    Row->SetNumberField(TEXT("last_end"), Estimate.EndedAt);
+                    Row->SetNumberField(TEXT("last_duration"), Estimate.LastDuration);
+                    Row->SetNumberField(TEXT("evidence"), Estimate.Evidence);
+                    Row->SetNumberField(TEXT("shortfall"), Estimate.Shortfall);
+                    Visits.Add(MakeShared<FJsonValueObject>(Row));
+                }
+                Data->SetArrayField(TEXT("food_visits"), MoveTemp(Visits));
+                const auto& LongTerm = Experience->LongTerm;
+                auto Development = MakeShared<FJsonObject>();
+                Development->SetNumberField(TEXT("condition"), LongTerm.Condition);
+                Development->SetNumberField(TEXT("condition_at"), LongTerm.ConditionAt);
+                Development->SetNumberField(TEXT("exploration"), LongTerm.Exploration);
+                Development->SetNumberField(TEXT("exploration_at"), LongTerm.ExplorationAt);
+                Development->SetNumberField(TEXT("association"), LongTerm.Association);
+                Development->SetNumberField(TEXT("association_at"), LongTerm.AssociationAt);
+                Development->SetNumberField(TEXT("last_social_at"), LongTerm.LastSocialAt);
+                TArray<TSharedPtr<FJsonValue>> Partners;
+                for (const auto& Partner : LongTerm.Partners)
+                {
+                    auto Row = MakeShared<FJsonObject>();
+                    Row->SetStringField(TEXT("agent"), LexToString(Partner.AgentId));
+                    Row->SetNumberField(TEXT("observed_at"), Partner.At);
+                    Row->SetNumberField(TEXT("familiarity"), Partner.Familiarity);
+                    Partners.Add(MakeShared<FJsonValueObject>(Row));
+                }
+                Development->SetArrayField(TEXT("partners"), MoveTemp(Partners));
+                Data->SetObjectField(TEXT("development"), Development);
+            }
             if(const auto* View=Manager.GetFragmentDataPtr<FEcoCreaturePresentationFragment>(E)){
                 Data->SetStringField(TEXT("activity"),UEnum::GetValueAsString(EEcoSpeciesActivity(View->Activity)));
                 Data->SetBoolField(TEXT("presentation_eating"),(View->Flags&2)!=0);
                 Data->SetStringField(TEXT("sense"),UEnum::GetValueAsString(EEcoSenseSource((View->Flags>>4)&3)));
                 Data->SetNumberField(TEXT("energy_fraction"),View->Energy/255.0);
                 Data->SetNumberField(TEXT("body_scale"),View->BodyScale/128.);
+                Data->SetNumberField(TEXT("body_condition"), View->BodyCondition / 128.);
+                Data->SetNumberField(TEXT("social_signal"), uint8(EcoFaunaSocial::Signal(View->SocialPresentation)));
+                Data->SetNumberField(TEXT("social_yaw"), EcoFaunaSocial::Yaw(View->SocialPresentation));
+                Data->SetBoolField(TEXT("fauna_alarm"), (View->SocialPresentation & EcoFaunaSocial::AlarmPulse) != 0);
             }
             if(const auto* Cue=Manager.GetFragmentDataPtr<FEcoCreatureCueFragment>(E)){
                 Data->SetStringField(TEXT("sense_source_key"),LexToString(Cue->Memory.SourceKey));

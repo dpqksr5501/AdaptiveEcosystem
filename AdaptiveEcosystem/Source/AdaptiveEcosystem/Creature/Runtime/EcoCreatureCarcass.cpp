@@ -70,7 +70,10 @@ bool AEcoCreatureIntegrationSpawner::SelectWolfCarrion(int64 WolfId, FName Regio
         // Bites are separated by a one-second resource interval.
         const double FeedingSeconds = Stock.ExpiresAt - Now - TravelSeconds;
         if (FeedingSeconds <= 0.) continue;
-        const double Value = EcoFaunaFeeding::Value(FMath::Min(double(Stock.Remaining), 8. * FMath::CeilToDouble(FeedingSeconds)), TravelSeconds);
+        const double Value = EcoFaunaFeeding::Value(
+            FMath::Min(double(Stock.Remaining), 8. * FMath::CeilToDouble(FeedingSeconds)), TravelSeconds)
+            * EncounterFoodFactor(WolfId, {EEcoEncounterKind::Carrion, EEcoEncounterMedium::Ground,
+                Region, Stock.Species, FEcoExperienceKey::PlantCell(Stock.Position), Pair.Key}, Stock.Position, Now);
         if (Value < BestValue || (Value == BestValue && Pair.Key >= BestId)
             || GetWorld()->LineTraceTestByObjectType(Position + FVector(0, 0, 55), Stock.Position + FVector(0, 0, 20),
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfCarrion)))) continue;
@@ -111,12 +114,20 @@ void AEcoCreatureIntegrationSpawner::FeedWolvesFromCarrion(double Now)
             || GetWorld()->LineTraceTestByObjectType(Position + FVector(0, 0, 55), Stock->Position + FVector(0, 0, 20),
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfCarrionContact)))) continue;
         const bool bAdaptive = UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal);
-        if (bAdaptive && !Link->Individual.MealCycle.bSeeking) continue;
+        if ((bAdaptive && !Link->Individual.MealCycle.bSeeking) || !Stock->CanApproach(WolfId, Now)) continue;
         const double Full = bAdaptive ? .92 : 1.;
-        const float Meal = Stock->Bite(WolfId, Now, float(FMath::Min(8., (Full - Link->Individual.Nutrition) * 100.)));
+        const float Requested = float(FMath::Min(8., (Full - Link->Individual.Nutrition) * 100.));
+        const float StockBefore = Stock->Remaining;
+        const float Meal = Stock->Bite(WolfId, Now, Requested);
+        ObserveSharedMeal(EM, WolfId, EM.GetFragmentDataChecked<FEcoIdentityFragment>(*Handle).SpeciesId,
+            {EEcoEncounterKind::Carrion, EEcoEncounterMedium::Ground,
+                Context->RegionId, Stock->Species, FEcoExperienceKey::PlantCell(Stock->Position), StockId},
+            Position, Now, Meal, Requested, StockBefore, 0., Meal <= 0.f);
         if (Meal <= 0.f) continue;
+        ObserveFaunaReactionMeal(WolfId, Context->RegionId, Now, Meal);
         Lifetime.NextFeedTimeSeconds = Now + 1.;
         Link->Individual.Nutrition = FMath::Min(1., Link->Individual.Nutrition + Meal / 100.);
+        RecordFaunaExperience(WolfId, {EEcoExperienceActivity::Carrion, Context->RegionId, Stock->Species}, Now);
         RecordGameplayReason(WolfId, Context->RegionId, Now, TEXT("CarrionEaten"), StockId, Meal);
         if (auto* Presentation = EM.GetFragmentDataPtr<FEcoPredatorStateFragment>(*Handle)) Presentation->EatCooldown = 1.1f;
         UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Scavenge] Eater=%lld Species=Wolf Carcass=%lld Amount=%.3f Remaining=%.3f"),
@@ -148,6 +159,8 @@ void AEcoCreatureIntegrationSpawner::CommitFaunaCarcass(const FEcoDeathOutcome& 
     const auto* Killer = AgentLookup.Find(Death.PredatorStableAgentId);
     if (Death.Cause == EEcoDeathCause::Predation && Killer && EM.IsEntityValid(*Killer))
     {
+        if (FaunaInteractionMode > 0)
+            Stock.ProducerSpecies = EM.GetFragmentDataChecked<FEcoIdentityFragment>(*Killer).SpeciesId;
         auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(*Killer);
         const auto& Survival = EM.GetFragmentDataChecked<FEcoCreatureSurvivalFragment>(*Killer);
         if (Vitals.HP > 0.f && Survival.Settings.bEnabled)

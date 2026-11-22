@@ -299,10 +299,20 @@ namespace EcoPolicyV3IntegratedProcImpl
             // hungry animal can stop for two real bites, instead of walking
             // forever over food it never considers sufficient to eat in place.
             const double Dispersed=std::hypot(H.Body->Pos.X-Life.SettlementX,H.Body->Pos.Y-Life.SettlementY);
-            if(Here>=.012&&!bPreferMove&&(!Settling||Dispersed>4||H.Body->Energy<.15)){
+            const bool bCanGrazeHere=Here>=.012&&!bPreferMove&&(!Settling||Dispersed>4||H.Body->Energy<.15);
+            const int32 LocalCell=G.CellOf(H.Body->Pos);
+            const auto CellCenter=[&](int32 Cell){return R::FVec2{(Cell%G.Gw+.5)*G.Cell,(Cell/G.Gw+.5)*G.Cell};};
+            const auto Local=CellCenter(LocalCell);
+            const double LocalVisit=bCanGrazeHere&&A.Combat&&A.AuthorityNow>=0.&&H.Body->Energy>.15
+                ? A.Combat->RankPlantVisit(D.Id,A.RegionId,FEcoExperienceKey::SpatialResourceCell(
+                    A.Ctx->UnitsToCm(Local.X,Local.Y,0.)),A.AuthorityNow) : 1.;
+            const auto GrazeHere=[&]{
                 if(Settling&&Dispersed>4)Life.SettlementUntil=Now;
                 H.Control->Velocity={};H.Control->Gait=R::kGaitStop;
                 H.Control->EatMult=C.GaitEat[R::kGaitStop];H.Control->DrainMult=C.GaitDrain[R::kGaitStop];Life.MotionReason=1;
+            };
+            if(bCanGrazeHere&&LocalVisit>=1.){
+                GrazeHere();
             }else{
                 if(Life.ForageOriginX!=A.Ctx->OriginCm.X||Life.ForageOriginY!=A.Ctx->OriginCm.Y){
                     Life.ForageCell=-1;Life.NextForageScan=0;Life.ForageOriginX=A.Ctx->OriginCm.X;Life.ForageOriginY=A.Ctx->OriginCm.Y;
@@ -311,26 +321,38 @@ namespace EcoPolicyV3IntegratedProcImpl
                 if(Now>=Life.NextForageScan){
                     Life.NextForageScan=Now+1;Life.ForageCell=-1;
                     struct FCandidate{int32 Cell;double Score;};TArray<FCandidate> Candidates;
-                    const int32 K=G.CellOf(H.Body->Pos),X=K%G.Gw,Y=K/G.Gw,Radius=FMath::CeilToInt(Range/G.Cell);
+                    const auto SiteValue=[&](int32 Cell,const R::FVec2& Q,double Dist){
+                        const auto* Bucket=A.BodyBuckets.Find(FIntPoint(FMath::FloorToInt((Q.X+A.Ctx->OriginCm.X/R::kUnitCm)/2),FMath::FloorToInt((Q.Y+A.Ctx->OriginCm.Y/R::kUnitCm)/2)));
+                        const int32 Occupants=Bucket?Bucket->Num():0;
+                        double Score=G.Food[Cell]/(1+Dist*.2)/(1+Occupants*(Life.bNaturalPopulation?2-Life.Genome.Sociability:1));
+                        if(PreferSaferGround)
+                            Score *= (1-.85*HuntRisk(Q))*(1-.65*G.VegetationCells[Cell].SurfaceWater);
+                        if(Life.bNaturalPopulation)Score*=.92+.16*EcoLifeV3::Unit(uint64(D.Id)^EcoLifeV3::Mix(uint64(Cell)));
+                        return Score;
+                    };
+                    const double StayValue=bCanGrazeHere ? LocalVisit*SiteValue(LocalCell,Local,0.) : 0.;
+                    const int32 X=LocalCell%G.Gw,Y=LocalCell/G.Gw,Radius=FMath::CeilToInt(Range/G.Cell);
                     for(int32 J=FMath::Max(0,Y-Radius);J<=FMath::Min(G.Gw-1,Y+Radius);++J)
                         for(int32 I=FMath::Max(0,X-Radius);I<=FMath::Min(G.Gw-1,X+Radius);++I){
                             const int32 Cell=J*G.Gw+I;if(G.Food[Cell]<.02||(!G.Habitats.empty()&&!G.Habitats[Cell].bGroundUsable))continue;
+                            if(bCanGrazeHere&&Cell==LocalCell)continue;
                             const R::FVec2 Q{(I+.5)*G.Cell,(J+.5)*G.Cell},Delta=R::Sub(Q,H.Body->Pos);
                             const double Dist=std::hypot(Delta.X,Delta.Y);if(Dist>Range||Dist<.01)continue;
                             if((Delta.X*H.Body->Head.X+Delta.Y*H.Body->Head.Y)/Dist<W.ObsCfg.ThreatFovCos||G.BlocksSight(H.Body->Pos.X,H.Body->Pos.Y,Q.X,Q.Y))continue;
-                            const auto* Bucket=A.BodyBuckets.Find(FIntPoint(FMath::FloorToInt((Q.X+A.Ctx->OriginCm.X/R::kUnitCm)/2),FMath::FloorToInt((Q.Y+A.Ctx->OriginCm.Y/R::kUnitCm)/2)));
-                            const int32 Occupants=Bucket?Bucket->Num():0;
-                            double Score=G.Food[Cell]/(1+Dist*.2)/(1+Occupants*(Life.bNaturalPopulation?2-Life.Genome.Sociability:1));
-                            if(PreferSaferGround)
-                                Score *= (1-.85*HuntRisk(Q))*(1-.65*G.VegetationCells[Cell].SurfaceWater);
-                            if(Life.bNaturalPopulation)Score*=.92+.16*EcoLifeV3::Unit(uint64(D.Id)^EcoLifeV3::Mix(uint64(Cell)));
+                            double Score=SiteValue(Cell,Q,Dist);
                             if(Settling){
                                 const double FromArrival=std::hypot(Q.X-Life.SettlementX,Q.Y-Life.SettlementY);
                                 if(FromArrival<4)continue;
                                 Score*=1+EcoNaturalHabitat::Random(uint32(D.Id),uint32(Cell))*.7;
                                 if(!G.Habitats.empty())Score*=1+.2*G.Habitats[Cell].WaterSupply;
                             }
-                            Candidates.Add({Cell,Score});
+                            if (A.Combat && A.AuthorityNow >= 0.)
+                            {
+                                const FVector Target = A.Ctx->UnitsToCm(Q.X, Q.Y, D.Int->GroundZ);
+                                Score *= A.Combat->RankPlantEncounter(D.Id, A.RegionId,
+                                    FEcoExperienceKey::SpatialResourceCell(Target), Target, A.AuthorityNow);
+                            }
+                            if(!bCanGrazeHere||Score>StayValue)Candidates.Add({Cell,Score});
                         }
                     Candidates.Sort([](const auto& L,const auto& Rhs){return L.Score==Rhs.Score?L.Cell<Rhs.Cell:L.Score>Rhs.Score;});
                     // Only four physical visibility/reachability checks per scan.
@@ -344,15 +366,20 @@ namespace EcoPolicyV3IntegratedProcImpl
                         Life.ForageCell=Cell;break;
                     }
                 }
-                if(Life.ForageCell>=0&&Life.ForageCell<int32(G.Food.size())&&G.Food[Life.ForageCell]>=.012){
-                    const int32 Cell=Life.ForageCell;const R::FVec2 Q{(Cell%G.Gw+.5)*G.Cell,(Cell/G.Gw+.5)*G.Cell};
+                bool bWalkToFood=false;
+                if(Life.ForageCell>=0&&(!bCanGrazeHere||Life.ForageCell!=LocalCell)
+                    &&Life.ForageCell<int32(G.Food.size())&&G.Food[Life.ForageCell]>=.012){
+                    const R::FVec2 Q=CellCenter(Life.ForageCell);
                     if(R::SizeSquared(R::Sub(Q,H.Body->Pos))<=Range*Range){
-                        Walk(R::Sub(Q,H.Body->Pos));Life.MotionReason=1;
+                        Walk(R::Sub(Q,H.Body->Pos));
+                        Life.MotionReason=1;
+                        bWalkToFood=true;
 #if !UE_BUILD_SHIPPING
-                        A.ObserveLocalGoal(Index, TEXT("ForageCell"), Cell, Q);
+                        A.ObserveLocalGoal(Index, TEXT("ForageCell"), Life.ForageCell, Q);
 #endif
                     }
                 }
+                if(bCanGrazeHere&&!bWalkToFood)GrazeHere();
             }
         }
         // Family is a local intent inside the existing Native writer. Never override danger,
@@ -803,8 +830,18 @@ namespace EcoPolicyV3IntegratedProcImpl
         };
         A.CaptureMask.Init(1,Input.NumPrey);
         for(int32 K=0;K<Input.NumPrey;++K){const auto& P=Input.Prey[K];
-            if(FMath::Square(P.X-Threat.State.PosX)+FMath::Square(P.Y-Threat.State.PosY)<=FMath::Square(Threat.Spec.CatchRadius*3))
-                A.CaptureMask[K]=ClearLine(P.X,P.Y,(*A.HerbInts)[K]->GroundZ)?1:0;
+            const double DistanceSquared=FMath::Square(P.X-Threat.State.PosX)+FMath::Square(P.Y-Threat.State.PosY);
+            if(DistanceSquared<=FMath::Square(Threat.Spec.CatchRadius*3)){
+                const double Ground=(*A.HerbInts)[K]->GroundZ;
+                A.CaptureMask[K]=ClearLine(P.X,P.Y,Ground)?1:0;
+                if(A.CaptureMask[K]&&A.Combat&&A.HerbIds&&A.HerbIds->IsValidIndex(K)&&A.AuthorityNow>=0.
+                    &&DistanceSquared<=FMath::Square(Threat.Spec.CatchRadius)){
+                    const FVector Start=A.Ctx->UnitsToCm(Threat.State.PosX,Threat.State.PosY,Link.GroundZ);
+                    const FVector End=A.Ctx->UnitsToCm(P.X,P.Y,Ground);
+                    // This is a candidate mask. Querying it must not pay a contact receipt.
+                    if(A.Combat->BlocksFaunaCapture(WolfId,(*A.HerbIds)[K],Start,End,A.AuthorityNow,false)) A.CaptureMask[K]=0;
+                }
+            }
         }
         Input.CaptureAllowed=A.CaptureMask.GetData();
         if(I.Role==EcoTracesV3::ERole::Lead&&Now<I.Until&&A.HerbIds){
@@ -1751,6 +1788,18 @@ void UEcoPolicyV3IntegratedStepProcessor::ExecuteSteps(FMassEntityManager& Entit
 			Adapter.MoveObservations = {};
 			Adapter.MoveSamples = {};
 #endif
+            if (CombatOwner && CombatOwner->RecordsFaunaExperience() && AuthoritySeconds >= 0.)
+            {
+                for (int32 Index = 0; Index < Views.Num(); ++Index)
+                {
+                    const auto& View = Views[Index];
+                    const auto& Seen = View.Perception->Threat;
+                    // Native wolf rows precede external threats, which may include players.
+                    if (View.Body->DeathCause == EcoWorldV3::kDeathNone && Seen.bNearestSight && WolfIds.IsValidIndex(Seen.Nearest))
+                        CombatOwner->ObserveEncounterThreat(EntityManager, StableViewIds[Index], WolfIds[Seen.Nearest],
+                            Ctx.RegionId, Ctx.UnitsToCm(View.Body->Pos.X, View.Body->Pos.Y, HerbInts[Index]->GroundZ), AuthoritySeconds);
+                }
+            }
 			{
 				const int64 RunD = Ctx.Sim.Stats.Route.Steps[EcoWorldV3::kRouteRun] - RouteRun0;
 				const int64 ShelterD = Ctx.Sim.Stats.Route.Steps[EcoWorldV3::kRouteShelter] - RouteShelter0;
@@ -1882,6 +1931,37 @@ void UEcoPolicyV3IntegratedStepProcessor::ExecuteSteps(FMassEntityManager& Entit
                 auto* Ecology = World->GetSubsystem<UEcologySimulationSubsystem>();
                 if (!Ecology || !Ecology->CommitSpatialFood(Ctx.RegionId, ++Ctx.ResourceReceiptSequence, BeforeFood, Eaten, Grown, AfterFood, Lost))
                 { UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] Resource conservation receipt rejected: %s"), *Ctx.RegionId.ToString()); Sub->RejectResourceContract(); return; }
+                if (CombatOwner && (CombatOwner->RecordsFaunaExperience() || CombatOwner->RecordsFoodVisits()
+                    || CombatOwner->FaunaInteractionMode == 2))
+                {
+                    const double SampleTime = AuthoritySeconds >= 0. ? AuthoritySeconds : Ctx.Sim.T * EcoRepertoireV3::kStepSeconds;
+                    const auto& Grid = Ctx.Sim.Food;
+                    TMap<int32, double> RationedDemand;
+                    for (int32 Index = 0; Index < Views.Num(); ++Index)
+                    {
+                        const double Want = Ctx.Sim.Want[Index];
+                        const int32 Cell = Ctx.Sim.CellIdx[Index];
+                        if (Want > 0. && Grid.Demand[Cell] < 1.) RationedDemand.FindOrAdd(Cell) += Want;
+                    }
+                    for (int32 Index = 0; Index < Views.Num(); ++Index)
+                    {
+                        const auto& Body = *Views[Index].Body;
+                        const double Requested = Ctx.Sim.Want[Index];
+                        if (Requested <= 0. || Body.DeathCause != EcoWorldV3::kDeathNone) continue;
+                        const FVector Position = Ctx.UnitsToCm(Body.Pos.X, Body.Pos.Y, HerbInts[Index]->GroundZ);
+                        const int32 Cell = Ctx.Sim.CellIdx[Index];
+                        const FVector Center = Ctx.UnitsToCm((Cell % Grid.Gw + .5) * Grid.Cell,
+                            (Cell / Grid.Gw + .5) * Grid.Cell, 0.);
+                        // The Native allocator's demand ratio recovers the stock before this simultaneous browse.
+                        const double Demand = FMath::Max(Requested, RationedDemand.FindRef(Cell));
+                        CombatOwner->ObservePlantMeal(StableViewIds[Index], Ctx.RegionId,
+                            FEcoExperienceKey::SpatialResourceCell(Center), Position, SampleTime, Body.LastIntake,
+                            Requested, Demand * Grid.Demand[Cell], Demand);
+                        if (Body.LastIntake > 0.)
+                            CombatOwner->RecordFaunaExperience(StableViewIds[Index],
+                                {EEcoExperienceActivity::Plants, Ctx.RegionId, NAME_None, FEcoExperienceKey::PlantCell(Position)}, SampleTime);
+                    }
+                }
             }
 		}
 		Sub->FinishGlobalStep();
