@@ -90,6 +90,9 @@ player_trial_match = re.search(r"(?:^|\s)-EcoIslandPlayerPassage=(Still|Sneak|Ru
 player_trial = player_trial_match[1] if player_trial_match else None
 combat_trial_match = re.search(r"(?:^|\s)-EcoIslandCombatCarrion=(Present|Attack|Rifle|RiflePresent)(?:\s|$)", command)
 combat_trial = combat_trial_match[1] if combat_trial_match else None
+saved_player_combat = "-EcoIslandSavedPlayerCombat" in command.split()
+if saved_player_combat and not combat_trial:
+    raise RuntimeError("Saved player combat verification requires an EcoIslandCombatCarrion trial")
 rifle_combat_trial = combat_trial in {"Rifle", "RiflePresent"}
 combat_start_match = re.search(r"(?:^|\s)-EcoIslandCombatStart=(\d+)(?:\s|$)", command)
 combat_start = int(combat_start_match[1]) if combat_start_match else 16
@@ -5331,14 +5334,18 @@ def begin():
         stage_mink_bank_layout()
     if combat_trial:
         world = editor.get_editor_world()
-        asset = u.load_asset("/Game/JWJ/Gameplay/BP_EcoGameMode_Common")
-        mode = u.BlueprintEditorLibrary.generated_class(asset) if asset else None
+        mode = u.EditorAssetLibrary.load_blueprint_class("/Game/JWJ/Gameplay/BP_EcoGameMode_Common")
         if not mode:
             raise RuntimeError("Team combat game mode asset missing")
-        world.get_world_settings().set_editor_property("default_game_mode", mode)
+        settings = world.get_world_settings()
         runtime, = (a for a in u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
                     if isinstance(a, u.EcoCreatureIntegrationSpawner))
-        runtime.set_editor_property("enable_player_combat", True)
+        if saved_player_combat:
+            if settings.get_editor_property("default_game_mode") != mode or not runtime.get_editor_property("enable_player_combat"):
+                raise RuntimeError("The saved island must use the team combat game mode with player combat enabled")
+        else:
+            settings.set_editor_property("default_game_mode", mode)
+            runtime.set_editor_property("enable_player_combat", True)
     if result.get("save_highland_approach"):
         save_verified_highland_approach()
         u.SystemLibrary.quit_editor()
