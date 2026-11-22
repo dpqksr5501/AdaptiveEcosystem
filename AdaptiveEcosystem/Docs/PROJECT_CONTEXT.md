@@ -1,19 +1,21 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
+**2026-11-22 작업 브랜치 기준.** `origin/codex/social-shelter-handoff`의 `182a0503`까지 다종 경험·사회 신호 복제, 보행·접지, 최신 섬 배치와 검증 도구를 반영했다. 최신 소유 섬은 사슴 R7e·늑대 Native 규칙·나머지 14종의 규칙 실행을 사용한다. 여우 PPO 연결과 이어 학습 실험은 되돌렸다. 섬의 저장 설정은 일반 경험 `0`, 먹이 방문 `2`, 종간 행동 반영 `0`이며, 직접 접속 시 현재 프로토콜은 `EcoProtocol=3`이다. [최신 섬 실행과 검증 범위](Team/JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#2026-11-22-작업-브랜치-기준) · [경험 모드와 저장](Architecture/FAUNA_EXPERIENCE_20261119.md#적용과-책임)
+
 **Unreal MCP 팀 사용.** [Unreal MCP 팀 운영 안내](Team/UNREAL_MCP_TEAM_PLAN_20261118.md)에서 개인 클라이언트 설정 적용, 조회 전용 연결, 소유 맵 패키지 겹침 검사를 실행한다.
 
 **조향·회피 후속 개발.** [사용자 콘솔 검증을 포함한 통합 계획](Performance/MassMovement/09_AVOIDANCE_INTEGRATION_SPEC_20261112.md)을 따른다. 첫 구현은 v3 사슴의 행동·목표·실제 변위를 사용자가 하나의 명령으로 기록하는 기능이다. 이후 기능도 같은 진입점에서 재현·비교하고, 다음 개선은 사용자가 생성한 보고서로 결정한다.
 
 **팀 섬 지형 복사본의 다종 적용.** 최신 작업용 맵 `/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`는 송해찬 담당 `/Game/Map/LV_SHC_IslandEcosystem1_WP`에서 가져온 지형과 물길에 수초·먹이·수생동물을 연결한다. 초지와 고원에는 지형에 맞춘 개체군과 마른 보금자리를 배치했다. 기본 시작·세션 맵은 `/Game/JWJ/Integration_JwJ`다. [최신 로컬 섬의 적용과 인계](Team/JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#2026-11-14-로컬-섬-마무리)
 
-**공유 기준과 후속 이슈.** [PR #19](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/19)의 검증 기준은 `fa0c04dd`다. 최신 팀 통합 브랜치는 직접 빌드와 자동화 332건, 최신 섬에서 초기 16종 118마리와 210 게임초 실행을 별도로 확인했다. 밍크 입수·상륙, 스트리밍, 경사 접지, 플레이어 개입과 장시간 비교는 [담당별 후속 이슈](Team/FAUNA_TEAM_REQUESTS_20261113.md#pr-19-후속-이슈)에서 이어간다.
+**공유 기준과 후속 이슈.** [PR #19](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/19)의 `fa0c04dd` 기준에서 직접 빌드, 자동화 332건, 당시 섬의 초기 16종 118마리와 210게임초 실행을 확인했다. 밍크 입수·상륙, 스트리밍, 경사 접지, 플레이어 개입과 장시간 비교의 역할 분담은 [담당별 후속 이슈](Team/FAUNA_TEAM_REQUESTS_20261113.md#pr-19-후속-이슈)를 따른다.
 
 **새 채팅에서 작업을 재개할 때.** 이 문서와 저장소 루트 `AGENTS.md`를 읽은 뒤, [다종 생태계 재개 안내](Team/FAUNA_TEAM_HANDOFF.md#새-채팅에서-재개)를 연다. 소유 맵의 16종 실행과 수변·식생 작업을 팀 레벨로 옮기기 위한 첫 단계는 **실제 접근 가능한 서식지·통로 확인과 같은 조건의 장기 비교**다. [담당별 작업 요청](Team/FAUNA_TEAM_REQUESTS_20261113.md) · [면적·배치·두뇌 비교 계획](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md)
 
 **2026-11-13 소유 다종 맵 기준.** `LV_JYU_ExpandedFauna`에 기존 8종과 신규 8종을 연결했다. `LV_JYU_HerbivoreForage`에서는 먹이 군락 15개의 재고와 외형을, `LV_JYU_RiparianReach`에서는 물가 17개 군락의 건조·강우·침수·섭취 반응과 수위별 연결 수심을 확인했다. 출생·이주, 장기 개체군, 식생 저장·네트워크, 수변 면적·렌더는 서로 다른 맵과 조건의 실행이다. 팀 적용은 송해찬 님의 레벨 디자인, 장원준 님의 플레이어 입력·사냥·발소리, 권신혁 님의 학습 계약과 연계한다. [맵별 완료·검증 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과) · [수변 실측과 팀 적용 조건](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md) · [돼지 전용 적용](조연우/JYU_PIG_HANDOFF_20261113.md)
 
 **2026-11-12 다종 작업 기준.** 기본 `/Game/JWJ/Integration_JwJ`는 Legacy 실행이며 Native v3와 자연 출생이 꺼져 있다. 로컬 소유 복사본 `/Game/JYU/Maps/LV_JYU_IntegrationR7eFauna`에서는 사슴 R7e, 늑대 Native 규칙, 여섯 종의 규칙 실행기가 함께 작동한다. 기존 시작 배치의 최신 4배속 30분 비교에서 사슴은 시드별로 25·34마리 남았고 늑대·여우·표범은 모두 기아로 사라졌다. 지상 통로·섭취, 고정 30·60 FPS 비교와 전용 서버 근접 사냥은 각각 문서에 적힌 별도 조건에서 확인했다. [최신 30분 결과](Architecture/FAUNA_POPULATION_BALANCE.md#다종-공용-사체의-영양-예약) · [검증별 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과)
-PR #16 → JWJ 통합(2026-11-09~10)의 저장 포맷 5와 실행 결과는 [당시 통합 기록](Team/PR16_JWJ_MERGE_20261109.md)에 있다. 팀 통합 기록의 체크포인트 포맷은 **11**, 현재 로컬 포맷은 **16**이다. 로컬은 산란장 예약, 규칙 전용 지역 환경, 공용 먹이 재고 접근점, 격자 밖 토양 수분과 연결 수원에 더해 수중 먹이터와 입수·상륙·마른 둑 좌표를 저장한다. 기존 슬롯은 저장 당시 빌드에서 확인한다. [수변과 새 프로세스 복원 검증](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md#잉어-선반과-두-번째-밍크-출구-적용)
+PR #16 → JWJ 통합(2026-11-09~10)의 포맷 5와 후속 팀 통합의 포맷 11은 당시 실행 이력이다. 포맷 16의 수변 검증은 산란장 예약·지역 환경·공용 먹이 접근점과 함께 수중 먹이터 및 입수·상륙 좌표를 복원했다. 현재 빌드는 경험·먹이 방문·종간 상호작용 모드가 모두 `0`이면 포맷 16, 하나라도 활성화하면 포맷 24를 사용한다. [PR #16 통합 기록](Team/PR16_JWJ_MERGE_20261109.md) · [수변 복원 검증](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md#잉어-선반과-두-번째-밍크-출구-적용) · [포맷 선택과 복원 조건](Architecture/FAUNA_EXPERIENCE_20261119.md#기억과-선택)
 
 사슴 이주 첫 구현(2026-11-09): [지역 순차 이주 구현/테스트](Architecture/REGIONAL_DEER_MIGRATION_IMPLEMENTATION_20261109.md)는 `eco.HerdMigration.Regional 1`에서 개별 순차 승인·지역 출발 예산을 제공한다. Editor 빌드/관련 자동화13개는 성공했고 실제1102 지형 도착·저장 왕복·멀티 검증은 남았다. 기본OFF이며 다음 ‘계획만 작성’ 설명은 첫 구현 이전 이력이다.
 

@@ -1,5 +1,13 @@
 # 팀 섬 레벨의 생태계 적용
 
+## 2026-11-22 작업 브랜치 기준
+
+작업 브랜치 `origin/codex/social-shelter-handoff`의 `182a0503` 기준이다. 대상은 소유 복사 맵 `/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`다. 현재 저장 배치의 재현 기준은 초기 16종 120개체다. 사슴은 R7e, 늑대는 Native 규칙, 여우를 포함한 나머지 14종은 규칙 실행기를 사용한다. 여우 PPO 실행 연결과 이어 학습 실험은 되돌렸다. Dots의 R9 6종은 별도 학습 계약을 따른다. [16종 배치 검증](../Architecture/FAUNA_EXPERIENCE_20261119.md#2026-11-20-섬-배치와-16종-화면-검증) · [Dots 실험 인계](../RL_Policy/DOTS_16_SPECIES_EXPERIMENT_HANDOFF_20261115.md)
+
+저장된 코디네이터 설정은 `FaunaExperienceMode=0`, `FaunaFoodVisitMode=2`, `FaunaInteractionMode=0`이다. 종간 경보·방어 반영을 비교할 때는 개발 세션의 `-EcoFaunaInteractions=2`를 쓴다. 기본 저장 섬은 먹이 방문 반영이 활성화되어 체크포인트 포맷 24를 사용한다. 직접 멀티플레이 접속은 같은 빌드의 서버·클라이언트와 `EcoProtocol=3`을 사용한다. [경험과 저장 계약](../Architecture/FAUNA_EXPERIENCE_20261119.md#적용과-책임) · [세션 프로토콜](../../Source/AdaptiveEcosystem/Network/Session/EcoSessionPolicy.h)
+
+실험을 되돌린 코드에서 UE 5.8 Editor 직접 빌드와 공격 준비, 부상 쥐 사냥, 접촉 반격, 먹이 방문, 종간 경쟁 자동화 5건이 통과했다. 로컬 원본은 `Saved/Logs/EcoFoxRollbackUBT.log`와 `Saved/Automation/FoxRollback/index.json`이다. 되돌린 뒤 최신 섬 PIE, 전용 서버의 늦은 접속, 저장·복원과 장기 개체군은 새로 실행하지 않았다. 아래 수치는 각 절에 적힌 당시 맵과 바이너리의 기록이다.
+
 ## 2026-11-14 로컬 섬 마무리
 
 이번 브랜치의 인계 범위는 최신 JYU 복사 섬의 배치, Unreal 권위 실행, 두 시드 회귀, 저장·복원과 전용 서버 확인이다. 사슴 R7e·늑대 Native v3·14종 규칙 실행을 학습 전 기준으로 사용한다. [검증 원본과 복원 경로](LOCAL_TEST_EVIDENCE.md#공통-로그-보관-폴더) · [Dots 학습 준비 상태](../RL_Policy/DOTS_ECOSYSTEM_TRAINING_HANDOFF_KO.txt)
