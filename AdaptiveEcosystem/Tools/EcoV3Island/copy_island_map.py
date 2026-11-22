@@ -35,8 +35,9 @@ ROOT = '/Game/Creatures/Integrated/'
 REGION_CENTER = (44700.0, 49200.0, 0.0)
 REGION_EXTENT = (140000.0, 140000.0, 15000.0)
 # 보는 자리·팀 그대로 판(통합 v3 를 켜지 못했을 때)의 시작 자리: 고원 위 첫 무리 자리 곁.
-# 첫 무리 자리는 자동 고르기로 (379, 444) m (땅 지도 지문 1d7c3ff530e12d8a, 11-05 헤드리스) — 그 남서쪽 85 m 에서 북동쪽(자리)을 본다
-VIEW_XY = (31900.0, 38400.0)
+# 첫 무리 자리는 자동 고르기로 (99, 544) m (11-10 다시 복사한 원본, 땅 지도 지문 0ddd2c38cad1c627 — 11-05 판 1d7c3ff530e12d8a 때는 (379, 444) m)
+# — 그 남서쪽 85 m 에서 북동쪽(자리)을 본다
+VIEW_XY = (3900.0, 48400.0)
 
 cmd = unreal.SystemLibrary.get_command_line()
 m = re.search(r'-CopyOut=(\S+)', cmd)
