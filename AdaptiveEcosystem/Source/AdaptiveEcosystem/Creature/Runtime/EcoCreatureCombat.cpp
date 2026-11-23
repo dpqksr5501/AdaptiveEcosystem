@@ -14,6 +14,7 @@
 #include "MassSpawnerSubsystem.h"
 #include "MassEntityManager.h"
 #include "World/EcoWorldClockSubsystem.h"
+#include "World/EcologyRegion.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "EngineUtils.h"
@@ -30,6 +31,22 @@ namespace EcoCreatureCombat
     {
         return !World.LineTraceTestByObjectType(A, B, FCollisionObjectQueryParams(ECC_WorldStatic),
             FCollisionQueryParams(SCENE_QUERY_STAT(EcoCombatObstruction), false));
+    }
+    bool CanSeeRuleTarget(UWorld& World, const FTransform& Body, const FEcoFaunaSpecies& Species,
+        const APawn& Pawn, double Range, double FacingCos)
+    {
+        const FVector Position = Body.GetLocation();
+        const FVector ToPlayer = Pawn.GetActorLocation() - Position;
+        return ToPlayer.SizeSquared() <= FMath::Square(Range)
+            && (ToPlayer.SizeSquared2D() <= 1. || FVector::DotProduct(Body.GetRotation().GetForwardVector().GetSafeNormal2D(),
+                ToPlayer.GetSafeNormal2D()) >= FacingCos)
+            && ClearLine(World, Position + FVector(0., 0., Species.EyeHeight), Pawn.GetActorLocation());
+    }
+    double RuleContactRange(const FEcoFaunaSpecies& Species, const FEcoFaunaFragment& Fauna, double Now,
+        const APawn& Target, bool bFunctionalTraits)
+    {
+        return Species.AttackReach * Fauna.Life.BodyScale(Now) * Fauna.Life.FunctionalTraits(Now, bFunctionalTraits).ReachScale()
+            + FMath::Max(0., double(Target.GetSimpleCollisionRadius()));
     }
     FVector NativePosition(FMassEntityManager& EM, FMassEntityHandle Entity, const UEcoPolicyV3IntegratedSubsystem& Native)
     {
@@ -53,7 +70,7 @@ void AEcoCreatureIntegrationSpawner::ResetCombat()
 {
     for (auto& Pair : HitProxies) if (IsValid(Pair.Value)) { Pair.Value->ClearBinding(); Pair.Value->Destroy(); }
     for (AEcoCreatureHitProxy* Proxy : HitProxyPool) if (IsValid(Proxy)) { Proxy->ClearBinding(); Proxy->Destroy(); }
-    HitProxies.Reset(); HitProxyPool.Reset(); ComboDamage.Reset(); PendingHuntingDeaths.Reset(); ComboReceipts.Reset(); WolfCombat.Reset(); CombatEpoch = 0;
+    HitProxies.Reset(); HitProxyPool.Reset(); ComboDamage.Reset(); PendingHuntingDeaths.Reset(); ComboReceipts.Reset(); PlayerCombat.Reset(); CombatEpoch = 0;
 }
 
 void AEcoCreatureIntegrationSpawner::UpdateHitProxies()
@@ -90,16 +107,19 @@ void AEcoCreatureIntegrationSpawner::UpdateHitProxies()
         {
             const auto* Profile = FindFauna(Identity.SpeciesId);
             if (!Profile) continue;
-            const float Scale = float(Fauna->Life.BodyScale(Time.ServerTimeSeconds));
-            Candidates.Add({Id, Position, Profile->BodyRadius * Scale, Profile->EyeHeight * .7f * Scale, Distance});
+            const float Width = float(Fauna->Life.BodyWidth(Time.ServerTimeSeconds, UsesFunctionalTraits()));
+            const float Height = float(Fauna->Life.BodyHeight(Time.ServerTimeSeconds, UsesFunctionalTraits()));
+            Candidates.Add({Id, Position, Profile->BodyRadius * Width, Profile->EyeHeight * .7f * Height, Distance});
         }
         else
         {
             const auto* C = Native->GetContext(Link->ContextIndex);
-            const float Scale = Link->Individual.bInitialized ? FMath::Clamp(
-                float(Link->Individual.BodyScale(C->Sim.T * EcoRepertoireV3::kStepSeconds)), .25f, 2.f) : 1.f;
+            const double Now = C->Sim.T * EcoRepertoireV3::kStepSeconds;
+            const float Width = Link->Individual.bInitialized ? float(Link->Individual.BodyWidth(Now, UsesFunctionalTraits())) : 1.f;
+            const float Height = Link->Individual.bInitialized ? float(Link->Individual.BodyHeight(Now, UsesFunctionalTraits())) : 1.f;
             const bool bWolf = EM.GetFragmentDataPtr<FEcoThreatStateFragment>(Entity) != nullptr;
-            Candidates.Add({Id, Position, (bWolf ? 48.f : 42.f) * Scale, (bWolf ? 52.f : 80.f) * Scale, Distance});
+            Candidates.Add({Id, Position, (bWolf ? 48.f : 42.f) * FMath::Clamp(Width, .25f, 2.f),
+                (bWolf ? 52.f : 80.f) * FMath::Clamp(Height, .25f, 2.f), Distance});
         }
     }
     Candidates.Sort([](const auto& A, const auto& B) { return A.Distance == B.Distance ? A.Id < B.Id : A.Distance < B.Distance; });
@@ -126,7 +146,7 @@ void AEcoCreatureIntegrationSpawner::UpdateHitProxies()
     }
     // All socket queries see the same completed logical-position snapshot, after native movement.
     for (auto* Player : Players) if (auto* Hit = Player->FindComponentByClass<UEcoMeleeHitComponent>()) Hit->EvaluateAtEcologyBoundary();
-    for (auto It = WolfCombat.CreateIterator(); It; ++It)
+    for (auto It = PlayerCombat.CreateIterator(); It; ++It)
     {
         const auto* Entity = AgentLookup.Find(It.Key());
         if (!Entity || !EM.IsEntityValid(*Entity) || EM.GetFragmentDataChecked<FEcoVitalsFragment>(*Entity).HP <= 0) It.RemoveCurrent();
@@ -193,10 +213,11 @@ void AEcoCreatureIntegrationSpawner::ProcessComboDamage(const FEcoServerTimeSnap
             if (Before <= 0) Outcome.Result = EEcoDamageResult::AlreadyDead;
             else
             {
-                ApplyPlayerDamage(*Player, *Entity, Request.Damage);
+                ApplyPlayerDamage(*Player, *Entity, Request.Damage, Time);
                 Outcome.RemainingHP = EM.GetFragmentDataChecked<FEcoVitalsFragment>(*Entity).HP;
                 Outcome.AppliedDamage = Before - Outcome.RemainingHP;
                 Outcome.Result = EEcoDamageResult::Committed; ++CombatDiagnostics.DamageCommitted;
+                RecordTraitHit(EM, *Entity, Time, Outcome);
                 if (Outcome.RemainingHP <= 0) PendingHuntingDeaths.Add(Request.Target, {Request.Source, Outcome, Request.WeaponSource});
                 if (Outcome.RemainingHP <= 0) if (auto* Proxy = HitProxies.FindRef(Request.Target).Get()) Proxy->ClearBinding();
             }
@@ -212,8 +233,8 @@ void AEcoCreatureIntegrationSpawner::ProcessComboDamage(const FEcoServerTimeSnap
 bool AEcoCreatureIntegrationSpawner::GuideWolfPlayerCombat(int64 Id, FEcoV3RegionContext& Context, const FVector& Position,
     const FVector& Heading, double Now, bool bAvailable, bool bProvoked, EcoThreatV3::FThreatStepInput& Input)
 {
-    if (!bEnablePlayerCombat || !bEnableEcosystemLife || !bReady || !bAvailable) { WolfCombat.Remove(Id); return false; }
-    auto& Attack = WolfCombat.FindOrAdd(Id);
+    if (!bEnablePlayerCombat || !bEnableEcosystemLife || !bReady || !bAvailable) { PlayerCombat.Remove(Id); return false; }
+    auto& Attack = PlayerCombat.FindOrAdd(Id);
     APawn* Best = nullptr; double BestDistance = FMath::Min(2400., EcoWorldV3::WolfViewNow(Context.Sim) * EcoRepertoireV3::kUnitCm);
     for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
     {
@@ -247,20 +268,129 @@ bool AEcoCreatureIntegrationSpawner::GuideWolfPlayerCombat(int64 Id, FEcoV3Regio
     return true;
 }
 
-void AEcoCreatureIntegrationSpawner::ProcessWolfAttacks(const FEcoServerTimeSnapshot& Time, uint64 ThroughSequence)
+bool AEcoCreatureIntegrationSpawner::GuideRuleFaunaPlayerCombat(int64 Id, FName Region, const FEcoFaunaSpecies& Species,
+    const FEcoFaunaFragment& Fauna, const FTransform& Transform, double Now, float Darkness, float Rain, bool bAvailable, FVector& Goal)
+{
+    if (!bEnableRuleFaunaPlayerAmbush || !bAuthorityWorld || !bReady || !bEnablePlayerCombat || !bEnableEcosystemLife)
+    {
+        PlayerCombat.Remove(Id);
+        return false;
+    }
+    auto* Existing = PlayerCombat.Find(Id);
+    if (Existing && Existing->bPending)
+    {
+        Goal = Transform.GetLocation();
+        return true;
+    }
+    const auto Cancel = [&]() {
+        if (Existing && Now < Existing->Cooldown)
+        {
+            Existing->Target.Reset();
+            Existing->Due = -1.;
+        }
+        else PlayerCombat.Remove(Id);
+        return false;
+    };
+    if (!bAvailable || (Darkness < .6f && Rain < .5f)) return Cancel();
+    const double Sight = Species.SightRange * FMath::Lerp(1.f, Species.NightVision, Darkness) * FMath::Lerp(1.f, .65f, Rain);
+    const double Range = FMath::Min(Sight, double(Species.StalkRange));
+    const double VisionCone = FMath::Cos(FMath::DegreesToRadians(Species.SightHalfAngle));
+    APawn* Target = Existing ? Existing->Target.Get() : nullptr;
+    const auto CanTrack = [&](const APawn* Pawn) {
+        if (!EcoCreatureCombat::AlivePlayer(Pawn)) return false;
+        const auto* Bridge = Pawn->FindComponentByClass<UEcoPlayerEcologyComponent>();
+        const auto* At = FindRegion(Pawn->GetActorLocation());
+        return Bridge && Bridge->bThreatEnabled && At && At->RegionId == Region
+            && EcoCreatureCombat::CanSeeRuleTarget(*GetWorld(), Transform, Species, *Pawn, Range, VisionCone);
+    };
+    if (Target && (!CanTrack(Target) || Existing->Avatar != Target->GetPlayerState<AEcoPlayerState>()->AvatarGeneration))
+        return Cancel();
+    if (!Target)
+    {
+        if (Existing && Now < Existing->Cooldown) return false;
+        double Nearest = MAX_dbl;
+        for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+        {
+            const auto* Controller = It->Get();
+            APawn* Pawn = Controller ? Controller->GetPawn() : nullptr;
+            if (!CanTrack(Pawn)) continue;
+            const double Distance = FVector::DistSquared(Pawn->GetActorLocation(), Transform.GetLocation());
+            if (Distance < Nearest)
+            {
+                Target = Pawn;
+                Nearest = Distance;
+            }
+        }
+        if (!Target) return Cancel();
+    }
+    auto& Attack = PlayerCombat.FindOrAdd(Id);
+    const bool bNewTarget = Attack.Target.Get() != Target;
+    Attack.Target = Target;
+    Attack.Avatar = Target->GetPlayerState<AEcoPlayerState>()->AvatarGeneration;
+    Attack.Region = Region;
+    Attack.LastSeen = Now;
+    Attack.bStalking = true;
+    if (bNewTarget)
+        UE_LOG(LogTemp, Log, TEXT("[EcoCombat][FaunaStalk] Id=%lld Species=%s Region=%s Dark=%.2f Rain=%.2f"),
+            Id, *Species.SpeciesId.ToString(), *Region.ToString(), Darkness, Rain);
+    const bool bInReach = EcoCreatureCombat::CanSeeRuleTarget(*GetWorld(), Transform, Species, *Target,
+        EcoCreatureCombat::RuleContactRange(Species, Fauna, Now, *Target, UsesFunctionalTraits()), .3);
+    if (Attack.Due < 0. && Now >= Attack.Cooldown && bInReach)
+    {
+        Attack.Due = Now + Species.AttackWindup;
+        UE_LOG(LogTemp, Log, TEXT("[EcoCombat][FaunaWindup] Id=%lld At=%.3f Due=%.3f"), Id, Now, Attack.Due);
+    }
+    if (Attack.Due >= 0. && !bInReach) return Cancel();
+    if (Attack.Due >= 0. && Now >= Attack.Due)
+    {
+        Attack.bPending = true;
+        Attack.Sequence = ++CombatContactSequence;
+        Attack.ContactTime = Now;
+        Attack.Cooldown = Now + FMath::Max(1., double(Species.AttackRecovery));
+        Attack.Due = -1.;
+    }
+    Goal = bInReach || Attack.bPending || Now < Attack.Cooldown ? Transform.GetLocation() : Target->GetActorLocation();
+    return true;
+}
+
+void AEcoCreatureIntegrationSpawner::ProcessCreaturePlayerAttacks(const FEcoServerTimeSnapshot& Time, uint64 ThroughSequence)
 {
     if (!bEnablePlayerCombat || !bEnableEcosystemLife) return;
-    auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>(); if (!Native) return;
+    auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
     auto& EM = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
-    TArray<int64> Order; WolfCombat.GetKeys(Order); Order.Sort();
+    TArray<int64> Order; PlayerCombat.GetKeys(Order); Order.Sort();
     for (const int64 Id : Order)
     {
-        auto& Attack = WolfCombat.FindChecked(Id);
+        auto& Attack = PlayerCombat.FindChecked(Id);
         if (!Attack.bPending || Attack.Sequence>ThroughSequence || Attack.ContactTime>Time.ServerTimeSeconds+1.e-6) continue;
         Attack.bPending = false;
         const auto* Entity = AgentLookup.Find(Id); auto* Player = Attack.Target.Get();
         if (!Entity || !EM.IsEntityValid(*Entity) || EM.GetFragmentDataChecked<FEcoVitalsFragment>(*Entity).HP <= 0 || !EcoCreatureCombat::AlivePlayer(Player)) continue;
         auto* State = Player->GetPlayerState<AEcoPlayerState>();
+        if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(*Entity))
+        {
+            const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(*Entity);
+            const auto* Species = FindFauna(Identity.SpeciesId);
+            const auto* Bridge = Player->FindComponentByClass<UEcoPlayerEcologyComponent>();
+            const auto* At = FindRegion(Player->GetActorLocation());
+            const double Now = Time.ServerTimeSeconds;
+            if (!bEnableRuleFaunaPlayerAmbush || !Species || !Bridge || !Bridge->bThreatEnabled || !At
+                || At->RegionId != Attack.Region || State->AvatarGeneration != Attack.Avatar
+                || EM.GetFragmentDataChecked<FEcoRegionFragment>(*Entity).CurrentRegionId != Attack.Region
+                || EM.GetFragmentDataChecked<FEcoTravelFragment>(*Entity).State == EEcoResidenceState::Traveling
+                || Now - Attack.LastSeen > .3 || Now < Fauna->ThreatUntil || Fauna->bRecovering
+                || !EcoCreatureCombat::CanSeeRuleTarget(*GetWorld(),
+                    EM.GetFragmentDataChecked<FTransformFragment>(*Entity).GetTransform(), *Species, *Player,
+                    EcoCreatureCombat::RuleContactRange(*Species, *Fauna, Now, *Player, UsesFunctionalTraits()), .3)) continue;
+            const float Paid = State->ApplyCreatureDamage(Player, 20.f, Id);
+            if (Paid > 0.f)
+            {
+                ++CombatDiagnostics.PlayerHits;
+                UE_LOG(LogTemp, Log, TEXT("[EcoCombat][FaunaPlayerHit] Id=%lld At=%.3f Paid=%.2f"), Id, Now, Paid);
+            }
+            continue;
+        }
+        if (!Native) continue;
         const auto& Link = EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(*Entity);
         const auto* C = Native->GetContext(Link.ContextIndex); if (!C || Link.bDead || State->AvatarGeneration != Attack.Avatar) continue;
         const double Now = C->Sim.T * EcoRepertoireV3::kStepSeconds;
@@ -281,9 +411,9 @@ void AEcoCreatureIntegrationSpawner::ProcessCombatDamage(const FEcoServerTimeSna
     {
         uint64 Next=MAX_uint64;
         for(const auto& R:ComboDamage) if(R.Issued<=Time.ServerTimeSeconds+1.e-6) Next=FMath::Min(Next,R.Sequence);
-        for(const auto& Pair:WolfCombat) if(Pair.Value.bPending&&Pair.Value.ContactTime<=Time.ServerTimeSeconds+1.e-6) Next=FMath::Min(Next,Pair.Value.Sequence);
+        for(const auto& Pair:PlayerCombat) if(Pair.Value.bPending&&Pair.Value.ContactTime<=Time.ServerTimeSeconds+1.e-6) Next=FMath::Min(Next,Pair.Value.Sequence);
         if(Next==MAX_uint64)break;
-        ProcessComboDamage(Time,Next);ProcessWolfAttacks(Time,Next);
+        ProcessComboDamage(Time,Next);ProcessCreaturePlayerAttacks(Time,Next);
     }
 }
 

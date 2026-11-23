@@ -2,10 +2,32 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "AI/Policy/EcoLifeHistoryV3.h"
 #include "Creature/Runtime/EcoEcosystemArchive.h"
+#include "Creature/Representation/EcoCreatureCoatPalette.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include <limits>
 #include "Network/Mass/EcoMassReplicationTypes.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoCoatContrast, "AdaptiveEcosystem.Life.CoatContrast",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoCoatContrast::RunTest(const FString&)
+{
+    using namespace EcoLifeV3;
+    const auto A = Founder(20000, 1, true);
+    const auto B = Founder(20000, 2, true);
+    const auto Child = Inherit(A, B, 37, true);
+    TestTrue(TEXT("Founders vary and offspring inherit a valid coat"), A.Coat != B.Coat && Child.IsValid());
+    const FEcoCoatSurface Fur;
+    const FEcoCoatSurface Scales{.35f, true};
+    const float Dark = Fur.Luminance(0.f);
+    const float Light = Fur.Luminance(1.f);
+    TestTrue(TEXT("Background reverses the direction of visual advantage"),
+        UEcoCreatureCoatPalette::DetectionRangeScale(Dark, Dark) < UEcoCreatureCoatPalette::DetectionRangeScale(Light, Dark)
+        && UEcoCreatureCoatPalette::DetectionRangeScale(Light, Light) < UEcoCreatureCoatPalette::DetectionRangeScale(Dark, Light));
+    TestTrue(TEXT("Subtle surfaces vary only in luminance"), Scales.Tint(1.f).R == Scales.Tint(1.f).B
+        && Scales.Luminance(1.f) - Scales.Luminance(0.f) < Light - Dark);
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoNaturalIndividualTraits,"AdaptiveEcosystem.Life.IndividualTraitsInheritanceAndPolicyBoundary",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoNaturalIndividualTraits::RunTest(const FString&)
@@ -154,6 +176,73 @@ bool FEcoLifeGenome::RunTest(const FString&)
     FReplicatedEcoMassAgent Dto;TestTrue(TEXT("Size-only change creates a transport delta"),Dto.SetPresentation(FVector::ZeroVector,1,255,255,0,0,96));
     TestEqual(TEXT("Late join DTO preserves juvenile scale"),Dto.GetBodyScale(),uint8(96));
     TestFalse(TEXT("Same size creates no duplicate delta"),Dto.SetPresentation(FVector::ZeroVector,1,255,255,0,0,96));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoIndependentFunctionalTraits, "AdaptiveEcosystem.Life.IndependentFunctionalTraits",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoIndependentFunctionalTraits::RunTest(const FString&)
+{
+    using namespace EcoLifeV3;
+    FGenome First;
+    FGenome Second;
+    First.Functional = {1.16, .84, .86};
+    Second.Functional = {.88, 1.14, 1.16};
+    FIndividual Child;
+    Child.bInitialized = true;
+    Child.Genome = Inherit(First, Second, 191);
+    const auto Off = Child.FunctionalTraits(Child.MaturitySeconds, false);
+    const auto Adult = Child.FunctionalTraits(Child.MaturitySeconds, true);
+    TestTrue(TEXT("Each trait inherits independent bounded variation"), Child.Genome.IsValid()
+        && FMath::Abs(Adult.Propulsion - 1.02) <= .03 && FMath::Abs(Adult.Endurance - .99) <= .03
+        && FMath::Abs(Adult.Form - 1.01) <= .03);
+    TestEqual(TEXT("Inactive phenotype is neutral"), Off.ActiveCost(), 1.);
+    TestEqual(TEXT("Lifetime growth does not change the allele"), Adult.Form, Child.Genome.Functional.Form);
+    TestTrue(TEXT("A heavy form trades maneuverability for reach"), Second.Functional.ReachScale() > First.Functional.ReachScale()
+        && Second.Functional.TurnScale() < First.Functional.TurnScale());
+    const FFunctionalTraits Durable{1., 1.14, 1.};
+    TestTrue(TEXT("Endurance lowers active cost at the expense of maintenance"), Durable.ActiveCost() < 1. && Durable.RestCost() > 1.);
+    FReplicatedEcoMassAgent Dto;
+    Dto.SetPresentation(FVector::ZeroVector, 1, 255, 255);
+    TestTrue(TEXT("Proportions alone are a presentation delta"), Dto.SetPresentation(
+        FVector::ZeroVector, 1, 255, 255, 0, 0, 128, 255, 128, 128, 0, 0x8977));
+    TestEqual(TEXT("Replicated proportions preserve both independent bytes"), Dto.GetInheritedProportions(), uint16(0x8977));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoBodyDevelopment, "AdaptiveEcosystem.Life.BodyDevelopment",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoBodyDevelopment::RunTest(const FString&)
+{
+    using namespace EcoLifeV3;
+    FGenome First, Second;
+    First.Functional.Development = {.12, -.12, .10, -.10};
+    Second.Functional.Development = {-.12, .12, -.10, .10};
+    TSet<uint32> Forms;
+    for (uint64 Seed = 1; Seed <= 32; ++Seed)
+    {
+        FIndividual Child;
+        Child.bInitialized = true;
+        Child.Genome = Inherit(First, Second, Seed);
+        const auto& Body = Child.Genome.Functional.Development;
+        const auto Born = Child.FunctionalTraits(Child.Born, true).Development;
+        TestTrue(TEXT("Mature body variation is inherited and bounded"), Body.IsValid()
+            && FMath::Abs(Body.Fore) >= .04 && FMath::Abs(Body.Fore) <= .08);
+        TestEqual(TEXT("Age changes expression without changing the genome"), Born.Fore, .6 * Body.Fore);
+        TestEqual(TEXT("Disabled worlds send the neutral body"), Child.FunctionalTraits(0., false).Development.Pack(), FBodyDevelopment::Neutral);
+        const uint32 Packed = Body.Pack();
+        TestEqual(TEXT("Rounded body modes survive the wire format"), FBodyDevelopment::Unpack(Packed).Pack(), Packed);
+        Forms.Add(Packed);
+    }
+    TestTrue(TEXT("Parents can produce multiple combinations"), Forms.Num() > 16);
+    const FFunctionalTraits Heavier{1., 1., 1., {.12, -.10, .12, .08}};
+    TestTrue(TEXT("A longer, wider foreground has meaningful reach and clearance costs"),
+        Heavier.ReachScale() > 1. && Heavier.WidthScale() > 1. && Heavier.SwimClearanceScale() > Heavier.WidthScale()
+        && Heavier.RestCost() > 1. && Heavier.DriveScale() < 1.);
+    FReplicatedEcoMassAgent Dto;
+    TestTrue(TEXT("Body modes alone dirty the presentation"), Dto.SetPresentation(
+        FVector::ZeroVector, 0, 0, 0, 0, 0, 128, 255, 128, 128, 0, 0x8080, Heavier.Development.Pack()));
+    TestEqual(TEXT("Body modes stay intact in the client payload"), Dto.GetInheritedBody(), Heavier.Development.Pack());
     return true;
 }
 

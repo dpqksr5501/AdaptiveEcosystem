@@ -108,6 +108,8 @@ public:
     bool RequestNaturalBirth(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator=false,FIntPoint ExcludedFauna=FIntPoint::ZeroValue,double PlantReservePerConsumer=1.);
     /** Fauna evaluates species prey availability before requesting; plant reserve is in spatial food units. */
     bool RequestFaunaBirth(FName RegionId, const FEcoServerTimeSnapshot& Time, FEcoSpawnRequest& Out, double RequiredPlantReserve);
+    bool RequestFaunaRecovery(FName RegionId, const FEcoServerTimeSnapshot& Time, FEcoSpawnRequest& Out,
+        double RequiredPlantReserve);
     bool RequestRecoverySpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator,FIntPoint ExcludedFauna=FIntPoint::ZeroValue);
 
 	bool StartResourceSimulation(int32 Epoch, const FEcoFoodEventSettings& Day, const FEcoFoodEventSettings& Night, bool bLogChanges);
@@ -172,6 +174,8 @@ private:
 	int64 LastMigrationReceiptStep = 0;
 	TSet<int64> MigrationReceipts;
 	bool ReserveSpawn(FName RegionId, FEcoSpawnRequest& Request,bool bSpatialBudget=false,bool bAllowsZeroPlantFood=false);
+    bool RequestFaunaSpawn(FName RegionId, const FEcoServerTimeSnapshot& Time, FEcoSpawnRequest& Out,
+        double RequiredPlantReserve, EEcoSpawnOrigin Origin, int32 Count);
     bool RequestLifeSpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator,EEcoSpawnOrigin Origin,int32 Count,FIntPoint ExcludedFauna,double PlantReservePerConsumer=1.);
 	struct FResourceLedger
 	{

@@ -59,7 +59,7 @@ float AEcoPlayerState::ApplyCreatureDamage(APawn* ExpectedAvatar, float Damage, 
     FGameplayEffectSpec Spec(Effect, AbilitySystem->MakeEffectContext(), 1.f);
     AbilitySystem->ApplyGameplayEffectSpecToSelf(Spec);
     const float Applied = Before - GetHealth();
-    UE_LOG(LogTemp, Log, TEXT("[EcoCombat][PlayerDamage] Player=%s Wolf=%lld Applied=%.2f HP=%.2f Avatar=%u"), *GetName(), AttackerId, Applied, GetHealth(), AvatarGeneration);
+    UE_LOG(LogTemp, Log, TEXT("[EcoCombat][PlayerDamage] Player=%s Creature=%lld Applied=%.2f HP=%.2f Avatar=%u"), *GetName(), AttackerId, Applied, GetHealth(), AvatarGeneration);
     return Applied;
 }
 void AEcoPlayerState::HealthChanged(const FOnAttributeChangeData& Change)
@@ -74,7 +74,7 @@ void AEcoPlayerState::ApplyDeathToAvatar()
     if (!HasAuthority() || bDeathHandled) return;
     bDeathHandled = true;
     AbilitySystem->CancelAllAbilities();
-    UE_LOG(LogTemp, Log, TEXT("[EcoCombat][PlayerDeath] Player=%s Wolf=%lld Avatar=%u"), *GetName(), LastCreatureAttacker, AvatarGeneration);
+    UE_LOG(LogTemp, Log, TEXT("[EcoCombat][PlayerDeath] Player=%s Creature=%lld Avatar=%u"), *GetName(), LastCreatureAttacker, AvatarGeneration);
     if (RespawnDelay > 0) GetWorldTimerManager().SetTimer(RespawnTimer, this, &ThisClass::Respawn, RespawnDelay, false);
 }
 void AEcoPlayerState::Respawn()

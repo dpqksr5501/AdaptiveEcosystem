@@ -921,6 +921,9 @@ namespace EcoThreatV3
         /** Optional integration constraints; defaults preserve existing golden trajectories. */
         std::int32_t PreferredTarget=-1;
         const std::uint8_t* CaptureAllowed=nullptr;
+        const double* InitialCoatSightScale = nullptr;
+        void (*AuditInitialSight)(void*, std::int32_t, double, double, double, bool) = nullptr;
+        void* SightAuditUser = nullptr;
         bool bHuntingAllowed=true;
         bool (*ExtraSightBlocked)(void*,double,double,double,double)=nullptr;
         void* SightUser=nullptr;
@@ -1423,16 +1426,25 @@ namespace EcoThreatV3
 				const double Dist = std::sqrt(DX * DX + DY * DY);
 				const double Perceived = Dist * PreyDetectMult(P, Cfg);
 				bool bVis = bPlayer;
+                bool bSightChecked = false;
 				if (!bVis)
 				{
 					const double Inv = 1.0 / (Dist > kEps ? Dist : kEps);
-					bVis = Perceived <= ViewR && (DX * HX + DY * HY) * Inv >= Cfg.PredFovCos;
+                    const double CoatSight = In.InitialCoatSightScale && i != T.Target ? In.InitialCoatSightScale[i] : 1.;
+                    const bool bInFov = (DX * HX + DY * HY) * Inv >= Cfg.PredFovCos;
+                    bVis = Perceived <= ViewR * CoatSight && bInFov;
+                    if (In.AuditInitialSight && i != T.Target && bInFov && Perceived <= ViewR
+                        && !InputSightBlocked(In, QX, QY, P.X, P.Y))
+                    {
+                        In.AuditInitialSight(In.SightAuditUser, i, Dist, Perceived, ViewR, bVis);
+                        bSightChecked = true;
+                    }
 				}
 				if (bVis && (i==In.PreferredTarget || J < 0 || (J!=In.PreferredTarget && Perceived < DT)))
 				{
 					// 세로 장애물: 보통 위협의 눈길이 원판을 지나면 안 보인다 (더 가까운 후보일 때만 재도 결과는 파이썬의 보임 행렬과 같다).
 					// 숲 시야(In.bFoliage)면 잎 원 합집합 안 길이가 문턱 이상이어도 안 보인다 (줄기 ∨ 잎)
-					if (!bPlayer && InputSightBlocked(In, QX, QY, P.X, P.Y))
+					if (!bPlayer && !bSightChecked && InputSightBlocked(In, QX, QY, P.X, P.Y))
 					{
 						continue;
 					}

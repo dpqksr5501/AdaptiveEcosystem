@@ -2792,13 +2792,42 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 	const int32 Wolves = FMath::Clamp(Settings.WolvesPerRegion, 0, 12);
 	int32 Deer = FMath::Clamp(Settings.DeerPerRegion, 1, FEcoV3IntegratedSettings::kTrainDeer);
 	int32 NativeGroupCount = 0;
+	int32 DefaultGroupCount = 0;
+	int64 AuthoredNativeTotal = 0;
+	int64 RuleFaunaTotal = 0;
+	bool bUsesAuthoredPopulation = false;
 	for (const FEcoCreatureSpawnGroup& Group : S.Groups)
 	{
 		NativeGroupCount += Group.bRulesOnly ? 0 : 1;
+		for (const FEcoFaunaPlacement& Placement : Group.Fauna)
+		{
+			RuleFaunaTotal += Placement.SpawnPoints.Num();
+		}
+		if (!Group.bUseAuthoredV3Population)
+		{
+			DefaultGroupCount += Group.bRulesOnly ? 0 : 1;
+			continue;
+		}
+		if (bIsland || Group.bRulesOnly || Group.Herbivores < 1 || Group.Herbivores > FEcoV3IntegratedSettings::kTrainDeer
+			|| Group.Wolves < 0 || Group.Wolves > 12)
+		{
+			UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] Invalid authored Native founder counts in %s: Deer=%d Wolves=%d"),
+				*Group.RegionId.ToString(), Group.Herbivores, Group.Wolves);
+			return false;
+		}
+		bUsesAuthoredPopulation = true;
+		AuthoredNativeTotal += Group.Herbivores + Group.Wolves;
 	}
-	while (NativeGroupCount * (Deer + Wolves) > 512 && Deer > 1)
+	const int64 Budget = bUsesAuthoredPopulation ? FMath::Min(S.GlobalPopulationLimit, 512) - RuleFaunaTotal : 512;
+	while (AuthoredNativeTotal + DefaultGroupCount * (Deer + Wolves) > Budget && Deer > 1)
 	{
-		--Deer;   // 조정자 개체 상한 512 안에 든다
+		--Deer;
+	}
+	if (bUsesAuthoredPopulation && AuthoredNativeTotal + DefaultGroupCount * (Deer + Wolves) > Budget)
+	{
+		UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] Authored Native founders and rule fauna exceed population limit %d"),
+			S.GlobalPopulationLimit);
+		return false;
 	}
 	const bool bStreaming = S.bUseHabitatStreaming;
 
@@ -2835,6 +2864,8 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 			return false;
 		}
 		const FVector Desired = G.bUseFoodPatchPosition ? G.FoodPatchPosition : Region->GetActorLocation();
+		const int32 RegionDeer = G.bUseAuthoredV3Population ? G.Herbivores : Deer;
+		const int32 RegionWolves = G.bUseAuthoredV3Population ? G.Wolves : Wolves;
 		auto Contains = [Region](const FVector& P) { return Region->ContainsPosition(P); };
 		auto Project = [World](const FVector& Hint, FVector& Out) { return ProjectLikeCoordinator(*World, Hint, Out); };
 		FEcoV3StagePlan Plan;
@@ -2842,23 +2873,23 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 		if (bStreaming)
 		{
 			// 지형이 덜 왔다: 이 계획은 힌트일 뿐이다(조정자가 이 자리로 스트리밍 원천 모양을 잡는다). 조정자 시작 직전 검사가 늘 다시 고른다
-			PlanStage(G.RegionId, g, Desired, Region->GetActorLocation(), Settings, Deer, Wolves, false, Contains, Project, Plan, &LevelTrunks);
+			PlanStage(G.RegionId, g, Desired, Region->GetActorLocation(), Settings, RegionDeer, RegionWolves, false, Contains, Project, Plan, &LevelTrunks);
 			Plan.bGrounded = false;
 			if (!Plan.bComplete)
 			{
 				UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 지역 %s 무대에 시작 자리를 다 놓지 못했다 (사슴 %d/%d, 늑대 %d/%d)"),
-					   *G.RegionId.ToString(), Plan.DeerPoints.Num(), Deer, Plan.WolfPoints.Num(), Wolves);
+					   *G.RegionId.ToString(), Plan.DeerPoints.Num(), RegionDeer, Plan.WolfPoints.Num(), RegionWolves);
 				return false;
 			}
 		}
 		else
 		{
 			// 스트리밍 없음: 조정자가 같은 UWorld::BeginPlay 안에서 바로 시작하므로 지금 지형이 조정자가 볼 지형이다
-			PlanStage(G.RegionId, g, Desired, Region->GetActorLocation(), Settings, Deer, Wolves, true, Contains, Project, Plan, &LevelTrunks);
-			if (!AcceptGroundedPlan(Plan, bPartial))
+			PlanStage(G.RegionId, g, Desired, Region->GetActorLocation(), Settings, RegionDeer, RegionWolves, true, Contains, Project, Plan, &LevelTrunks);
+			if (!AcceptGroundedPlan(Plan, bPartial) || (G.bUseAuthoredV3Population && bPartial))
 			{
 				UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 지역 %s 무대에서 지면 검사를 통과한 시작 자리가 모자란다 (사슴 %d/%d, 늑대 %d/%d)"),
-					   *G.RegionId.ToString(), Plan.DeerPoints.Num(), Deer, Plan.WolfPoints.Num(), Wolves);
+					   *G.RegionId.ToString(), Plan.DeerPoints.Num(), RegionDeer, Plan.WolfPoints.Num(), RegionWolves);
 				return false;
 			}
 		}
@@ -2996,7 +3027,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ValidateSpawnPointsNow()
 		PlanStage(G->RegionId, Old.GroupIndex, Desired, Region->GetActorLocation(), Settings, Old.WantDeer, Old.WantWolves, true, Contains,
 				  Project, Grounded, &LevelTrunks);
 		bool bPartial = false;
-		if (!AcceptGroundedPlan(Grounded, bPartial))
+		if (!AcceptGroundedPlan(Grounded, bPartial) || (G->bUseAuthoredV3Population && bPartial))
 		{
 			UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 지역 %s: 시작 직전 지면 검사를 통과한 자리가 모자란다 (사슴 %d/%d, 늑대 %d/%d)"),
 				   *G->RegionId.ToString(), Grounded.DeerPoints.Num(), Old.WantDeer, Grounded.WolfPoints.Num(), Old.WantWolves);

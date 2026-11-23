@@ -235,6 +235,44 @@ def add_eagle_perch(runtime):
         put(runtime, fauna_perches=[*perches, site])
 
 
+def enable_local_nurseries(runtime):
+    patches = list(get(runtime, "fauna_habitat_patches"))
+    sites = {}
+    for label, species in (("IslandRiverGravelInsects", "AriakeCatfish"), ("IslandRiverDrift", "UnidentifiedFish")):
+        patch, = (item for item in patches if str(get(item, "id")) == label)
+        if not get(patch, "submerged") or species not in map(str, get(patch, "consumers")):
+            raise RuntimeError(f"Expected an existing submerged food patch for {species}")
+        put(patch, aquatic_nursery=True)
+        sites[label] = {"species": species, "center_cm": list(get(patch, "center").to_tuple())}
+    put(runtime, fauna_habitat_patches=patches)
+    return sites
+
+
+def save_local_nurseries():
+    world = editor.get_editor_world()
+    if world.get_path_name().split(".")[0] != TARGET:
+        raise RuntimeError("Expected owned island")
+    scenario = "LocalNurseriesMove"
+    path = REPORT.parent / f"Island_20000_{scenario}/IslandFaunaPIE.json"
+    audit = json.loads(path.read_bytes())
+    log = (REPORT.parent / f"IslandAccessBaseline/20000_{scenario}.log").read_text(encoding="utf-8-sig")
+    if audit["errors"] or not audit["trait_evidence"]["cohorts"][0]["aquatic_nursery_approach"]:
+        raise RuntimeError("Expected a successful island nursery approach audit")
+    for label, row in audit["local_nurseries"].items():
+        if not any(f"[AquaticHatch] Nursery={label} " in line and f" Species={row['species']}" in line for line in log.splitlines()):
+            raise RuntimeError(f"No confirmed hatch at {label}")
+    runtime = common["runtime"]()
+    runtime.modify()
+    sites = enable_local_nurseries(runtime)
+    for label, row in sites.items():
+        measured = audit["local_nurseries"][label]
+        if row["species"] != measured["species"] or any(abs(a - b) > .01 for a, b in zip(row["center_cm"], measured["center_cm"])):
+            raise RuntimeError(f"The authored point changed after verification: {label}")
+    if not levels.save_current_level():
+        raise RuntimeError("Unable to save the local nursery layout")
+    u.log(f"ECO_ISLAND_LOCAL_NURSERIES_SAVED {sites}")
+
+
 def save_eagle_perch():
     world = editor.get_editor_world()
     if world.get_path_name().split(".")[0] != TARGET:
@@ -665,6 +703,7 @@ def author():
         v3_use_authored_shelters=True)
     add_eagle_perch(runtime)
     apply_food_visit_layout(world, runtime)
+    enable_local_nurseries(runtime)
     if not levels.save_current_level():
         raise RuntimeError("Unable to save island")
     result = {"map": TARGET, "river": river_region, "water_samples": samples, "forage": len(stock) - len(samples), "foliage": scenery,
@@ -699,6 +738,8 @@ if __name__ == "__main__":
             save_mink_high_bank()
         elif "-EcoIslandSaveEaglePerch" in u.SystemLibrary.get_command_line().split():
             save_eagle_perch()
+        elif "-EcoIslandSaveLocalNurseries" in u.SystemLibrary.get_command_line().split():
+            save_local_nurseries()
         elif "-EcoIslandSaveFoodVisitLayout" in u.SystemLibrary.get_command_line().split():
             save_food_visit_layout()
         elif "-EcoIslandSaveForageSoil" in u.SystemLibrary.get_command_line().split():

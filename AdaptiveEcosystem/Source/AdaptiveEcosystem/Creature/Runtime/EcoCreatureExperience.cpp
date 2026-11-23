@@ -274,8 +274,9 @@ double AEcoCreatureIntegrationSpawner::FoodVisitFactor(int64 AgentId, const FEnc
     if ((!Memory || Memory->FoodVisits.IsEmpty()) && !Active) return 1.;
     const auto Key = FoodVisitKey(Resource, Now);
     const auto* Estimate = Memory ? Memory->FoodVisits.FindByPredicate([&](const auto& Row) { return Row.Key == Key; }) : nullptr;
+    // A confirmed shortfall can redirect the next scan before another meal attempt or visit close.
     const bool bCurrentVisit = Active && Active->Resource == Resource && Active->Key == Key && Now >= Active->Last
-        && Now - Active->Last <= FoodVisitGapSeconds && Active->Last > Active->First;
+        && Now - Active->Last <= FoodVisitGapSeconds && (Active->Last > Active->First || Active->Paid < Active->Requested);
     if (!Estimate && !bCurrentVisit) return 1.;
     const auto* Entity = AgentLookup.Find(AgentId);
     const auto& Manager = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();

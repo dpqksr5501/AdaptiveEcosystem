@@ -6,7 +6,9 @@ import json
 from itertools import combinations, product
 import math
 from pathlib import Path
+from random import Random
 import re
+import runpy
 import sys
 import time
 import traceback
@@ -21,9 +23,112 @@ authored = json.loads((out / "IslandFaunaAuthoring.json").read_text(encoding="ut
 inspect = u.EcoCreatureInspectionLibrary
 result = {"errors": [], "samples": [], "capture_files": []}
 command = u.SystemLibrary.get_command_line()
+rule_ambush_arg = re.search(r"(?:^|\s)-EcoIslandAuditRuleAmbush(?:=(DayClear|DayRain|NightClear|NightRain))?(?:\s|$)", command)
+rule_ambush_trial = rule_ambush_arg is not None
+rule_ambush_climate = rule_ambush_arg[1] if rule_ambush_arg else None
+trait_audit = "-EcoTraitAudit" in command.split()
+audit_aquatic_cohorts = "-EcoIslandAuditAquaticMeals" in command.split()
+trait_checkpoint_resume = "-EcoIslandTraitCheckpointResume" in command.split()
 audit_label = re.search(r"(?:^|\s)-EcoIslandAuditLabel=([A-Za-z0-9_]{1,32})(?:\s|$)", command)
 population_duration = re.search(r"(?:^|\s)-EcoIslandPopulationSeconds=(\d+)(?:\s|$)", command)
 population_duration = int(population_duration[1]) if population_duration else None
+trait_climate_match = re.search(r"(?:^|\s)-EcoIslandTraitClimate=(Dry|Rain)(?:\s|$)", command)
+trait_climate_regions = {}
+water_food_audit = re.search(r"(?:^|\s)-EcoIslandWaterFoodAuditAgent=(\d+)(?:\s|$)", command)
+water_food_audit_agent = int(water_food_audit[1]) if water_food_audit else 0
+forage_stock_audit = re.search(r"(?:^|\s)-EcoIslandForageStockAuditPatch=([A-Za-z][A-Za-z0-9_]{0,63})(?:\s|$)", command)
+wolf_lineage_trial = "-EcoIslandTraitWolfLineage" in command.split()
+wolf_kin_match = re.search(r"(?:^|\s)-EcoIslandWolfKin=(Separated|Shared)(?:\s|$)", command)
+wolf_kin_trial = wolf_kin_match[1] if wolf_kin_match else None
+wolf_territory_trial = "-EcoIslandWolfTerritory" in command.split() or bool(wolf_kin_trial)
+wolf_food_survey = re.search(r"(?:^|\s)-EcoIslandWolfFoodSurvey=([1-9]\d*)(?:\s|$)", command)
+wolf_carrion_survey = "-EcoIslandWolfCarrionSurvey" in command.split()
+wolf_prey_mix = "-EcoIslandWolfPreyMix" in command.split()
+if wolf_prey_mix and not (wolf_kin_trial == "Shared" and wolf_carrion_survey):
+    raise RuntimeError("The Grassland prey mix requires the shared wolf comparison")
+wolf_observer = re.search(r"(?:^|\s)-EcoIslandWolfObserver=(Hold|Leave),(\d+),([1-9]\d*)(?:\s|$)", command)
+wolf_descendant_save = re.search(r"(?:^|\s)-EcoIslandWolfDescendantSave=([A-Za-z0-9_]{1,20})(?:\s|$)", command)
+wolf_descendant_restore = re.search(r"(?:^|\s)-EcoIslandWolfDescendantRestore=([A-Za-z0-9_]{1,20}),([A-Za-z0-9_]{1,24})(?:\s|$)", command)
+if wolf_observer and not (wolf_prey_mix and population_duration and 4 < int(wolf_observer[2]) < population_duration - 35):
+    raise RuntimeError("The Native wolf observer comparison needs the prey mix and a full observation window")
+wolf_checkpoint = re.search(r"(?:^|\s)-EcoIslandWolfCheckpoint=(Save|Load|Reject),([A-Za-z0-9_]{1,20})(?:\s|$)", command)
+wolf_checkpoint_reject_birth = "-EcoIslandWolfCheckpointRejectBirthRule" in command.split()
+wolf_checkpoint_client = bool(wolf_descendant_restore or (wolf_checkpoint and wolf_checkpoint[1] == "Load"))
+wolf_birth_fork = re.search(r"(?:^|\s)-EcoIslandWolfBirthFork=(Save|Hold|Leave),([A-Za-z0-9_]{1,20}),(Founder|Descendant)(?:\s|$)", command)
+if wolf_birth_fork and (not (wolf_prey_mix and audit_label and population_duration) or wolf_checkpoint or wolf_observer):
+    raise RuntimeError("The Native wolf birth fork needs a labeled Grassland prey mix and its own checkpoint")
+wolf_rejoin_port = re.search(r"(?:^|\s)-EcoIslandWolfRejoinPort=(\d+)(?:\s|$)", command)
+if wolf_food_survey and wolf_kin_trial != "Shared":
+    raise RuntimeError("The Native food survey belongs to the shared wolf territory comparison")
+if ((wolf_descendant_save or wolf_descendant_restore) and not (wolf_prey_mix and wolf_food_survey and trait_audit and population_duration)
+        or (wolf_descendant_save and wolf_descendant_restore)):
+    raise RuntimeError("A Native descendant checkpoint requires one mode in the paired Grassland feeding and lineage audit")
+local_nurseries_trial = "-EcoIslandLocalNurseries" in command.split()
+predator_habitat_trial = "-EcoIslandPredatorBreedingHabitat" in command.split()
+buffalo_guard_trial = re.search(r"(?:^|\s)-EcoIslandBuffaloGuardTrial(?:=(Calf))?(?:\s|$)", command)
+predator_roots_trial = "-EcoIslandPredatorBreedingAtRoots" in command.split()
+predator_sites_trial = "-EcoIslandPredatorBreedingSites" in command.split() or predator_roots_trial
+eagle_family_match = re.search(r"(?:^|\s)-EcoIslandEagleFamilies=(Landscape|PreyRoute|Provisioned)(?:\s|$)", command)
+eagle_family_trial = eagle_family_match[1] if eagle_family_match else None
+if eagle_family_trial and not (audit_label and population_duration and trait_audit):
+    raise RuntimeError("The eagle family layout needs a labeled population and lineage audit")
+mink_roots_seasonal_shelf = "-EcoIslandMinkRootsSeasonalShelf" in command.split()
+mink_roots_shelf = "-EcoIslandMinkRootsShelf" in command.split() or mink_roots_seasonal_shelf
+mink_roots_nursery = "-EcoIslandMinkRootsNursery" in command.split() or mink_roots_shelf
+mink_roots_watch = "-EcoIslandMinkRootsWatch" in command.split() or mink_roots_nursery
+mink_bank_watch = "-EcoIslandMinkBankWatch" in command.split() or mink_roots_watch
+mink_near_surface_prey = "-EcoIslandMinkNearSurfacePrey" in command.split() or mink_bank_watch
+mink_near_prey_trial = "-EcoIslandMinkNearPrey" in command.split() or mink_near_surface_prey
+covered_refuge_food_trial = "-EcoIslandCoveredRefugeFood" in command.split()
+land_forage_regrowth_trial = "-EcoIslandLandForageRegrowth" in command.split()
+aquatic_forage_regrowth_trial = "-EcoIslandAquaticForageRegrowth" in command.split()
+aquatic_neighborhoods = "-EcoIslandAquaticNeighborhoods" in command.split()
+aquatic_neighborhood_supply = "-EcoIslandAquaticNeighborhoodSupply" in command.split()
+if aquatic_neighborhood_supply and not (aquatic_neighborhoods and aquatic_forage_regrowth_trial):
+    raise RuntimeError("The local aquatic supply comparison needs the matched neighborhood and regrowth layout")
+carp_capacity_match = re.search(r"(?:^|\s)-EcoIslandOpenCarpCapacityAt=(\d+)(?:\s|$)", command)
+carp_capacity_at = int(carp_capacity_match[1]) if carp_capacity_match else None
+if carp_capacity_at is not None and not (aquatic_forage_regrowth_trial and population_duration
+                                        and 0 < carp_capacity_at < population_duration):
+    raise RuntimeError("The carp capacity trial needs a positive time within an aquatic regrowth run")
+small_fish_capacity_match = re.search(r"(?:^|\s)-EcoIslandOpenSmallFishCapacityAt=(\d+)(?:,([24]))?(?:\s|$)", command)
+small_fish_capacity_at = int(small_fish_capacity_match[1]) if small_fish_capacity_match else None
+small_fish_capacity_increase = int(small_fish_capacity_match[2] or 2) if small_fish_capacity_match else 2
+if small_fish_capacity_at is not None and not (aquatic_neighborhood_supply and population_duration
+                                              and 0 < small_fish_capacity_at < population_duration):
+    raise RuntimeError("The small-fish capacity trial needs a positive time within a local supply run")
+small_fish_encounter = "-EcoIslandSmallFishEncounter" in command.split()
+if small_fish_encounter and (small_fish_capacity_at != 630 or small_fish_capacity_increase != 4 or not trait_audit):
+    raise RuntimeError("The encounter comparison requires the four-place aquatic capacity trial")
+small_fish_meal_access = "-EcoIslandSmallFishMealAccess" in command.split()
+if small_fish_meal_access and not small_fish_encounter:
+    raise RuntimeError("The post-hatch feeding trial requires the matched founder layout")
+meal_fork_match = re.search(r"(?:^|\s)-EcoIslandSmallFishMealFork=(Save|Load),([A-Za-z0-9_]{1,20})(?:\s|$)", command)
+meal_fork_mode = meal_fork_match[1] if meal_fork_match else None
+if meal_fork_mode and (not small_fish_encounter or small_fish_meal_access != (meal_fork_mode == "Save")):
+    raise RuntimeError("The post-hatch fork saves with access and restores as the original-access control")
+meal_transfer_match = re.search(r"(?:^|\s)-EcoIslandSmallFishMealTransfer=(0\.\d+)(?:\s|$)", command)
+meal_regrowth_transfer = float(meal_transfer_match[1]) if meal_transfer_match else 0.
+if meal_transfer_match and (meal_fork_mode != "Load" or not meal_regrowth_transfer):
+    raise RuntimeError("The regrowth transfer requires a restored post-hatch fork and a positive transfer")
+breeding_checkpoint_match = re.search(r"(?:^|\s)-EcoIslandBreedingCheckpoint=(Save|Load),([A-Za-z0-9_]{1,20})(?:\s|$)", command)
+breeding_checkpoint_mode = breeding_checkpoint_match[1] if breeding_checkpoint_match else None
+breeding_checkpoint_client = "-EcoIslandBreedingCheckpointClient" in command.split()
+if breeding_checkpoint_client and breeding_checkpoint_mode != "Load":
+    raise RuntimeError("The breeding client observes the restored hatch")
+if breeding_checkpoint_mode and not (trait_audit and audit_label and population_duration and population_duration >= 840
+                                     and small_fish_capacity_at == 630 and small_fish_capacity_increase == 4
+                                     and "-EcoFaunaBreedingOpportunity" in command.split()):
+    raise RuntimeError("The breeding checkpoint uses the matched trial through at least 840 authority seconds")
+dispersed_land_forage = "-EcoIslandLandForageAccess=Dispersed" in command.split()
+land_forage_access_trial = dispersed_land_forage or "-EcoIslandLandForageAccess" in command.split()
+if land_forage_access_trial and not land_forage_regrowth_trial:
+    raise ValueError("Land forage access requires the matched regrowth scenario")
+covered_refuge_energy_budget = "-EcoIslandCoveredRefugeEnergyBudget" in command.split()
+covered_refuge_caregiver = "-EcoIslandCoveredRefugeCaregiver" in command.split()
+audit_refuge_meals = "-EcoIslandAuditRefugeMeals" in command.split()
+if (covered_refuge_energy_budget or covered_refuge_caregiver or audit_refuge_meals) and not covered_refuge_food_trial:
+    raise ValueError("The refuge comparison requires the covered refuge food setup")
 population_without_forage_soil = "-EcoIslandPopulationWithoutForageSoil" in command.split()
 survey_second_mink_shore = "-EcoIslandSurveySecondMinkShore" in command.split()
 survey_local_mink_water = "-EcoIslandSurveyLocalMinkWater" in command.split()
@@ -88,6 +193,11 @@ feeding_track_match = re.search(r"(?:^|\s)-EcoIslandFeedingTrack=([1-9]\d*(?:,[1
 feeding_track_ids = sorted({int(agent) for agent in feeding_track_match[1].split(",")}) if feeding_track_match else []
 player_trial_match = re.search(r"(?:^|\s)-EcoIslandPlayerPassage=(Still|Sneak|Run)(?:\s|$)", command)
 player_trial = player_trial_match[1] if player_trial_match else None
+passage_climate_match = re.search(r"(?:^|\s)-EcoIslandPassageClimate=(DayClear|DayRain|NightClear|NightRain)(?:\s|$)", command)
+passage_climate = passage_climate_match[1] if passage_climate_match else None
+passage_clock_offset = 60. if passage_climate and passage_climate.startswith("Night") else 0.
+if passage_climate and (not player_trial or population_duration):
+    raise RuntimeError("A passage climate needs a fixed player-passage trial in Full mode")
 combat_trial_match = re.search(r"(?:^|\s)-EcoIslandCombatCarrion=(Present|Attack|Rifle|RiflePresent)(?:\s|$)", command)
 combat_trial = combat_trial_match[1] if combat_trial_match else None
 saved_player_combat = "-EcoIslandSavedPlayerCombat" in command.split()
@@ -98,10 +208,52 @@ combat_start_match = re.search(r"(?:^|\s)-EcoIslandCombatStart=(\d+)(?:\s|$)", c
 combat_start = int(combat_start_match[1]) if combat_start_match else 16
 combat_victim_match = re.search(r"(?:^|\s)-EcoIslandCombatVictim=(\d+)(?:\s|$)", command)
 combat_victim = int(combat_victim_match[1]) if combat_victim_match else 49
+combat_clear_approach = "-EcoIslandCombatClearApproach" in command.split()
+combat_isolate_target = "-EcoIslandCombatIsolateTarget" in command.split()
+if combat_isolate_target and (combat_trial != "Rifle" or not combat_clear_approach):
+    raise RuntimeError("A target-isolated trial requires Rifle and CombatClearApproach")
+combat_selection_match = re.search(r"(?:^|\s)-EcoIslandCombatSelection=(Largest|Blind|VisibleLargest|VisibleSmallest)(?:\s|$)", command)
+combat_selection = combat_selection_match[1] if combat_selection_match else None
+visible_combat_selection = combat_selection in {"VisibleLargest", "VisibleSmallest"}
+audit_hunt_carrion = "-EcoIslandAuditHuntCarrion" in command.split()
+audit_player_attack_witness = "-EcoIslandAuditPlayerAttackWitness" in command.split()
+if audit_player_attack_witness and not (combat_isolate_target and population_duration and combat_victim_match):
+    raise RuntimeError("Player attack witness audit requires an isolated rifle trial with an explicit victim")
+if audit_hunt_carrion and not (combat_isolate_target and population_duration
+                              and population_duration >= combat_start + 80):
+    raise RuntimeError("The carrion audit requires an isolated rifle trial with at least 80 seconds after the hunt starts")
+combat_layout_match = re.search(r"(?:^|\s)-EcoIslandCombatSelectionLayout=(\d+)(?:\s|$)", command)
+combat_layout_seed = int(combat_layout_match[1]) if combat_layout_match else None
+if combat_selection or combat_layout_seed is not None:
+    if not (combat_selection and combat_isolate_target and population_duration and saved_player_combat
+            and combat_layout_seed is not None and 0 < combat_layout_seed <= 2147483647 and not combat_victim_match):
+        raise RuntimeError("Selection trials require a layout seed, saved island, target isolation and no explicit victim")
+combat_episodes = [("combat_carrion", combat_start, combat_victim)] if combat_trial else []
+combat_repeat_match = re.search(r"(?:^|\s)-EcoIslandCombatRepeat=(\d+),(\d+)(?:\s|$)", command)
+if combat_repeat_match:
+    repeat_start, repeat_victim = map(int, combat_repeat_match.groups())
+    if (not combat_isolate_target or not saved_player_combat or not population_duration or combat_selection
+            or not combat_victim_match or repeat_victim <= 0 or repeat_victim == combat_victim
+            or repeat_start < combat_start + 30 or population_duration < repeat_start + (80 if audit_hunt_carrion else 30)):
+        raise RuntimeError("Repeat hunt requires two distinct explicit targets and separated rifle windows on the saved island")
+    combat_episodes.append(("combat_repeat", repeat_start, repeat_victim))
+recovery_trial = re.search(r"(?:^|\s)-EcoIslandRecoveryAfterHunt=(\d+)(?:\s|$)", command)
+recovery_restore = re.search(r"(?:^|\s)-EcoIslandRecoveryRestore=([A-Za-z][A-Za-z0-9_]{0,23})(?:\s|$)", command)
+recovery_pair_fixture = "-EcoIslandRecoveryPairFixture" in command.split()
+if recovery_trial and not (audit_label and trait_audit and combat_repeat_match
+                           and int(combat_repeat_match[1]) + 80 < int(recovery_trial[1]) < population_duration - 10):
+    raise RuntimeError("Recovery needs a labeled trait population run after two completed hunts")
+if recovery_pair_fixture and not recovery_trial:
+    raise RuntimeError("The reduced founder fixture requires a recovery trial")
+if recovery_restore and (population_duration or combat_trial or not audit_label):
+    raise RuntimeError("Recovery restore uses a separate labeled island startup")
+combat_selection_draw = 2601
+COMBAT_SELECTION_REGION = "Grassland"
 forage_intent_match = re.search(r"(?:^|\s)-EcoIslandForageIntent=(Control|Alternate|Expired|Switch|Hold)(?:\s|$)", command)
 forage_intent = forage_intent_match[1] if forage_intent_match else None
 forage_guild_trial = "-EcoIslandOpenMeadowBrowse" in command.split()
 forage_guild_west = "-EcoIslandWestMeadowBrowse" in command.split()
+forage_guild_wet = "-EcoIslandWestMeadowWetGuild" in command.split()
 forage_half_meal = "-EcoIslandWestMeadowHalfMeal" in command.split()
 stage_bounds_trial = re.search(r"(?:^|\s)-EcoIslandTrialStageBounds=(Grassland|Riverbank|Highland)(?:\s|$)", command)
 water_species = {"AriakeCatfish", "CommonCarp", "UnidentifiedFish", "Mink"}
@@ -398,12 +550,13 @@ origin = u.Vector(*authored["river_view"])
 
 def finish():
     if rifle_combat_trial and not result["errors"]:
-        trial = result.get("combat_carrion", {})
-        if combat_trial == "Rifle" and trial.get("release_hp") != 0:
-            result["errors"].append("Rifle trial target did not reach zero HP")
-        if combat_trial == "RiflePresent" and (
-                trial.get("release_hp") != 100. or trial.get("shots") or trial.get("damage")):
-            result["errors"].append("No-fire rifle control did not preserve the target without damage")
+        for key, _, victim_id in combat_episodes:
+            trial = result.get(key, {})
+            if combat_trial == "Rifle" and trial.get("release_hp") != 0:
+                result["errors"].append(f"Rifle trial {key} (target {trial.get('victim', victim_id)}) did not reach zero HP")
+            if combat_trial == "RiflePresent" and (
+                    trial.get("release_hp") != 100. or trial.get("shots") or trial.get("damage")):
+                result["errors"].append("No-fire rifle control did not preserve the target without damage")
     if local_soil_trial and not result["errors"] and not result.get("checkpoint_mode"):
         trial = result.get("local_forage_soil", {})
         names = set(trial.get("tracked_patches", ()))
@@ -458,8 +611,10 @@ def finish():
                                                  if region == "Riverbank" and "Eaten" in reason and t >= arrived[0])
             if not founder["destination_meals"]:
                 result["errors"].append("Founder arrived without a recorded destination meal")
-    if (result.get("record_gameplay_reasons") and not result["errors"] and result.get("checkpoint_mode") != "Save"
-            and not result.get("checkpoint_rejected_shifted_rat_mouth")):
+    if (result.get("record_gameplay_reasons") and not rule_ambush_trial and not result["errors"] and result.get("checkpoint_mode") != "Save"
+            and not recovery_restore and not wolf_checkpoint and not wolf_birth_fork and not wolf_descendant_restore
+            and not result.get("checkpoint_rejected_shifted_rat_mouth")
+            and not result.get("checkpoint_rejected_trait_mismatch")):
         if not any(agent.get("gameplay_reason_history") for sample in result["samples"] for agent in sample["agents"]):
             result["errors"].append("Authority gameplay history was not captured")
     if feeding_track_ids and not result["errors"]:
@@ -657,17 +812,46 @@ def tick(_):
         timeout = max(170., duration / 2. + 90.) if duration else 170.
         if time.monotonic() - started > timeout:
             raise RuntimeError("Island PIE timed out")
-        world = editor.get_game_world()
+        client_world = None
+        if breeding_checkpoint_client or wolf_checkpoint_client:
+            worlds = [world for world in u.ObjectIterator(u.World) if "/UEDPIE_" in world.get_path_name()
+                      and world.get_name().endswith("LV_JYU_IslandEcosystemRefreshed")]
+            world = next((world for world in worlds if u.SystemLibrary.is_dedicated_server(world)), None)
+            client_world = next((other for other in worlds if other != world and u.GameplayStatics.get_player_controller(other, 0)), None)
+        else:
+            world = editor.get_game_world()
         if not world:
             return
+        if trait_audit and not result.get("trait_ledger_logging"):
+            u.SystemLibrary.execute_console_command(world, "eco.Resources.Log 1")
+            result["trait_ledger_logging"] = True
         now = u.GameplayStatics.get_time_seconds(world)
-        if combat_trial and combat_start <= now <= combat_start + 30.:
-            update_combat_carrion(world, now)
-        if population_duration:
-            tick_population(world, now)
+        if rule_ambush_trial:
+            if tick_rule_ambush(world, now):
+                finish()
             return
-        if player_trial and 20. <= now <= 43.:
-            update_player_passage(world, now)
+        if recovery_restore:
+            runtime = u.GameplayStatics.get_actor_of_class(world, u.EcoCreatureIntegrationSpawner)
+            if now >= 4. and runtime and runtime.is_runtime_ready():
+                restore_fauna_recovery(runtime, recovery_restore[1])
+                finish()
+            return
+        for key, start, victim_id in combat_episodes:
+            if start <= now <= start + 30.:
+                update_combat_carrion(world, now, key, start, victim_id)
+                if audit_player_attack_witness:
+                    sample_player_attack_witnesses(world, now, key)
+            if audit_hunt_carrion and start <= now <= start + 80.:
+                sample_hunt_carrion(world, key)
+        if population_duration:
+            tick_population(world, now, client_world)
+            return
+        if player_trial and 20. <= now - passage_clock_offset <= 43.:
+            update_player_passage(world, now - passage_clock_offset)
+        if passage_climate and now > 43. + passage_clock_offset and not result["player_passage"].get("trace_stopped"):
+            for name in ("eco.Senses.NoiseLog 0", "eco.Footsteps.HearingLog 0"):
+                u.SystemLibrary.execute_console_command(world, name)
+            result["player_passage"]["trace_stopped"] = True
         if feeding_track_ids and now >= next_feeding_sample:
             sample_feeding_track(world, now)
             next_feeding_sample = now + result["feeding_track"]["interval_seconds"]
@@ -722,16 +906,10 @@ def tick(_):
                 raise RuntimeError("Forage guild trial requires a labeled PIE before stock initialization")
             if forage_guild_trial and forage_guild_west:
                 raise RuntimeError("Forage guild trial changes one patch at a time")
-            patch_id = "IslandForageWestMeadow" if forage_guild_west else "IslandForageOpenMeadow"
-            patches = list(runtime.get_editor_property("fauna_habitat_patches"))
-            meadow, = (patch for patch in patches if str(patch.get_editor_property("id")) == patch_id)
-            if meadow.get_editor_property("plant_guild") != u.EcoFaunaPlantGuild.GRASS:
-                raise RuntimeError("Forage guild trial requires a saved grass meadow")
-            meadow.set_editor_property("plant_guild", u.EcoFaunaPlantGuild.BROWSE)
-            runtime.set_editor_property("fauna_habitat_patches", patches)
-            result["forage_guild_trial"] = {"patch": patch_id, "from": "GRASS", "to": "BROWSE"}
+            patch_id = "IslandForageOpenMeadow" if forage_guild_trial else "IslandForageWestMeadow"
+            stage_land_forage_guild(runtime, patch_id, "BROWSE")
         if runtime and forage_half_meal and "forage_meal_trial" not in result:
-            if not audit_label or runtime.is_runtime_ready() or forage_guild_trial or forage_guild_west:
+            if not audit_label or runtime.is_runtime_ready() or "forage_guild_trial" in result:
                 raise RuntimeError("Meal-size trial requires a labeled PIE before stock initialization and the saved guild")
             patch_id = "IslandForageWestMeadow"
             patches = list(runtime.get_editor_property("fauna_habitat_patches"))
@@ -1266,10 +1444,743 @@ def read_agent(world, agent):
     return json.loads(raw) if raw else None
 
 
-def tick_population(world, now):
-    if water_forage_shared and "-EcoIslandAuditDriftStock" in command.split() and not result.get("drift_stock_audit"):
-        u.SystemLibrary.execute_console_command(world, "eco.Fauna.ForageStockAudit IslandRiverDrift")
-        result["drift_stock_audit"] = True
+def tick_rule_ambush(world, now):
+    runtime = u.GameplayStatics.get_actor_of_class(world, u.EcoCreatureIntegrationSpawner)
+    pawn = u.GameplayStatics.get_player_pawn(world, 0)
+    if not runtime or not runtime.is_runtime_ready() or not pawn:
+        return False
+    trial = result.setdefault("rule_ambush", {"positions": {}, "samples": []})
+    state = pawn.get_editor_property("player_state")
+    if not isinstance(state, u.EcoPlayerState) or not runtime.get_editor_property("enable_rule_fauna_player_ambush"):
+        raise RuntimeError("The saved island needs its authority player and explicit ambush flag")
+    compare_climate = rule_ambush_climate is not None
+    night = compare_climate and rule_ambush_climate.startswith("Night")
+    # Use the island's 60-second phases, past twilight and after the leopards start looking for food.
+    encounter_start = (65. if night else 125.) if compare_climate else 0.
+    if now < encounter_start:
+        return False
+    if "rain" not in trial:
+        region = isolate_region_weather(world, {"Riverbank"})["Riverbank"]
+        weather = region.get_environment_state()
+        rain = not compare_climate or rule_ambush_climate.endswith("Rain")
+        weather.set_editor_property("rainfall", .8 if rain else 0.)
+        weather.set_editor_property("weather_state", u.EcoWeatherState.RAIN if rain else u.EcoWeatherState.CLEAR)
+        region.set_environment_state(weather)
+        trial["rain"] = region.get_environment_state().get_editor_property("rainfall")
+    if now < trial.get("next_sample", 0.):
+        return False
+    trial["next_sample"] = now + .15
+
+    def position_of(agent):
+        return u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", agent["position"])))
+
+    if compare_climate:
+        clock = u.GameplayStatics.get_game_state(world).get_ecology_summary().get_editor_property("time")
+        phase = clock.get_editor_property("day_cycle").get_editor_property("phase")
+        expected = u.EcoDayPhase.NIGHT if night else u.EcoDayPhase.DAY
+        if phase != expected:
+            raise RuntimeError(f"Ambush climate {rule_ambush_climate} saw unexpected clock phase {phase} at {now:.2f}")
+        trial.update(climate=rule_ambush_climate, phase="Night" if night else "Day")
+    if "leopard" not in trial:
+        if now > (encounter_start + 24. if compare_climate else 145.):
+            raise RuntimeError("No hungry leopard with a clear ground approach was observed")
+        for identity in (71, 72):
+            agent = read_agent(world, identity)
+            if not agent or agent["species"] != "Leopard" or agent["region"] != "Riverbank" or agent["hp"] <= 0.:
+                continue
+            position = position_of(agent)
+            previous = trial["positions"].get(str(identity))
+            trial["positions"][str(identity)] = list(position.to_tuple())
+            if not previous or agent.get("energy_fraction", 1.) >= .79:
+                continue
+            heading = position - u.Vector(*previous)
+            heading.z = 0.
+            if heading.length() < 5.:
+                continue
+            target = position + heading * (320. / heading.length())
+            ground = u.EcoCreatureAnimationBuilder.project_placement_point(world, target)
+            if ground is None or abs(ground.z - position.z) > 40.:
+                continue
+            center = ground + u.Vector(0., 0., pawn.capsule_component.get_scaled_capsule_half_height())
+            if u.SystemLibrary.line_trace_single_for_objects(world, position + u.Vector(0., 0., 40.), center,
+                    [u.ObjectTypeQuery.OBJECT_TYPE_QUERY1], False, [], u.DrawDebugTrace.NONE, False):
+                continue
+            pawn.character_movement.stop_movement_immediately()
+            if not pawn.set_actor_location(center, False, True):
+                raise RuntimeError("Could not place the existing player on the verified ground")
+            trial.update(leopard=identity, started=now, initial_hp=state.get_health(),
+                         initial_distance_cm=(position - center).length(), initial_energy=agent["energy_fraction"],
+                         leopard_start_cm=list(position.to_tuple()), player_start_cm=list(center.to_tuple()))
+            break
+        return False
+    agent = read_agent(world, trial["leopard"])
+    if not agent or now - trial["started"] > 18.:
+        raise RuntimeError(f"Rule ambush did not complete on the verified approach: {trial}")
+    hp = state.get_health()
+    activity = agent["activity"]
+    trial["samples"].append({"time": now, "activity": activity, "player_hp": hp,
+                             "distance_cm": (position_of(agent) - pawn.get_actor_location()).length()})
+    if rule_ambush_climate == "DayClear":
+        if hp < trial["initial_hp"]:
+            raise RuntimeError("Staged leopard engaged the player in clear daylight")
+        if now - trial["started"] < 8.:
+            return False
+        result["samples"].append({"time": now, "agents": [agent]})
+        trial["final_hp"] = hp
+        return True
+    if hp >= trial["initial_hp"]:
+        return False
+    if (abs(trial["initial_hp"] - hp - 20.) > .01 or not any("Stalk" in s["activity"] for s in trial["samples"])
+            or not any("Attack" in s["activity"] for s in trial["samples"])):
+        raise RuntimeError("Damage did not follow the observed stalk and preparation")
+    result["samples"].append({"time": now, "agents": [agent]})
+    trial["final_hp"] = hp
+    return True
+
+
+def sample_population_traits(world, runtime, completed):
+    audit = result.setdefault("trait_evidence", {"cohorts": [], "cruise": {}})
+    cohorts = audit["cohorts"]
+    cohort_due = not cohorts or completed >= min(
+        population_duration, (math.floor(cohorts[-1]["completed_seconds"] / 30.) + 1) * 30.)
+    descendant_flight = eagle_family_trial and cohorts and any(
+        row["species"] == "GoldenEagle" and row["generation"] >= 2 for row in cohorts[-1]["agents"])
+    flight_due = (completed <= 90. or descendant_flight) and completed >= audit.get("next_flight_sample", 0.)
+    if not (cohort_due or flight_due):
+        return
+    raw = runtime.capture_population_traits()
+    if not raw:
+        return
+    snapshot = json.loads(raw)
+    if not cohorts:
+        expected = {"Herbivore", "Wolf"}.union(*(row.keys() for row in authored["founders"].values()))
+        found = {agent["species"] for agent in snapshot["agents"]}
+        if found != expected:
+            raise RuntimeError(f"Trait snapshot roster differs from map roster: {found ^ expected}")
+    if cohort_due:
+        cohorts.append(snapshot)
+        if audit_aquatic_cohorts:
+            sample_aquatic_cohort_clearance(world, runtime, snapshot, audit)
+    if not flight_due:
+        return
+    audit["next_flight_sample"] = completed + (.5 if completed <= 90. else 1.)
+    for agent in snapshot["agents"]:
+        if completed > 90. and (agent["species"] != "GoldenEagle" or agent["generation"] < 2):
+            continue
+        cap = agent.get("cruise_cap_cm_s")
+        if cap is None or agent["flight_phase"] != 2:
+            continue
+        speed = agent.get("horizontal_speed_cm_s", 0.)
+        records = audit["cruise"].setdefault(agent["species"], [])
+        records.append({"seconds": completed, "id": agent["id"], "generation": agent["generation"],
+                        "speed_gene": agent["speed_gene"],
+                        "speed_scale": agent["speed_scale"], "cruise_cap_cm_s": cap,
+                        "horizontal_speed_cm_s": speed, "stamina": agent["stamina"],
+                        "stamina_drain_per_second": agent.get("flight_stamina_drain_per_second")})
+
+
+def sample_aquatic_cohort_clearance(world, runtime, snapshot, audit):
+    profiles = {str(profile.get_editor_property("species_id")): profile.get_editor_property("body_radius")
+                for profile in runtime.get_editor_property("fauna_species")}
+    samples = audit.setdefault("aquatic_cohort_clearance", {})
+    for trait in snapshot["agents"]:
+        kind, identity = trait["species"], trait["id"]
+        if kind not in water_species or kind == "Mink" or not trait["generation"] or identity in samples:
+            continue
+        agent = read_agent(world, int(identity))
+        if not agent:
+            raise RuntimeError(f"Cannot inspect the first cohort sample of aquatic descendant {identity}")
+        point = u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", agent["position"])))
+        clearance = max(1., profiles[kind] * trait["body_scale"] * .65)
+        column = inspect.inspect_fauna_water(world, trait["region"], point, 1.)
+        bottom, surface = (column[0].x, column[0].y) if column else (None, None)
+        samples[identity] = {"species": kind, "region": trait["region"], "generation": trait["generation"],
+                             "sample_seconds": trait["sample_seconds"], "born": trait["born"],
+                             "size_gene": trait["size_gene"], "body_scale": trait["body_scale"],
+                             "center_z_cm": point.z, "bottom_z_cm": bottom, "surface_z_cm": surface,
+                             "required_clearance_cm": clearance,
+                             "actual_clearance_cm": min(point.z - bottom, surface - point.z) if column else None}
+
+
+def recovery_pigs(snapshot):
+    fields = ("id", "sex", "origin", "region", "generation", "parent_a", "parent_b", "born",
+              "size_gene", "speed_gene", "caution_gene", "sociability_gene", "coat_gene")
+    return [{field: row[field] for field in fields} for row in snapshot["agents"]
+            if row["species"] == "Pig" and row["region"] == "Grassland"]
+
+
+def sample_fauna_recovery(runtime, completed):
+    trial = result.setdefault("fauna_recovery", {"slot": f"Recovery_{seed}_{audit_label[1]}",
+                                                "before": [], "founders": []})
+    if trial.get("saved"):
+        return
+    snapshot = json.loads(runtime.capture_population_traits())
+    pigs = recovery_pigs(snapshot)
+    if "queued_at" not in trial:
+        if pigs:
+            raise RuntimeError(f"Grassland still has pigs at the planned recovery boundary: {pigs}")
+        if not runtime.queue_fauna_recovery("Grassland", "Pig"):
+            raise RuntimeError("Authority rejected the authored Grassland pig recovery request")
+        trial["duplicate_accepted"] = runtime.queue_fauna_recovery("Grassland", "Pig")
+        if trial["duplicate_accepted"]:
+            raise RuntimeError("A duplicate queued recovery was accepted")
+        trial["queued_at"] = completed
+        return
+    if not pigs:
+        if completed > trial["queued_at"] + 2.:
+            raise RuntimeError("The recovery request never added live pigs")
+        return
+    if (len(pigs) != 2 or {row["sex"] for row in pigs} != {1, 2}
+            or any(row["origin"] != 2 or row["generation"] != 0
+                   or str(row["parent_a"]) != "0" or str(row["parent_b"]) != "0" for row in pigs)):
+        raise RuntimeError(f"The recovery spawn does not match the expected unrelated adult pair: {pigs}")
+    if not trial["founders"]:
+        trial["founders"] = pigs
+        trial["cooldown_accepted"] = runtime.queue_fauna_recovery("Grassland", "Pig")
+        if trial["cooldown_accepted"]:
+            raise RuntimeError("Recovery cooldown did not reject a follow-up request")
+    if runtime.save_ecosystem(trial["slot"]):
+        trial["saved"] = True
+        trial["saved_at"] = snapshot["completed_seconds"]
+    elif completed > trial["queued_at"] + 5.:
+        raise RuntimeError("Could not save the recovery checkpoint at an authority boundary")
+
+
+def restore_fauna_recovery(runtime, source_label):
+    report = out.parent / f"Island_{seed}_{source_label}" / "IslandFaunaPIE.json"
+    expected = json.loads(report.read_text(encoding="utf-8"))["fauna_recovery"]
+    if not expected["saved"] or not runtime.load_ecosystem(expected["slot"]):
+        raise RuntimeError("Could not load the recovery checkpoint on a fresh island server")
+    snapshot = json.loads(runtime.capture_population_traits())
+    founders = recovery_pigs(snapshot)
+    if founders != expected["founders"]:
+        raise RuntimeError("Recovery founder IDs, genes or provenance changed on restore")
+    if runtime.queue_fauna_recovery("Grassland", "Pig"):
+        raise RuntimeError("Authority accepted another recovery during the restored cooldown")
+    result["fauna_recovery"] = {"slot": expected["slot"], "restored_at": snapshot["completed_seconds"],
+                                "founders": founders, "cooldown_accepted": False}
+    result["samples"].append({"completed_clock": {"authority_seconds": snapshot["completed_seconds"]},
+                              "agents": founders})
+
+
+def sample_breeding_checkpoint(world, runtime, completed):
+    slot = f"IslandBreeding_{breeding_checkpoint_match[2]}"
+    evidence_path = out.parent / "IslandAccessBaseline" / f"{slot}_snapshot.json"
+    checkpoint = result.setdefault("breeding_checkpoint", {"mode": breeding_checkpoint_mode, "slot": slot})
+    if "snapshot" not in checkpoint:
+        traits = json.loads(runtime.capture_population_traits())
+        if not any(row.get("native_adopted") for row in traits["agents"]):
+            return
+        if breeding_checkpoint_mode == "Save":
+            reserved = [row for row in traits["nurseries"] if row["species"] == "UnidentifiedFish" and row["due"] > 775.]
+            if not reserved:
+                if completed >= 780.:
+                    raise RuntimeError("No pending small-fish reservation before the checkpoint deadline")
+                return
+            if evidence_path.exists() or (out.parent.parent / "Ecosystem" / f"{slot}.eco").exists():
+                raise RuntimeError("The breeding checkpoint slot already exists")
+            if not runtime.save_ecosystem(slot):
+                return
+        else:
+            expected = json.loads(evidence_path.read_text(encoding="utf-8"))
+            profiles = [profile.copy() for profile in runtime.get_editor_property("fauna_species")]
+            fish, = (profile for profile in profiles if str(profile.get_editor_property("species_id")) == "UnidentifiedFish")
+            fish.set_editor_property("regional_limit", expected["limit"])
+            runtime.set_editor_property("fauna_species", profiles)
+            if not runtime.load_ecosystem(slot):
+                raise RuntimeError(f"Fresh authority failed to load {slot}")
+            traits = json.loads(runtime.capture_population_traits())
+            reserved = [row for row in traits["nurseries"] if row["species"] == "UnidentifiedFish"]
+            u.GameplayStatics.set_global_time_dilation(world, 4.)
+        reservation, = reserved
+        fields = ("species", "region", "born", "generation", "parent_a", "parent_b", "offspring", "origin", "sex",
+                  "size_gene", "speed_gene", "coat_gene", "caution_gene", "sociability_gene", "hp", "energy",
+                  "visual_body_scale", "visual_maturity", "visual_coat_tone")
+        patch_inputs = snapshot_population_patch_inputs(runtime)
+        stocks = {}
+        for site in sorted(patch_inputs["patches"]):
+            stock = runtime.inspect_fauna_habitat_stock(site)
+            stocks[site] = stock[-1] if isinstance(stock, tuple) else stock
+        snapshot = {"epoch": traits["epoch"], "at": traits["completed_seconds"], "reservation": reservation,
+                    "breeding_rule": traits["fauna_breeding_opportunity"],
+                    "limit": result["small_fish_capacity_change"]["to"] if breeding_checkpoint_mode == "Save" else expected["limit"],
+                    "living": {row["id"]: {field: row[field] for field in fields} for row in traits["agents"]},
+                    "stocks": stocks}
+        if not snapshot["breeding_rule"]:
+            raise RuntimeError("The authority did not activate the breeding rule")
+        checkpoint["snapshot"] = snapshot
+        if breeding_checkpoint_mode == "Save":
+            evidence_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+        else:
+            result["initial_patch_inputs"] = patch_inputs
+            mismatched = [key for key, value in expected.items() if key != "epoch" and snapshot[key] != value]
+            if mismatched or snapshot["epoch"] == expected["epoch"]:
+                raise RuntimeError(f"Breeding checkpoint did not preserve fields across epochs: {mismatched}")
+        return
+    snapshot = checkpoint["snapshot"]
+    reservation = snapshot["reservation"]
+    if completed < reservation["due"] or "hatch" in checkpoint:
+        return
+    traits = json.loads(runtime.capture_population_traits())
+    parents = (reservation["parent_a"], reservation["parent_b"])
+    offspring = [row for row in traits["agents"] if row["species"] == reservation["species"]
+                 and (row["parent_a"], row["parent_b"]) == parents and row["born"] >= reservation["due"]]
+    if not offspring:
+        if completed >= reservation["due"] + 25.:
+            raise RuntimeError("The reserved small-fish pair failed to hatch within its nursery window")
+        return
+    child, = offspring
+    after = {row["id"]: row["offspring"] for row in traits["agents"] if row["id"] in parents}
+    if any(after.get(parent) != snapshot["living"][parent]["offspring"] + 1 for parent in parents):
+        raise RuntimeError("The resumed hatch did not increment both parents exactly once")
+    checkpoint["hatch"] = {key: child[key] for key in (
+        "id", "species", "region", "parent_a", "parent_b", "generation", "born", "size_gene", "speed_gene", "coat_gene",
+        "caution_gene", "sociability_gene")}
+
+
+def observe_restored_hatch(world, runtime, client_world):
+    checkpoint = result["breeding_checkpoint"]
+    if "hatch" in checkpoint:
+        observe_restored_visual(world, runtime, client_world, checkpoint, int(checkpoint["hatch"]["id"]))
+
+
+def observe_restored_visual(world, runtime, client_world, checkpoint, child_id):
+    if not client_world or "client_visual" in checkpoint:
+        return
+    if "viewer_placed" not in checkpoint:
+        player = next((pc.get_controlled_pawn() for pc in u.GameplayStatics.get_all_actors_of_class(world, u.PlayerController)
+                       if pc.get_controlled_pawn()), None)
+        row = read_agent(world, child_id)
+        if not player or not row:
+            return
+        point = u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", row["position"])))
+        player.character_movement.set_movement_mode(u.MovementMode.MOVE_FLYING)
+        player.set_actor_location(point + u.Vector(-350., 0., 180.), False, True)
+        player.character_movement.stop_movement_immediately()
+        checkpoint["viewer_placed"] = True
+    visual = next((row.visual_state for row in u.GameplayStatics.get_all_actors_of_class(client_world, u.EcoCreatureRepresentationActor)
+                   if row.get_editor_property("bound") and int(row.visual_state.stable_agent_id) == child_id and row.visual_state.alive), None)
+    if visual is None:
+        return
+    traits = json.loads(runtime.capture_population_traits())
+    child = next((row for row in traits["agents"] if int(row["id"]) == child_id), None)
+    if not child or abs(child["visual_body_scale"] - visual.body_scale) > .00001:
+        return
+    client_runtime = u.GameplayStatics.get_actor_of_class(client_world, u.EcoCreatureIntegrationSpawner)
+    if not client_runtime:
+        return
+    ids = inspect.get_authority_agent_ids(client_world)
+    if ids or client_runtime.capture_population_traits():
+        raise RuntimeError("The visual observer can access authoritative lineage")
+    if wolf_checkpoint_client and client_runtime.capture_native_wolf_forage("Grassland"):
+        raise RuntimeError("The visual observer can read Native wolf nutrition")
+    checkpoint["client_visual"] = {"id": child_id, "body_scale": visual.body_scale, "authority_body_scale": child["visual_body_scale"],
+                                   "maturity": visual.maturity, "authority_agents": len(ids), "at": traits["completed_seconds"]}
+
+
+def wolf_checkpoint_snapshot(runtime, state, family):
+    traits = json.loads(runtime.capture_population_traits())
+    fields = ("id", "species", "region", "parent_a", "parent_b", "generation", "born", "origin", "sex",
+              "size_gene", "speed_gene", "caution_gene", "sociability_gene", "coat_gene", "hp", "energy")
+    forage = json.loads(runtime.capture_native_wolf_forage("Grassland"))
+    native = {row["id"]: {key: row[key] for key in ("nutrition", "reserved_meat_consumed", "reserved_meat_remaining")}
+              for row in forage["wolves"] if row["id"] in family}
+    rows = {row["id"]: {key: row[key] for key in fields} for row in traits["agents"]}
+    if not set(family) <= native.keys() or not set(family) <= rows.keys():
+        raise RuntimeError("The checkpoint does not contain the expected Native wolf family")
+    summary = state.get_ecology_summary()
+    food = {str(row.get_editor_property("region_id")): row.get_editor_property("food_amount")
+            for row in summary.get_editor_property("regions")}
+    return {"epoch": traits["epoch"], "at": traits["completed_seconds"], "living": rows, "family": native,
+            "provisioning": forage["provisioning_enabled"], "region_food": food,
+            "birth_after_separation": bool(runtime.get_editor_property("enable_native_wolf_birth_after_separation"))}
+
+
+def wolf_parent_meals(world, child):
+    row = read_agent(world, int(child)) or {}
+    return [event for event in row.get("gameplay_reason_history", ()) if event["reason"] == "ParentProvisioned"]
+
+
+def sample_wolf_observer(world, runtime, completed):
+    mode, start, agent_id = wolf_observer.groups()
+    start = int(start)
+    if not start - 4 <= completed <= start + 35:
+        return
+    trial = result.setdefault("wolf_observer", {"mode": mode, "subject": agent_id, "requested_at": start, "samples": []})
+    track_wolf_observer(world, runtime, completed, trial)
+
+
+def track_wolf_observer(world, runtime, completed, trial):
+    if trial["samples"] and completed < trial["samples"][-1]["at"] + .25:
+        return
+    agent_id = trial["subject"]
+    pawn = u.GameplayStatics.get_player_pawn(world, 0)
+    agent = read_agent(world, int(agent_id))
+    if not pawn or not agent or agent["species"] != "Wolf" or agent["region"] != "Grassland":
+        raise RuntimeError("The observer comparison requires a local player and the Native Grassland wolf")
+    position = u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", agent["position"])))
+    if completed >= trial["requested_at"] and "intervention_at" not in trial:
+        trial["intervention_at"] = completed
+        if trial["mode"] == "Leave":
+            origin = pawn.get_actor_location()
+            dx, dy = origin.x - position.x, origin.y - position.y
+            heading = math.atan2(dy, dx)
+            offset = u.Vector(4200. * math.cos(heading), 4200. * math.sin(heading), 300.)
+            pawn.character_movement.set_movement_mode(u.MovementMode.MOVE_FLYING)
+            if not pawn.set_actor_location(origin + offset, False, True):
+                raise RuntimeError("Could not place the authority player outside the encounter")
+            pawn.character_movement.stop_movement_immediately()
+    player_location = pawn.get_actor_location()
+    forage = json.loads(runtime.capture_native_wolf_forage("Grassland"))
+    subject, = (row for row in forage["wolves"] if row["id"] == agent_id)
+    life = agent["life"]
+    trial["samples"].append({"at": completed, "player_position_cm": [player_location.x, player_location.y, player_location.z],
+                             "distance_xy_cm": math.hypot(player_location.x - position.x, player_location.y - position.y),
+                             "activity": agent["activity"], "response": life["response"], "last_evidence": life["last_evidence"],
+                             "last_encounter": life["last_encounter"], "forage": subject})
+
+
+def wolf_player_id(controller):
+    pawn = controller.get_controlled_pawn() if controller else None
+    return pawn.player_state.get_editor_property("player_id") if pawn and pawn.player_state else None
+
+
+def wolf_viewers(world):
+    return {player_id: pc for pc in u.GameplayStatics.get_all_actors_of_class(world, u.PlayerController)
+            if (player_id := wolf_player_id(pc)) is not None}
+
+
+def wolf_client_sample(client, recent, child, status):
+    actors = u.GameplayStatics.get_all_actors_of_class(client, u.EcoCreatureRepresentationActor)
+    actor = next((actor for actor in actors
+                  if actor.get_editor_property("bound") and actor.visual_state.stable_agent_id == child
+                  and actor.visual_state.alive and not actor.get_editor_property("hidden")), None)
+    remote = u.GameplayStatics.get_actor_of_class(client, u.EcoCreatureIntegrationSpawner)
+    status.update(proxies=len(actors), target_proxy=bool(actor), runtime=bool(remote))
+    if not actor or not remote:
+        return None
+    if (inspect.get_authority_agent_ids(client) or remote.capture_population_traits()
+            or remote.capture_native_wolf_forage("Grassland")):
+        raise RuntimeError("The rejoining observer can access the Native authority")
+    proxy = actor.visual_state
+    if str(proxy.species_id) != recent[-1]["species"]:
+        raise RuntimeError("The rejoining observer received a different species for the stable wolf ID")
+    matched = next((row for row in reversed(recent) if abs(proxy.body_scale - row["visual_body_scale"]) < 1e-5
+                    and abs(proxy.maturity - row["visual_maturity"]) <= 1.0001 / 255.), None)
+    status.update(body_scale=proxy.body_scale, maturity=proxy.maturity, authority_scale=recent[-1]["visual_body_scale"],
+                  authority_maturity=recent[-1]["visual_maturity"], matched=bool(matched))
+    if not matched or any(abs(scale - proxy.body_scale) > 1e-5 for scale in actor.get_actor_scale3d().to_tuple()):
+        return None
+    return {"id": child, "body_scale": proxy.body_scale, "authority_body_scale": matched["visual_body_scale"],
+            "maturity": proxy.maturity, "authority_agents": 0, "sequence": proxy.sequence,
+            "matched_authority_seconds": matched["sample_seconds"]}
+
+
+def tick_wolf_rejoin(world, runtime, trial, completed):
+    rejoin = result.setdefault("wolf_rejoin", {"epoch": trial["snapshot"]["epoch"]})
+    if completed < rejoin.get("next_probe", 0.):
+        return False
+    rejoin["next_probe"] = completed + .1
+    child = int(trial["child"])
+    traits = json.loads(runtime.capture_population_traits())
+    authority = next((row for row in traits["agents"] if int(row["id"]) == child and row["hp"] > 0.), None)
+    fields = ("id", "species", "parent_a", "parent_b", "generation", "born", "size_gene", "speed_gene", "coat_gene")
+    saved = trial["snapshot"]["living"][str(child)]
+    if not authority or traits["epoch"] != rejoin["epoch"] or any(authority[key] != saved[key] for key in fields):
+        raise RuntimeError("The dedicated world or juvenile identity changed during the rejoin cycle")
+    recent = rejoin.setdefault("recent_authority", [])
+    recent.append(authority)
+    recent[:] = [row for row in recent if row["sample_seconds"] >= authority["sample_seconds"] - 2.]
+    status = rejoin["client_status"] = {}
+
+    def sample_client(pid):
+        return wolf_client_sample(clients[pid][1], recent, child, status.setdefault(pid, {}))
+
+    viewers = wolf_viewers(world)
+    worlds = [other for other in u.ObjectIterator(u.World) if other != world and "/UEDPIE_" in other.get_path_name()]
+    clients, offline = {}, {}
+    for other in worlds:
+        context = re.search(r"UEDPIE_(\d+)_", other.get_path_name())
+        pc = u.GameplayStatics.get_player_controller(other, 0)
+        if not context or not pc:
+            continue
+        index = int(context[1])
+        if other.get_name().endswith("LV_JYU_IslandEcosystemRefreshed"):
+            player_id = wolf_player_id(pc)
+            if player_id is not None:
+                clients[player_id] = (index, other)
+        elif other.get_name().endswith("Entry"):
+            offline[index] = other
+
+    if "before" not in rejoin:
+        if len(viewers) != 2 or viewers.keys() != clients.keys():
+            return False
+        if "positioned" not in rejoin:
+            position_wolf_observers(world, viewers, child)
+            rejoin["positioned"] = completed
+            return False
+        visuals = {pid: sample_client(pid) for pid in clients}
+        if not all(visuals.values()):
+            return False
+        leaving, remaining = sorted(viewers)
+        context, departing = clients[leaving]
+        rejoin.update(before=visuals, initial_at=completed, leaving=leaving, remaining=remaining, context=context,
+                      authority_identity={key: authority[key] for key in fields})
+        trial["client_visual"] = visuals[remaining] | {"at": traits["completed_seconds"]}
+        u.log(f"ECO_WOLF_REJOIN_LEAVE player={leaving} witness={remaining} context={context}")
+        u.GameplayStatics.open_level(departing, "/Engine/Maps/Entry", True)
+        return False
+
+    remaining = rejoin["remaining"]
+    if "return_requested_at" not in rejoin:
+        if set(viewers) != {remaining} or remaining not in clients or rejoin["context"] not in offline:
+            return False
+        visual = sample_client(remaining)
+        if not visual:
+            return False
+        rejoin.setdefault("away_at", completed)
+        if completed < rejoin["away_at"] + 3.:
+            return False
+        rejoin.update(away=visual, away_connected=len(viewers), return_requested_at=completed)
+        u.log(f"ECO_WOLF_REJOIN_RETURN context={rejoin['context']} at={completed:.3f}")
+        u.GameplayStatics.open_level(offline[rejoin["context"]], f"127.0.0.1:{wolf_rejoin_port[1]}", True, "EcoProtocol=5")
+        return False
+
+    if len(viewers) != 2 or remaining not in viewers or viewers.keys() != clients.keys():
+        return False
+    returned, = viewers.keys() - {remaining}
+    if clients[returned][0] != rejoin["context"]:
+        raise RuntimeError("A different PIE context joined in place of the departing observer")
+    if "returned_positioned" not in rejoin:
+        position_wolf_observers(world, viewers, child)
+        rejoin["returned_positioned"] = completed
+        return False
+    position_wolf_observers(world, viewers, child, only_if_far=True)
+    visuals = {pid: sample_client(pid) for pid in clients}
+    if not all(visuals.values()) or visuals[returned]["maturity"] <= rejoin["before"][rejoin["leaving"]]["maturity"]:
+        return False
+    rejoin.update(returned_at=completed, returned=returned, after=visuals, after_connected=len(viewers))
+    del rejoin["recent_authority"]
+    return True
+
+
+def position_wolf_observers(world, viewers, child, only_if_far=False):
+    row = read_agent(world, child)
+    point = u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", row["position"])))
+    for pc, offset in zip(viewers.values(), (u.Vector(-350., -160., 180.), u.Vector(350., 160., 180.)), strict=True):
+        pawn = pc.get_controlled_pawn()
+        if only_if_far and (pawn.get_actor_location() - point).length() < 1500.:
+            continue
+        pawn.character_movement.set_movement_mode(u.MovementMode.MOVE_FLYING)
+        pawn.set_actor_location(point + offset, False, True)
+        pawn.character_movement.stop_movement_immediately()
+
+
+def tick_wolf_checkpoint(world, runtime, state, client_world, completed):
+    mode, name = wolf_checkpoint.groups()
+    slot = f"IslandWolf_{name}"
+    evidence = out.parent / "IslandAccessBaseline" / f"{slot}_snapshot.json"
+    trial = result.setdefault("wolf_checkpoint", {"mode": mode, "slot": slot})
+    if "snapshot" not in trial:
+        if mode == "Save":
+            if completed < 45.:
+                if "dilation" not in trial:
+                    u.GameplayStatics.set_global_time_dilation(world, 4.)
+                    trial["dilation"] = 4.
+                return
+            if trial.get("dilation") != 1.:
+                u.GameplayStatics.set_global_time_dilation(world, 1.)
+                trial["dilation"] = 1.
+            if completed > 80.:
+                raise RuntimeError("No checkpoint was saved between live Native wolf provisions")
+            forage = json.loads(runtime.capture_native_wolf_forage("Grassland"))
+            for wolf in forage["wolves"]:
+                if not wolf["generation"]:
+                    continue
+                child = wolf["id"]
+                meals = wolf_parent_meals(world, child)
+                if not meals or not -1e-6 <= completed - meals[-1]["time"] < .85:
+                    continue
+                latest = meals[-1]
+                if evidence.exists() or (out.parent.parent / "Ecosystem" / f"{slot}.eco").exists():
+                    raise RuntimeError(f"The checkpoint slot already exists: {slot}")
+                snapshot = wolf_checkpoint_snapshot(runtime, state, [child, latest["related_id"]])
+                if not runtime.save_ecosystem(slot):
+                    return
+                if not snapshot["provisioning"] or not latest["time"] <= snapshot["at"] < latest["time"] + 1.:
+                    raise RuntimeError("The save missed the live provisioning cooldown window")
+                trial.update(snapshot=snapshot, child=child, last_payment=latest)
+                evidence.write_text(json.dumps({key: trial[key] for key in ("snapshot", "child", "last_payment")}, indent=2),
+                                    encoding="utf-8")
+                break
+            return
+
+        expected = json.loads(evidence.read_text(encoding="utf-8"))
+        if completed < 4.:
+            return
+        if mode == "Reject":
+            before = wolf_checkpoint_snapshot(runtime, state, [])
+            rule = "birth_after_separation" if wolf_checkpoint_reject_birth else "provisioning"
+            if before[rule] or runtime.load_ecosystem(slot):
+                raise RuntimeError(f"Authority accepted the wolf checkpoint with {rule} disabled")
+            if before != wolf_checkpoint_snapshot(runtime, state, []):
+                raise RuntimeError("Rejected load changed the running authority state")
+            trial.update(rejected=True, unchanged=True, disabled_rule=rule,
+                         birth_after_separation=before["birth_after_separation"], provisioning=before["provisioning"])
+            result["samples"].append({"completed_clock": {"authority_seconds": completed}})
+            finish()
+            return
+        if not runtime.load_ecosystem(slot):
+            raise RuntimeError(f"Fresh authority failed to load {slot}")
+        child = expected["child"]
+        latest = expected["last_payment"]
+        snapshot = wolf_checkpoint_snapshot(runtime, state, [child, latest["related_id"]])
+        saved = expected["snapshot"]
+        differences = [key for key in saved if key != "epoch" and saved[key] != snapshot[key]]
+        if differences or saved["epoch"] == snapshot["epoch"]:
+            raise RuntimeError(f"Wolf checkpoint did not preserve fields across epochs: {differences}")
+        trial.update(snapshot=snapshot, child=child, last_payment=latest)
+        return
+
+    after_save = [meal for meal in wolf_parent_meals(world, trial["child"])
+                  if meal["time"] > trial["snapshot"]["at"]]
+    if after_save and "next_payment" not in trial:
+        trial["next_payment"] = after_save[0]
+        if after_save[0]["time"] + 1e-6 < trial["last_payment"]["time"] + 1.:
+            raise RuntimeError("Reloaded Native wolf provision bypassed its feeding cooldown")
+    if mode == "Load" and "next_payment" in trial:
+        if wolf_rejoin_port:
+            if tick_wolf_rejoin(world, runtime, trial, completed):
+                result["samples"].append({"completed_clock": {"authority_seconds": completed}})
+                finish()
+                return
+            if completed >= population_duration:
+                raise RuntimeError("The Native wolf client rejoin did not finish before the authority deadline")
+        else:
+            observe_restored_visual(world, runtime, client_world, trial, int(trial["child"]))
+    if completed >= population_duration:
+        if "next_payment" not in trial or (mode == "Load" and "client_visual" not in trial):
+            raise RuntimeError("Wolf checkpoint run missed a resumed provision or the restored client proxy")
+        result["samples"].append({"completed_clock": {"authority_seconds": completed}})
+        finish()
+
+
+def tick_wolf_birth_fork(world, runtime, state, completed):
+    mode, name, cohort = wolf_birth_fork.groups()
+    slot = f"IslandWolfBirth_{name}"
+    evidence = out.parent / "IslandAccessBaseline" / f"{slot}_snapshot.json"
+    trial = result.setdefault("wolf_birth_fork", {"mode": mode, "slot": slot})
+    if "snapshot" not in trial:
+        pawn = u.GameplayStatics.get_player_pawn(world, 0)
+        if not pawn:
+            return
+        if mode == "Save":
+            if "accelerated" not in trial:
+                u.GameplayStatics.set_global_time_dilation(world, 4.)
+                trial["accelerated"] = True
+            if completed >= population_duration:
+                raise RuntimeError(f"No pending Native wolf request for the {cohort.lower()} cohort was captured")
+            if completed < (180. if cohort == "Descendant" else 10.) or completed < trial.get("next_scan", 0.):
+                return
+            trial["next_scan"] = completed + 1.
+            log = evidence.with_name(f"{seed}_{audit_label[1]}.log")
+            queued = re.findall(r"\[EcoLife\]\[BirthQueued\] Region=Grassland Predator=1 Parents=(\d+),(\d+) Due=([\d.]+)",
+                                log.read_text(encoding="utf-8-sig", errors="replace"))
+            if not queued:
+                return
+            first, second, due = queued[-1]
+            due = float(due)
+            if not due - 30.01 <= completed <= due - 26.:
+                return
+            parents = [first, second]
+            snapshot = wolf_checkpoint_snapshot(runtime, state, parents)
+            family = snapshot["living"]
+            descendant = next((agent for agent in parents if family[agent]["generation"] > 0), None)
+            if bool(descendant) != (cohort == "Descendant") or any(snapshot["family"][agent]["nutrition"] < .7 for agent in parents):
+                return
+            reservation = {"parents": parents, "due": due, "subject": descendant or first, "cohort": cohort}
+            if evidence.exists() or (out.parent.parent / "Ecosystem" / f"{slot}.eco").exists():
+                raise RuntimeError(f"The Native birth fork slot already exists: {slot}")
+            player_position = list(pawn.get_actor_location().to_tuple())
+            if not runtime.save_ecosystem(slot):
+                return
+            evidence.write_text(json.dumps({"snapshot": snapshot, "reservation": reservation, "player_position": player_position},
+                                           indent=2), encoding="utf-8")
+        else:
+            if completed < 4.:
+                return
+            expected = json.loads(evidence.read_text(encoding="utf-8"))
+            reservation = expected["reservation"]
+            if reservation["cohort"] != cohort:
+                raise RuntimeError("The saved Native wolf pregnancy has a different parent cohort")
+            player_position = expected["player_position"]
+            if not runtime.load_ecosystem(slot):
+                raise RuntimeError(f"Fresh authority failed to load {slot}")
+            snapshot = wolf_checkpoint_snapshot(runtime, state, reservation["parents"])
+            saved = expected["snapshot"]
+            differences = [key for key in saved if key != "epoch" and snapshot[key] != saved[key]]
+            if differences or snapshot["epoch"] == saved["epoch"]:
+                raise RuntimeError(f"Native birth fork snapshot mismatch: {differences}")
+        if not snapshot["birth_after_separation"] or not snapshot["provisioning"]:
+            raise RuntimeError("Native birth fork requires the matched birth and provisioning rules")
+        # Put each branch at the same observer transform before the presence intervention.
+        pawn.character_movement.set_movement_mode(u.MovementMode.MOVE_FLYING)
+        if not pawn.set_actor_location(u.Vector(*player_position), False, True):
+            raise RuntimeError("Could not restore the observer position for the wolf birth fork")
+        pawn.character_movement.stop_movement_immediately()
+        u.GameplayStatics.set_global_time_dilation(world, 1.)
+        trial.update(snapshot=snapshot, reservation=reservation, player_position=player_position)
+        observer = {"mode": "Leave" if mode == "Leave" else "Hold", "subject": reservation["subject"],
+                    "requested_at": snapshot["at"], "samples": []}
+        trial["observer"] = observer
+        track_wolf_observer(world, runtime, snapshot["at"], observer)
+        return
+
+    if completed > trial["snapshot"]["at"]:
+        track_wolf_observer(world, runtime, completed, trial["observer"])
+    if completed >= trial["reservation"]["due"] + 10.:
+        trial["end"] = wolf_checkpoint_snapshot(runtime, state, [])
+        result["samples"].append({"completed_clock": {"authority_seconds": completed}})
+        finish()
+
+
+def tick_wolf_descendant_restore(world, runtime, state, client_world, completed):
+    trial = result.setdefault("wolf_descendant_restore", {})
+    if "snapshot" not in trial:
+        if completed < 4.:
+            return
+        name, source_label = wolf_descendant_restore.groups()
+        path = out.parent / f"Island_{seed}_{source_label}" / "IslandFaunaPIE.json"
+        source = json.loads(path.read_text(encoding="utf-8"))["wolf_descendant_save"]
+        slot = f"IslandWolfDescendant_{name}"
+        if source["slot"] != slot or not runtime.load_ecosystem(slot):
+            raise RuntimeError(f"Fresh authority failed to restore the naturally born wolf from {slot}")
+        child = source["child"]
+        snapshot = wolf_checkpoint_snapshot(runtime, state, [child])
+        restored = snapshot["living"][child]
+        if (snapshot["epoch"] == source["epoch"] or snapshot["at"] != source["at"] or restored["generation"] < 2
+                or restored != source["child_state"] or snapshot["region_food"] != source["region_food"]):
+            raise RuntimeError("The restored Native wolf lost lineage, energy or regional food state")
+        trial.update(slot=slot, snapshot={"child": child, "child_state": restored, "at": snapshot["at"],
+                                         "region_food": snapshot["region_food"], "epoch": snapshot["epoch"]})
+        return
+    observe_restored_visual(world, runtime, client_world, trial, int(trial["snapshot"]["child"]))
+    if "client_visual" in trial:
+        result["samples"].append({"completed_clock": {"authority_seconds": completed}})
+        finish()
+    elif completed >= max(population_duration, trial["snapshot"]["at"] + 20.):
+        raise RuntimeError("The restored Native descendant was not received by the connected client")
+
+
+def tick_population(world, now, client_world=None):
+    if not result.get("forage_stock_audit_patch"):
+        drift_stock_audit = water_forage_shared and "-EcoIslandAuditDriftStock" in command.split()
+        patch = forage_stock_audit[1] if forage_stock_audit else "IslandRiverDrift" if drift_stock_audit else None
+        if patch:
+            u.SystemLibrary.execute_console_command(world, f"eco.Fauna.ForageStockAudit {patch}")
+            result["forage_stock_audit_patch"] = patch
+            if drift_stock_audit and patch == "IslandRiverDrift":
+                result["drift_stock_audit"] = True
     global next_sample
     runtime = u.GameplayStatics.get_actor_of_class(world, u.EcoCreatureIntegrationSpawner)
     if runtime and "population_uses_forage_soil" not in result:
@@ -1281,12 +2192,113 @@ def tick_population(world, now):
         result["population_uses_forage_soil"] = enabled and not population_without_forage_soil
     state = u.GameplayStatics.get_game_state(world)
     if not runtime or not runtime.is_runtime_ready() or not state:
+        if now >= 25. and (wolf_lineage_trial or wolf_territory_trial or predator_habitat_trial or predator_sites_trial
+                           or eagle_family_trial
+                           or mink_near_prey_trial or covered_refuge_food_trial):
+            raise RuntimeError("Breeding fixture did not finish authority startup; see the first engine error")
+        return
+    if eagle_family_trial == "PreyRoute" and "prey_placements" not in result["eagle_families"]:
+        result["eagle_families"]["prey_placements"] = place_highland_prey_pair(world, runtime)
+        return
+    if small_fish_encounter and "small_fish_encounter" not in result:
+        result["small_fish_encounter"] = place_small_fish_encounter_founder(world, runtime)
         return
     summary = state.get_ecology_summary()
     if summary.get_editor_property("revision") <= 0:
         return
     clock = summary.get_editor_property("time")
     completed = clock.get_editor_property("server_time_seconds")
+    if wolf_checkpoint:
+        tick_wolf_checkpoint(world, runtime, state, client_world, completed)
+        return
+    if wolf_birth_fork:
+        tick_wolf_birth_fork(world, runtime, state, completed)
+        return
+    if wolf_descendant_restore:
+        tick_wolf_descendant_restore(world, runtime, state, client_world, completed)
+        return
+    if breeding_checkpoint_mode == "Load":
+        sample_breeding_checkpoint(world, runtime, completed)
+        if breeding_checkpoint_client:
+            observe_restored_hatch(world, runtime, client_world)
+        if completed >= population_duration:
+            agents = [row for agent in inspect.get_authority_agent_ids(world) if (row := read_agent(world, agent))]
+            result["samples"].append({"completed_clock": {"authority_seconds": completed},
+                                      "agents": agents, "vegetation": sample_vegetation(world)})
+            finish()
+        return
+    if meal_fork_mode == "Load":
+        tick_loaded_meal_fork(world, runtime, completed)
+        return
+    if audit_aquatic_cohorts and "aquatic_species_limits" not in result:
+        result["aquatic_species_limits"] = {
+            str(profile.get_editor_property("species_id")): profile.get_editor_property("regional_limit")
+            for profile in runtime.get_editor_property("fauna_species")
+            if str(profile.get_editor_property("species_id")) in water_species - {"Mink"}}
+    for at, increase, species, key in (
+            (carp_capacity_at, 2, "CommonCarp", "carp_capacity_change"),
+            (small_fish_capacity_at, small_fish_capacity_increase, "UnidentifiedFish", "small_fish_capacity_change")):
+        if at is None or completed < at or key in result:
+            continue
+        profiles = [profile.copy() for profile in runtime.get_editor_property("fauna_species")]
+        target, = (profile for profile in profiles if str(profile.get_editor_property("species_id")) == species)
+        old_limit = target.get_editor_property("regional_limit")
+        residents, = (row.get_editor_property("population") for row in summary.get_editor_property("species")
+                      if str(row.get_editor_property("species_id")) == species
+                      and str(row.get_editor_property("region_id")) == authored["river"])
+        if species == "UnidentifiedFish" and residents != old_limit:
+            raise RuntimeError("The small-fish capacity trial needs the region to have reached the saved limit")
+        target.set_editor_property("regional_limit", old_limit + increase)
+        runtime.set_editor_property("fauna_species", profiles)
+        result[key] = {"at": completed, "residents": residents, "from": old_limit,
+                       "to": target.get_editor_property("regional_limit")}
+    if breeding_checkpoint_mode == "Save" and completed >= 770.:
+        sample_breeding_checkpoint(world, runtime, completed)
+    if recovery_pair_fixture and "occupied_check_queued_at" not in result["recovery_pair_fixture"]:
+        if not runtime.queue_fauna_recovery("Grassland", "Pig"):
+            raise RuntimeError("Could not queue the occupied-region recovery check")
+        result["recovery_pair_fixture"]["occupied_check_queued_at"] = completed
+    if trait_audit:
+        sample_population_traits(world, runtime, completed)
+    if buffalo_guard_trial and 30. <= completed <= 180.:
+        sample_buffalo_guard_trial(world, runtime, completed)
+    if wolf_descendant_save and "wolf_descendant_save" not in result and completed >= 180.:
+        cohort = result["trait_evidence"]["cohorts"][-1]
+        child = next((row for row in cohort["agents"] if row["species"] == "Wolf" and row["generation"] >= 2
+                      and row["region"] == "Grassland"), None)
+        if child:
+            slot = f"IslandWolfDescendant_{wolf_descendant_save[1]}"
+            if (out.parent.parent / "Ecosystem" / f"{slot}.eco").exists():
+                raise RuntimeError(f"The Native descendant slot already exists: {slot}")
+            if runtime.save_ecosystem(slot):
+                snapshot = wolf_checkpoint_snapshot(runtime, state, [child["id"]])
+                result["wolf_descendant_save"] = {"slot": slot, "child": child["id"], "at": snapshot["at"],
+                                                  "epoch": snapshot["epoch"], "child_state": snapshot["living"][child["id"]],
+                                                  "region_food": snapshot["region_food"]}
+    if wolf_carrion_survey:
+        samples = result.setdefault("wolf_carrion_survey", [])
+        if not samples or completed >= samples[-1]["at"] + 2.:
+            snapshot = runtime.capture_native_wolf_forage("Grassland")
+            if not snapshot:
+                raise RuntimeError("Could not capture the completed Native wolf foraging state")
+            row = json.loads(snapshot)
+            if samples or row["wolves"]:
+                samples.append(row)
+    if wolf_observer:
+        sample_wolf_observer(world, runtime, completed)
+    if small_fish_meal_access and completed >= 720. and "small_fish_meal_access" not in result:
+        cohort = result["trait_evidence"]["cohorts"][-1]
+        fry = sorted((row for row in cohort["agents"] if row["species"] == "UnidentifiedFish" and row["generation"] == 2),
+                     key=lambda row: (row["born"], int(row["id"])))
+        if fry:
+            if meal_fork_mode == "Save" and "small_fish_meal_fork" not in result:
+                if not save_small_fish_meal_fork(runtime, fry[0]["id"]):
+                    return
+            result["small_fish_meal_access"] = open_small_fish_meal_access(world, runtime, completed, fry[0])
+    if eagle_family_trial == "PreyRoute" and 120. <= completed < 220.:
+        sample_eagle_family_landings(world, now, completed)
+    if recovery_trial and completed >= int(recovery_trial[1]):
+        sample_fauna_recovery(runtime, completed)
     if water_forage_shared and "-EcoIslandDriftRainPulse" in command.split():
         update_drift_rain_pulse(world, completed)
     if drift_seasonal_trial:
@@ -1295,6 +2307,18 @@ def tick_population(world, now):
         sample_seasonal_drift_visual(world, runtime, completed)
     if completed < next_sample:
         return
+    if trait_climate_match and result["samples"]:
+        apply_trait_climate(world, completed)
+    if mink_roots_seasonal_shelf:
+        shelf = result["mink_near_prey"]["nursery"]["shallow_shelf"]
+        depth = {"at": completed}
+        for zone in ("core", "rim"):
+            point = u.Vector(*shelf[f"{zone}_cm"])
+            column = inspect.inspect_fauna_water(world, authored["river"], point, 1.)
+            if not column:
+                raise RuntimeError(f"The Roots shelf {zone} lost its authority water column")
+            depth[zone] = column[0].y - column[0].x
+        shelf.setdefault("authority_depth_samples_cm", []).append(depth)
     agents = []
     population = Counter()
     regional = {}
@@ -1309,14 +2333,110 @@ def tick_population(world, now):
         if agent["hp"] > 0.:
             population[kind] += 1
             regional.setdefault(agent["region"], Counter())[kind] += 1
-        agents.append({key: agent[key] for key in (
+        row = {key: agent[key] for key in (
             "stable_id", "species", "region", "position", "energy", "energy_fraction", "hp", "activity", "body_scale",
-            "brain", "policy_contract", "gameplay_reason_history", "last_intake") if key in agent})
+            "brain", "policy_contract", "gameplay_reason_history", "last_intake") if key in agent}
+        if wolf_food_survey and kind == "Herbivore" and row["region"] == "Grassland":
+            row.update({key: agent[key] for key in ("last_plant_intake", "native_food_cell", "native_food_remaining",
+                                                   "native_world_position", "native_food_probe", "native_threat_count",
+                                                   "native_threat_distance_cm", "native_nearest_threat_kind", "nearest_wolf_reason") if key in agent})
+            life = agent.get("life", {})
+            row.update({key: life[key] for key in ("local_forage_cell", "forage_scan_wait", "motion_reason", "response") if key in life})
+        if audit_refuge_meals and kind == "Rat":
+            details = agent["rule_fauna"]
+            row["refuge_meal_candidate"] = {key: details[key] for key in (
+                "food_patch_index", "blocked_patch_index", "threat_until")}
+        if water_food_audit_agent == agent_id and "rule_fauna" in agent:
+            point = u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", agent["position"])))
+            profile, = (item for item in runtime.get_editor_property("fauna_species")
+                        if str(item.get_editor_property("species_id")) == kind)
+            clearance = max(1., .65 * agent["body_scale"] * profile.get_editor_property("body_radius"))
+            column = inspect.inspect_fauna_water(world, agent["region"], point, 1.)
+            body_column = inspect.inspect_fauna_water(world, agent["region"], point, clearance)
+            row["water_food_probe"] = {"body_clearance_estimate_cm": clearance,
+                                       "local_column_cm": list(column[0].to_tuple()) if column else None,
+                                       "body_column_usable": bool(body_column),
+                                       "food_patch_index": agent["rule_fauna"]["food_patch_index"]}
+        agents.append(row)
+    if wolf_food_survey:
+        survey_native_grassland_food(world, completed, agents)
     if not result["samples"]:
+        if buffalo_guard_trial:
+            verify_buffalo_guard_trial(world, agents, regional)
+        if combat_selection:
+            profiles = runtime.get_editor_property("region_habitat_profiles")
+            profile = next((value for key, value in profiles.items() if str(key) == COMBAT_SELECTION_REGION), None)
+            profile = profile or runtime.get_editor_property("natural_habitat_profile")
+            actual_seed = profile.get_editor_property("layout_seed")
+            if actual_seed != combat_layout_seed:
+                raise RuntimeError("The Grassland selection layout seed was not applied in PIE")
+            result["combat_selection_layout"]["first_authority_seed"] = actual_seed
+        if mink_roots_shelf:
+            nursery = result["mink_near_prey"]["nursery"]
+            shelf = nursery["shallow_shelf"]
+            fish_profile, = (item for item in runtime.get_editor_property("fauna_species")
+                             if str(item.get_editor_property("species_id")) == "UnidentifiedFish")
+            shelf["first_authority_depths_cm"] = []
+            for point in [nursery["center_cm"], *(row["after_cm"] for row in nursery["founders"])]:
+                position = u.Vector(*point)
+                water = inspect.inspect_fauna_water(world, authored["river"], position, fish_profile.get_editor_property("body_radius"))
+                mink_water = inspect.inspect_fauna_water(world, authored["river"], position, .5 * shelf["adult_mink_minimum_depth_cm"])
+                if not water or mink_water:
+                    raise RuntimeError("The shallow nursery shelf must block an adult mink body in actual PIE")
+                shelf["first_authority_depths_cm"].append(water[0].y - water[0].x)
         expected = set().union(*(set(row) for row in authored["founders"].values()))
-        if not expected <= population.keys() or len(population) != 16 or sum(population.values()) != 118:
+        expected_count = 176 if wolf_lineage_trial or wolf_kin_trial else 120
+        if eagle_family_trial:
+            expected_count += 2
+            founders = [row for row in result["trait_evidence"]["cohorts"][0]["agents"]
+                        if row["species"] == "GoldenEagle"]
+            if (len(founders) != 4 or Counter(row["sex"] for row in founders) != {1: 2, 2: 2}
+                    or any(row["region"] != "Highland" or row["generation"] != 0
+                           or str(row["parent_a"]) != "0" or str(row["parent_b"]) != "0" for row in founders)):
+                raise RuntimeError(f"Expected four unrelated Highland eagle founders: {founders}")
+            result["eagle_families"]["founders"] = [row["id"] for row in founders]
+            if eagle_family_trial == "PreyRoute":
+                prey_ids = {row["id"] for row in result["eagle_families"]["prey_placements"]}
+                prey = [row for row in result["trait_evidence"]["cohorts"][0]["agents"] if row["id"] in prey_ids]
+                if (len(prey) != 2 or {row["sex"] for row in prey} != {1, 2}
+                        or any(row["species"] != "Jackrabbit" or row["region"] != "Highland"
+                               or row["generation"] != 0 for row in prey)):
+                    raise RuntimeError("The Highland relocation must preserve both original hare founders")
+        if recovery_pair_fixture:
+            expected_count -= 2
+            if regional["Grassland"]["Pig"] != 2:
+                raise RuntimeError("Recovery fixture requires exactly two starting Grassland pigs")
+        if not expected <= population.keys() or len(population) != 16 or sum(population.values()) != expected_count:
             raise RuntimeError(f"Unexpected island starting roster: {population}")
+        if wolf_lineage_trial or wolf_territory_trial:
+            native_regions = {name: {kind: counts[kind] for kind in ("Herbivore", "Wolf")}
+                              for name, counts in regional.items() if counts["Herbivore"] or counts["Wolf"]}
+            expected_native = (result["wolf_territory_layout"] if wolf_territory_trial else
+                               {name: {"Herbivore": 28, "Wolf": 2}
+                                for name in ("Grassland", "Highland", "Riverbank", "Snowfield")})
+            if native_regions != expected_native:
+                raise RuntimeError(f"Unexpected wolf lineage fixture: {native_regions}")
+            result["wolf_lineage_fixture"] = native_regions
+            result["wolf_birth_after_separation"] = bool(runtime.get_editor_property("enable_native_wolf_birth_after_separation"))
+        if wolf_prey_mix:
+            grassland = regional["Grassland"]
+            if sum(grassland.values()) != 63 or any(grassland[kind] != count for kind, count in result["wolf_prey_mix"]["after"].items()):
+                raise RuntimeError(f"The Grassland mix did not preserve its 63 starting places: {grassland}")
         result["initial_backends"] = {kind: sorted(values) for kind, values in backends.items()}
+        result["fauna_persistence_enabled"] = bool(
+            runtime.get_editor_property("fauna_persistence").get_editor_property("enabled"))
+        if local_nurseries_trial:
+            profiles = {str(p.get_editor_property("species_id")): p for p in runtime.get_editor_property("fauna_species")}
+            for row in result["local_nurseries"].values():
+                profile = profiles[row["species"]]
+                clearance = profile.get_editor_property("body_radius")
+                point = u.Vector(*row["center_cm"])
+                column = inspect.inspect_fauna_water(world, authored["river"], point, clearance)
+                if not column or not column[0].x < point.z < column[0].y:
+                    raise RuntimeError(f"Unusable nursery water column for {row['species']}")
+                limit = profile.get_editor_property("max_nursery_current")
+                current = math.hypot(column[1].x, column[1].y)
+                row.update(bottom_cm=column[0].x, surface_cm=column[0].y, current_cm_s=current, maximum_cm_s=limit)
         result["population_target_seconds"] = population_duration
         if water_forage_split or water_forage_shared:
             point = u.Vector(*result["water_forage_split"]["center_cm"])
@@ -1351,12 +2471,24 @@ def tick_population(world, now):
         "forage_soil_moisture": sample_forage_soil(runtime, stocks) if result["population_uses_forage_soil"] else {},
     })
     if len(result["samples"]) == 1:
-        if abs(sum(capacities.values()) - 215.) > .01:
+        added_capacity = sum(row["capacity"] for row in result.get("predator_habitat", {}).values())
+        for reserve in result.get("eagle_families", {}).get("food", ()):
+            site, capacity = reserve["patch"], reserve["capacity"]
+            if capacities.get(site) != capacity or stocks.get(site) != capacity:
+                raise RuntimeError(f"Eagle reserve {site} did not initialize with the authored stock")
+            added_capacity += capacity
+        if abs(sum(capacities.values()) - 215. - added_capacity) > .01:
             raise RuntimeError("Unexpected initial authored food capacity")
         if water_forage_shared and abs(capacities.get("IslandRiverDrift", 0.) - 11.) > .001:
             raise RuntimeError("Shared Drift access changed the original stock capacity")
         result["authored_capacities"] = capacities
         result["initial_patch_inputs"] = snapshot_population_patch_inputs(runtime)
+        if forage_guild_wet:
+            west = result["initial_patch_inputs"]["patches"]["IslandForageWestMeadow"]
+            if "WET_MEADOW" not in west["plant_guild"] or west["submerged"]:
+                raise RuntimeError("Authority did not initialize WestMeadow with the requested dry wet-meadow guild")
+        if land_forage_access_trial:
+            verify_land_forage_access(world, result["initial_patch_inputs"]["patches"])
         u.GameplayStatics.set_global_time_dilation(world, 4.)
         result["population_dilation"] = u.GameplayStatics.get_global_time_dilation(world)
     next_sample = min(population_duration, (math.floor(completed / 30.) + 1) * 30.)
@@ -1364,6 +2496,11 @@ def tick_population(world, now):
         result["population_midpoint_reported"] = True
         u.log(f"ECO_ISLAND_POPULATION midpoint={completed:.3f} alive={sum(population.values())}")
     if completed >= population_duration:
+        if meal_fork_mode == "Save":
+            fork = result["small_fish_meal_fork"]
+            fork["end"] = small_fish_meal_snapshot(runtime, fork["snapshot"]["child"])
+        if recovery_trial and not result.get("fauna_recovery", {}).get("saved"):
+            raise RuntimeError("The recovery trial did not verify and save both founders")
         if drift_visual_trial:
             phases = {row["phase"]: row for row in result.get("drift_visual_samples", [])}
             if (set(phases) != {"before", "exposed", "recovered", "late"}
@@ -1481,6 +2618,14 @@ def update_player_passage(world, now):
         rabbit = next((profile for name, profile in profiles.items() if str(name) == "Jackrabbit"), None)
         if rabbit is None:
             raise RuntimeError("Island jackrabbit hearing profile missing")
+        if passage_climate:
+            regional = isolate_region_weather(world, {"Riverbank"})["Riverbank"]
+            environment = regional.get_environment_state()
+            wet = passage_climate.endswith("Rain")
+            environment.set_editor_property("rainfall", .7 if wet else 0.)
+            environment.set_editor_property("weather_state", u.EcoWeatherState.RAIN if wet else u.EcoWeatherState.CLEAR)
+            regional.set_environment_state(environment)
+            trial["climate"] = passage_climate
         trial["jackrabbit_hearing_profile"] = {
             "asset": audio.get_path_name(),
             **{key: rabbit.get_editor_property(key) for key in ("hearing_range", "hearing_threshold", "occluded_hearing")},
@@ -1510,7 +2655,8 @@ def update_player_passage(world, now):
     if player_trial != "Still" and 22. <= now < 33. and forward < 1100.:
         pawn.add_movement_input(direction, 1., False)
     samples = trial["samples"]
-    if samples and now - samples[-1]["world_seconds"] < .25:
+    world_now = now + passage_clock_offset
+    if samples and world_now - samples[-1]["world_seconds"] < .25:
         return
     agents = []
     for agent_id in (49, 50, 70, 71):
@@ -1521,17 +2667,34 @@ def update_player_passage(world, now):
                 "gameplay_reason_history", "wolf_hunting", "wolf_has_target") if key in row})
     state = u.GameplayStatics.get_game_state(world)
     clock = state.get_ecology_summary().get_editor_property("time")
-    samples.append({"world_seconds": now, "completed_authority_seconds": clock.get_editor_property("server_time_seconds"),
+    phase = clock.get_editor_property("day_cycle").get_editor_property("phase")
+    day_phase = "Night" if phase == u.EcoDayPhase.NIGHT else "Day"
+    rainfall = None
+    if passage_climate:
+        region, = (actor for actor in u.GameplayStatics.get_all_actors_of_class(world, u.EcologyRegion)
+                   if str(actor.get_editor_property("region_id")) == "Riverbank")
+        rainfall = region.get_environment_state().get_editor_property("rainfall")
+        if now >= 22. and (not passage_climate.startswith(day_phase)
+                           or abs(rainfall - (.7 if passage_climate.endswith("Rain") else 0.)) > .001):
+            raise RuntimeError(f"Expected passage climate {passage_climate}, received {day_phase} with rainfall {rainfall}")
+    samples.append({"world_seconds": world_now, "completed_authority_seconds": clock.get_editor_property("server_time_seconds"),
                     "player_position_cm": list(position.to_tuple()), "player_speed_cm_per_s": pawn.get_velocity().length(),
-                    "grounded": movement.is_moving_on_ground(), "agents": agents})
+                    "grounded": movement.is_moving_on_ground(), "day_phase": day_phase, "rainfall": rainfall, "agents": agents})
 
 
-def update_combat_carrion(world, now):
+def update_combat_carrion(world, now, key, start, victim_id):
     pawn = u.GameplayStatics.get_player_pawn(world, 0)
     if pawn is None:
         return
-    trial = result.setdefault("combat_carrion", {
-        "mode": combat_trial, "start_game_seconds": combat_start, "victim": combat_victim, "damage": [], "press_times": [],
+    if combat_selection and "combat_selection" not in result:
+        cohorts = result.get("trait_evidence", {}).get("cohorts", [])
+        if not cohorts:
+            return
+        record_combat_selection(cohorts[0])
+    if combat_selection:
+        victim_id = result["combat_selection"]["target"]
+    trial = result.setdefault(key, {
+        "mode": combat_trial, "start_game_seconds": start, "victim": victim_id, "damage": [], "press_times": [],
     })
     if trial.get("released"):
         return
@@ -1544,20 +2707,25 @@ def update_combat_carrion(world, now):
         trial["player_state"] = player_state.get_class().get_name()
         trial["pawn"] = pawn.get_class().get_name()
         player_state.set_invulnerable(True)
-        melee.on_damage_outcome.add_callable(record_carrion_damage)
+        if key == "combat_carrion":
+            melee.on_damage_outcome.add_callable(record_carrion_damage)
         if rifle_combat_trial:
             fire = pawn.get_component_by_class(u.EcoWeaponFireComponent)
             equipment = pawn.get_component_by_class(u.EcoEquipmentComponent)
             if not fire or not equipment or not equipment.get_editor_property("weapon"):
                 raise RuntimeError("Team combat pawn needs its equipped rifle")
-            fire.on_damage_outcome.add_callable(record_carrion_damage)
-            fire.on_shot.add_callable(record_carrion_shot)
+            if key == "combat_carrion":
+                fire.on_damage_outcome.add_callable(record_carrion_damage)
+                fire.on_shot.add_callable(record_carrion_shot)
             u.SystemLibrary.execute_console_command(world, "Log LogTemp Verbose")
             pawn.character_movement.set_movement_mode(u.MovementMode.MOVE_FLYING)
     victim = read_agent(world, trial["victim"])
-    if now >= combat_start + 24. or not victim or victim["hp"] <= 0.:
+    if now >= start + 24. or not victim or victim["hp"] <= 0.:
         trial["release_hp"] = victim["hp"] if victim else None
         trial["released"] = now
+        if audit_hunt_carrion and trial["release_hp"] == 0.:
+            trial["dead_target_position_cm"] = [
+                float(value) for value in re.findall(r"[XYZ]=([-+\d.eE]+)", victim["position"])]
         if rifle_combat_trial:
             avatar = pawn.get_component_by_class(u.EcoAbilityAvatarComponent)
             avatar.release_configured_action(u.load_asset("/Game/JWJ/Weapons/IA_FireRifle"))
@@ -1565,12 +2733,20 @@ def update_combat_carrion(world, now):
             u.SystemLibrary.execute_console_command(world, "Log LogTemp Log")
         pawn.set_actor_location(u.Vector(37600., 35750., 15000.), False, True)
         pawn.character_movement.stop_movement_immediately()
+        if combat_isolate_target:
+            committed = [row for row in trial["damage"] if row["applied"] > 0.
+                         and ".COMMITTED:" in row["result"]]
+            if (trial["release_hp"] != 0 or len(committed) != 4
+                    or any(row["target"] != str(trial["victim"]) for row in committed)
+                    or abs(sum(row["applied"] for row in committed) - 100.) > .0001):
+                raise RuntimeError(f"Target {trial['victim']} did not receive only four committed hits totaling 100 damage")
         return
     native_position = victim.get("native_world_position")
     position = native_position or [
         float(value) for value in re.findall(r"[XYZ]=([-+\d.eE]+)", victim["position"])]
     target = u.Vector(*position)
     trial["last_live_target_position_cm"] = position
+    trial["last_live_target_region"] = victim["region"]
     if rifle_combat_trial:
         update_carrion_rifle(world, pawn, trial, target, now, aim_at_proxy=not native_position)
         return
@@ -1587,7 +2763,7 @@ def update_combat_carrion(world, now):
     facing = u.Rotator(yaw=math.degrees(math.atan2(offset.y, offset.x)))
     controller.set_control_rotation(facing)
     pawn.set_actor_rotation(facing, True)
-    if "first_attack" in trial and now <= combat_start + 4.3:
+    if "first_attack" in trial and now <= start + 4.3:
         hand = pawn.mesh.get_socket_location("Attack_Hand_R")
         proxy_center = u.Vector(*trial["first_attack"]["target_proxy"]) if trial["first_attack"]["target_proxy"] else None
         if proxy_center:
@@ -1595,7 +2771,7 @@ def update_combat_carrion(world, now):
             trial["closest_hand_to_proxy_cm"] = min(
                 trial.get("closest_hand_to_proxy_cm", float("inf")), (hand - current_proxy_center).length())
     presses = trial["press_times"]
-    if combat_trial == "Attack" and now >= combat_start + 3. and (not presses or now - presses[-1] >= 1.5):
+    if combat_trial == "Attack" and now >= start + 3. and (not presses or now - presses[-1] >= 1.5):
         if not presses:
             runtime = u.GameplayStatics.get_actor_of_class(world, u.EcoCreatureIntegrationSpawner)
             proxies = u.GameplayStatics.get_all_actors_of_class(world, u.EcoCreatureHitProxy)
@@ -1617,15 +2793,151 @@ def update_combat_carrion(world, now):
         presses.append(now)
 
 
+def record_combat_selection(cohort):
+    candidates = sorted((row for row in cohort["agents"] if row["species"] == "Herbivore"
+                         and row["region"] == COMBAT_SELECTION_REGION and row["generation"] == 0
+                         and row["sex"] == 2 and row["maturity"] >= 1. and row["hp"] > 0.),
+                        key=lambda row: int(row["id"]))
+    if len(candidates) < 2:
+        raise RuntimeError("Selection requires at least two mature male Grassland deer")
+    if combat_selection == "Largest":
+        target = max(candidates, key=lambda row: row["size_gene"])
+    elif visible_combat_selection:
+        if len({row["visual_body_scale"] for row in candidates}) < 2:
+            raise RuntimeError("Visual selection requires distinct published body scales")
+        select = max if combat_selection == "VisibleLargest" else min
+        target = select(candidates, key=lambda row: row["visual_body_scale"])
+    else:
+        drawn_id = Random(combat_selection_draw).choice([row["id"] for row in candidates])
+        target = next(row for row in candidates if row["id"] == drawn_id)
+    result["combat_selection"] = {
+        "policy": combat_selection, "draw_seed": combat_selection_draw if combat_selection == "Blind" else None,
+        "candidate_sample_seconds": cohort["completed_seconds"], "target": int(target["id"]),
+        "candidates": [{key: row[key] for key in ("id", "sex", "generation", "maturity", "size_gene", "visual_body_scale", "hp")}
+                       for row in candidates],
+    }
+
+
+def sample_player_attack_witnesses(world, now, key):
+    trial = result.get(key)
+    if not trial or not trial["press_times"] or now < trial.get("next_witness_sample", 0.):
+        return
+    if "released" in trial and now > trial["released"] + 3.:
+        return
+    trial["next_witness_sample"] = now + .10
+    witnesses = trial.setdefault("player_attack_witnesses", {})
+    reasons = {"PlayerAttackWitnessed", "PlayerAttackWitnessEscape"}
+    if len(trial["damage"]) != trial.get("witness_damage_receipts", 0):
+        trial["witness_damage_receipts"] = len(trial["damage"])
+        for agent_id in inspect.get_authority_agent_ids(world):
+            agent = read_agent(world, agent_id)
+            events = [event for event in agent.get("gameplay_reason_history", ())
+                      if event["reason"] in reasons and event["related_id"] == str(trial["victim"])] if agent else []
+            if not events:
+                continue
+            row = witnesses.setdefault(str(agent_id), {"species": agent["species"], "region": agent["region"], "reasons": []})
+            row["reasons"].extend(event for event in events if event not in row["reasons"])
+
+    tracked = set(witnesses)
+    if candidate := trial.get("first_shot_witness_candidate"):
+        tracked.add(str(candidate["id"]))
+    if not tracked:
+        return
+    runtime = u.GameplayStatics.get_actor_of_class(world, u.EcoCreatureIntegrationSpawner)
+    raw_traits = runtime.capture_population_traits()
+    if not raw_traits:
+        return
+    traits = {row["id"]: row for row in json.loads(raw_traits)["agents"] if row["id"] in tracked}
+    trajectories = trial.setdefault("player_witness_trajectories", {})
+    for agent_id, trait in sorted(traits.items()):
+        agent = read_agent(world, int(agent_id))
+        if not agent or "rule_fauna" not in agent:
+            continue
+        samples = trajectories.setdefault(agent_id, [])
+        if samples and trait["sample_seconds"] <= samples[-1]["motion_seconds"]:
+            continue
+        samples.append({"motion_seconds": trait["sample_seconds"], "region": agent["region"], "activity": agent["activity"],
+                        "position_cm": list(map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", agent["position"]))),
+                        "speed_cm_s": trait["horizontal_speed_cm_s"], "threat_until": trait["threat_until"],
+                        "caution_gene": trait["caution_gene"], "hp": trait["hp"],
+                        "hearing": [event for event in agent.get("gameplay_reason_history", ())
+                                    if event["reason"] in {"ShotHeard", "ThreatHeard"}
+                                    and event["time"] >= trial["start_game_seconds"]]})
+
+
+def sample_hunt_carrion(world, key):
+    trial = result.get(key, {})
+    if "last_live_target_position_cm" not in trial:
+        return
+    clock = u.GameplayStatics.get_game_state(world).get_ecology_summary().get_editor_property("time")
+    now = clock.get_editor_property("server_time_seconds")
+    trace = (result if key == "combat_carrion" else trial).setdefault("hunt_carrion_observations", [])
+    if trace and now < trace[-1]["authority_seconds"] + 1. - 1.e-6:
+        return
+    origin = trial.get("dead_target_position_cm", trial["last_live_target_position_cm"])
+    region = trial["last_live_target_region"]
+    agents = []
+    for agent in inspect.get_authority_agent_ids(world):
+        row = read_agent(world, agent)
+        if not row or row["hp"] <= 0. or row["region"] != region:
+            continue
+        details = row.get("rule_fauna", {})
+        if row["species"] != "Wolf" and not details:
+            continue
+        position = row.get("native_world_position") or [
+            float(value) for value in re.findall(r"[XYZ]=([-+\d.eE]+)", row["position"])]
+        life = row.get("life", {})
+        agents.append({"id": row["stable_id"], "species": row["species"],
+                       "distance_cm": math.dist(position, origin), "energy_fraction": life.get("nutrition", row["energy_fraction"]),
+                       "activity": row["activity"], "native_reserved_source": life.get("carcass_source"),
+                       "rule_carcass_target": details.get("carcass"), "rule_prey_target": details.get("prey"),
+                       "rule_food_patch": details.get("food_patch_index")})
+    trace.append({"authority_seconds": now, "target_region": region, "target_position_cm": origin,
+                  "target_confirmed_dead": trial.get("release_hp") == 0., "agents": agents})
+
+
 def record_carrion_damage(value):
-    result["combat_carrion"]["damage"].append({
+    trial = result.get("combat_repeat") or result["combat_carrion"]
+    receipt = {
         "result": str(value.result), "target": str(value.target_stable_agent_id), "step": value.step_id,
         "applied": value.applied_damage, "hp": value.remaining_hp,
-    })
+    }
+    if audit_player_attack_witness and value.applied_damage > 0.:
+        world = editor.get_game_world()
+        pawn = u.GameplayStatics.get_player_pawn(world, 0)
+        receipt["execution"] = value.attack_execution_id
+        if pawn:
+            receipt["attacker_position_cm"] = list(pawn.get_actor_location().to_tuple())
+    trial["damage"].append(receipt)
 
 
 def update_carrion_rifle(world, pawn, trial, target, now, aim_at_proxy):
-    pawn.set_actor_location(target + u.Vector(-650., 0., 96.), False, True)
+    point = target + u.Vector(0., 0., 45.)
+    proxy = None
+    if aim_at_proxy or combat_isolate_target:
+        proxy = next((actor for actor in u.GameplayStatics.get_all_actors_of_class(world, u.EcoCreatureHitProxy)
+                      if actor.get_editor_property("stable_agent_id") == trial["victim"]), None)
+        if proxy:
+            point = proxy.get_actor_location()
+    approach_distance = 320. if audit_player_attack_witness else 650.
+    position = target + u.Vector(-approach_distance, 0., 96.)
+    if combat_clear_approach:
+        # Real muzzle traces reveal obstructions that a ray from the pawn origin can miss.
+        view_angles = (180., 0., 90., 270., 135., 225., 45., 315.)
+        sector = trial.get("approach_sector", 0)
+        shots = trial.get("shots", [])
+        if shots and shots[-1]["execution"] != trial.get("approach_observed_shot"):
+            latest = shots[-1]
+            trial["approach_observed_shot"] = latest["execution"]
+            if latest["distance_cm"] < approach_distance - 200.:
+                sector = (sector + 1) % len(view_angles)
+                trial["approach_sector"] = sector
+                trial.setdefault("clear_approach_changes", []).append({
+                    "time": now, "angle_deg": view_angles[sector], "short_shot_cm": latest["distance_cm"],
+                })
+        yaw = math.radians(view_angles[sector])
+        position = target + u.Vector(approach_distance * math.cos(yaw), approach_distance * math.sin(yaw), 96.)
+    pawn.set_actor_location(position, False, True)
     pawn.character_movement.stop_movement_immediately()
     controller = u.GameplayStatics.get_player_controller(world, 0)
     controller.set_view_target_with_blend(pawn, 0.)
@@ -1635,24 +2947,134 @@ def update_carrion_rifle(world, pawn, trial, target, now, aim_at_proxy):
     if not trial.get("aim_requested"):
         avatar.press_configured_action(u.load_asset("/Game/JWJ/Weapons/IA_AimRifle"))
         trial["aim_requested"] = True
-    point = target + u.Vector(0., 0., 45.)
-    if aim_at_proxy:
-        proxy = next((actor for actor in u.GameplayStatics.get_all_actors_of_class(world, u.EcoCreatureHitProxy)
-                      if actor.get_editor_property("stable_agent_id") == combat_victim), None)
-        if proxy:
-            point = proxy.get_actor_location()
     controller.set_control_rotation(u.MathLibrary.find_look_at_rotation(camera.get_world_location(), point))
     presses = trial["press_times"]
-    if combat_trial == "Rifle" and aim.get_editor_property("aiming") and now >= combat_start + 3. and (
+    if combat_trial == "Rifle" and aim.get_editor_property("aiming") and now >= trial["start_game_seconds"] + 3. and (
             not presses or now - presses[-1] >= .6):
+        if audit_player_attack_witness and not presses and trial is result.get("combat_carrion"):
+            if now < trial.get("next_witness_preflight", 0.):
+                return
+            witness = rifle_witness_preflight(world, trial, target, pawn.get_actor_location())
+            if witness is None:
+                trial["approach_sector"] = (sector + 1) % len(view_angles)
+                trial["next_witness_preflight"] = now + .20
+                return
+            trial["first_shot_witness_candidate"] = witness
+        if combat_isolate_target:
+            gate = rifle_aim_target_gate(world, pawn, proxy)
+            if gate != "Target":
+                if gate == "ViewUpdating":
+                    return
+                advance_at = trial.setdefault("next_preflight_rotation", now + .35)
+                if now >= advance_at:
+                    trial["approach_sector"] = (sector + 1) % len(view_angles)
+                    trial["next_preflight_rotation"] = now + .35
+                    trial.setdefault("preflight_changes", []).append({
+                        "time": now, "angle_deg": view_angles[sector], "gate": gate,
+                    })
+                return
+            trial.pop("next_preflight_rotation", None)
+        if visible_combat_selection and not presses:
+            selection = result["combat_selection"]
+            candidate = next(row for row in selection["candidates"] if int(row["id"]) == trial["victim"])
+            for visual in u.GameplayStatics.get_all_actors_of_class(world, u.EcoCreatureRepresentationActor):
+                state = visual.get_editor_property("visual_state")
+                if not state.alive or state.stable_agent_id != trial["victim"]:
+                    continue
+                scale = state.get_editor_property("body_scale")
+                if not math.isclose(scale, candidate["visual_body_scale"], abs_tol=1.e-6):
+                    raise RuntimeError("Selected visible size changed before the first shot")
+                mesh = next((component.get_skeletal_mesh_asset() for component in
+                             visual.get_components_by_class(u.SkeletalMeshComponent)
+                             if component.is_visible() and component.get_skeletal_mesh_asset()), None)
+                if mesh:
+                    selection["first_shot_visual"] = {"target": trial["victim"], "body_scale": scale,
+                                                      "actor_scale": list(visual.get_actor_scale3d().to_tuple()),
+                                                      "mesh": mesh.get_path_name()}
+                    break
+            if "first_shot_visual" not in selection:
+                return
         action = u.load_asset("/Game/JWJ/Weapons/IA_FireRifle")
         avatar.release_configured_action(action)
         avatar.press_configured_action(action)
         presses.append(now)
 
 
+def rifle_witness_preflight(world, trial, target, attacker):
+    runtime = u.GameplayStatics.get_actor_of_class(world, u.EcoCreatureIntegrationSpawner)
+    profiles = {str(profile.get_editor_property("species_id")): profile for profile in runtime.get_editor_property("fauna_species")}
+    victim = read_agent(world, trial["victim"])
+    victim_profile = profiles.get(victim["species"])
+    victim_height = victim_profile.get_editor_property("eye_height") if victim_profile else 65.
+    geometry = u.EcoCreatureAnimationBuilder
+    for actor in u.GameplayStatics.get_all_actors_of_class(world, u.EcoCreatureRepresentationActor):
+        visual = actor.get_editor_property("visual_state")
+        if not visual.alive or visual.stable_agent_id == trial["victim"]:
+            continue
+        row = read_agent(world, visual.stable_agent_id)
+        if not row or row["region"] != victim["region"] or "rule_fauna" not in row:
+            continue
+        profile = profiles.get(row["species"])
+        if not profile or row["rule_fauna"]["swimming"]:
+            continue
+        position = u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", row["position"])))
+        ahead = actor.get_actor_forward_vector()
+        range_limit = min(550., profile.get_editor_property("threat_sense_range"))
+        fov = math.cos(math.radians(profile.get_editor_property("threat_sight_half_angle")))
+        eye = position + u.Vector(0., 0., profile.get_editor_property("eye_height"))
+        visible = True
+        for point, height in ((target, victim_height), (attacker, 0.)):
+            delta = point - position
+            horizontal = math.hypot(delta.x, delta.y)
+            if (delta.length() >= range_limit or (delta.length() > 85. and horizontal > 0.
+                    and (ahead.x * delta.x + ahead.y * delta.y) / horizontal < fov)
+                    or not geometry.has_fauna_audit_sight(world, eye, point + u.Vector(0., 0., height))):
+                visible = False
+                break
+        if visible:
+            return {"id": int(visual.stable_agent_id), "species": row["species"], "region": row["region"],
+                    "position_cm": list(position.to_tuple()), "attacker_cm": list(attacker.to_tuple())}
+    return None
+
+
+def rifle_aim_target_gate(world, pawn, proxy):
+    if proxy is None:
+        return "ProxyUnavailable"
+    weapon = pawn.get_component_by_class(u.EcoEquipmentComponent).get_editor_property("weapon")
+    definition = weapon.get_editor_property("definition")
+    if weapon.get_editor_property("use_muzzle_point"):
+        muzzle = weapon.get_editor_property("muzzle_point").get_world_location()
+    else:
+        mesh_name = "skeletal_mesh" if definition.get_editor_property("skeletal_mesh") else "static_mesh"
+        muzzle = weapon.get_editor_property(mesh_name).get_socket_location(definition.get_editor_property("muzzle_socket"))
+    fire = pawn.get_component_by_class(u.EcoWeaponFireComponent)
+    if fire.get_editor_property("trace_channel") != u.CollisionChannel.ECC_VISIBILITY:
+        raise RuntimeError("Target-isolated fixture requires the existing Visibility rifle trace")
+    camera = u.GameplayStatics.get_player_camera_manager(world, 0)
+    origin = camera.get_camera_location()
+    view = u.MathLibrary.get_forward_vector(camera.get_camera_rotation())
+    current_aim = u.MathLibrary.get_forward_vector(pawn.get_control_rotation())
+    alignment = view.x * current_aim.x + view.y * current_aim.y + view.z * current_aim.z
+    if (origin - pawn.get_actor_location()).length() > 650. or alignment < .95:
+        return "ViewUpdating"
+    ignored = [pawn, weapon]
+    def trace(start, end):
+        return u.SystemLibrary.line_trace_single(
+            world, start, end, u.TraceTypeQuery.TRACE_TYPE_QUERY1, True, ignored, u.DrawDebugTrace.NONE, True)
+    sight_hit = trace(origin, origin + view * definition.get_editor_property("range"))
+    if not sight_hit:
+        return "CameraOccluded"
+    _, _, _, _, _, impact, _, _, _, hit_actor, *_ = sight_hit.to_tuple()
+    if hit_actor != proxy:
+        return "CameraOccluded"
+    muzzle_to_impact = impact - muzzle
+    shot_hit = trace(muzzle, impact + muzzle_to_impact * (6. / max(1., muzzle_to_impact.length())))
+    return "Target" if shot_hit and shot_hit.to_tuple()[9] == proxy else "MuzzleOccluded"
+
+
 def record_carrion_shot(execution, muzzle, end):
-    result["combat_carrion"].setdefault("shots", []).append({
+    trial = result.get("combat_repeat") or result["combat_carrion"]
+    trial.setdefault("shots", []).append({
         "execution": execution, "distance_cm": (end - muzzle).length(),
     })
 
@@ -1824,6 +3246,41 @@ def prepare_lower_river_land_forage(world, runtime):
     }
 
 
+def survey_native_grassland_food(world, completed, agents):
+    field, = (actor for actor in u.GameplayStatics.get_all_actors_of_class(world, u.EcoVegetationField)
+              if str(actor.get_editor_property("region_id")) == "Grassland")
+    grid = json.loads(field.capture_diagnostics(True))
+    cells = grid.get("logical_cells", [])
+    if not cells:
+        raise RuntimeError("The Grassland survey requires the live Native food grid")
+    cx, cy, _ = grid["native_origin_cm"]
+    width = grid["grid_width"]
+    cell_cm = grid["cell_size_units"] * grid["native_unit_cm"]
+    available = [(cx + (row["cell"] % width + .5) * cell_cm,
+                  cy + (row["cell"] // width + .5) * cell_cm, row)
+                 for row in cells if row["ground_usable"] and row["food"] >= .02]
+    nearby = []
+    for deer in agents:
+        if deer["hp"] <= 0. or deer["energy_fraction"] > .30 or "native_world_position" not in deer:
+            continue
+        px, py, _ = deer["native_world_position"]
+        distance_cm, closest_cell = min(((math.hypot(px - x, py - y), row["cell"]) for x, y, row in available),
+                                        default=(None, None))
+        nearby.append({"id": deer["stable_id"], "nearest_usable_stock_distance_cm": distance_cm, "cell": closest_cell})
+    ledger = grid.get("ledger_amount")
+    stock = grid["food"]
+    cell_total = sum(row["food"] for row in cells)
+    if abs(cell_total - stock) > 1e-7 or ledger is None or abs(ledger - stock) > 1e-6:
+        raise RuntimeError("Grassland grid and the authority ledger disagree at the survey boundary")
+    survey = result.setdefault("wolf_food_survey", {
+        "probe_agent": int(wolf_food_survey[1]),
+        "forage_approach": "-EcoIslandNativeForageApproach" in command.split(), "samples": []})
+    survey["samples"].append({
+        "at": completed, "native_step": grid["native_step"], "total_stock": stock, "ledger_stock": ledger,
+        "usable_stock": sum(row["food"] for _, _, row in available), "usable_cells_with_food": len(available),
+        "grid_cells": len(cells), "deer_below_30_percent_energy": nearby})
+
+
 def sample_vegetation(world):
     keys = ("native_step", "habitat_dynamics", "food", "capacity", "mean_moisture", "rain", "grown",
             "environment_lost", "consumed", "ledger_amount", "ledger_capacity", "ledger_consumed",
@@ -1975,6 +3432,23 @@ def isolate_region_weather(world, names):
             adapter.set_editor_property("cycle_rainfall", False)
             adapter.set_editor_property("apply_authored_weather", False)
     return {name: regions[name] for name in sorted(names)}
+
+
+def apply_trait_climate(world, completed):
+    rain = .75 if trait_climate_match[1] == "Rain" else 0.
+    trial = result.setdefault("trait_climate", {"mode": trait_climate_match[1], "samples": []})
+    if not trait_climate_regions:
+        trait_climate_regions.update(isolate_region_weather(world, {"Grassland", "Highland", "Riverbank", "LowerRiver"}))
+        for region in trait_climate_regions.values():
+            state = region.get_environment_state()
+            state.set_editor_property("rainfall", rain)
+            state.set_editor_property("weather_state", u.EcoWeatherState.RAIN if rain else u.EcoWeatherState.DROUGHT)
+            region.set_environment_state(state)
+    rainfall = {name: region.get_environment_state().get_editor_property("rainfall")
+                for name, region in trait_climate_regions.items()}
+    if any(abs(value - rain) > .001 for value in rainfall.values()):
+        raise RuntimeError(f"Trait climate input changed unexpectedly at {completed}: {rainfall}")
+    trial["samples"].append({"completed_seconds": completed, "rainfall": rainfall})
 
 
 local_soil_weather_regions = {}
@@ -3565,6 +5039,11 @@ def check_island_checkpoint(world, runtime, now):
             return False
         if mode == "Load":
             loaded = runtime.load_ecosystem(slot)
+            if "-EcoIslandTraitCheckpointMismatch" in command.split():
+                if loaded:
+                    raise RuntimeError("Checkpoint accepted a changed fauna rule")
+                result["checkpoint_rejected_trait_mismatch"] = True
+                return True
             if river_rat_shift_mouth:
                 if loaded:
                     raise RuntimeError("Checkpoint accepted a shifted rat approach point")
@@ -3577,6 +5056,27 @@ def check_island_checkpoint(world, runtime, now):
                 raise RuntimeError(f"Could not save {slot} before the first hatch")
             return False
         snapshot = {"agents": {}, "stock": {}}
+        if trait_audit:
+            traits = json.loads(runtime.capture_population_traits())
+            fields = ("species", "region", "parent_a", "parent_b", "generation", "origin", "born",
+                      "size_gene", "speed_gene", "caution_gene", "sociability_gene", "coat_gene")
+            snapshot["heritable_flight"] = traits["heritable_flight"]
+            snapshot["heritable_fauna_maintenance"] = traits.get("heritable_fauna_maintenance", False)
+            if traits.get("functional_traits"):
+                snapshot["functional_traits"] = True
+                fields += ("propulsion_gene", "endurance_gene", "form_gene", "shape_fore_gene", "shape_aft_gene",
+                           "shape_span_gene", "shape_rise_gene")
+            if traits.get("covered_refuge_meal_rotation"):
+                snapshot["covered_refuge_meal_rotation"] = True
+            if traits.get("aquatic_patch_meal_rotation"):
+                snapshot["aquatic_patch_meal_rotation"] = True
+            if traits.get("land_plant_meal_rotation"):
+                snapshot["land_plant_meal_rotation"] = True
+            snapshot["traits"] = {row["id"]: {field: row[field] for field in fields} for row in traits["agents"]}
+            if traits.get("aquatic_nursery_approach"):
+                snapshot["aquatic_nursery_approach"] = True
+                snapshot["reserved_nurseries"] = traits["nurseries"]
+            result["checkpoint_traits_time"] = traits["completed_seconds"]
         river, = (actor for actor in u.GameplayStatics.get_all_actors_of_class(world, u.EcologyRegion)
                   if str(actor.get_editor_property("region_id")) == authored["river"])
         environment = river.get_editor_property("environment_state")
@@ -3665,6 +5165,17 @@ def check_island_checkpoint(world, runtime, now):
             return False
     if now < result["checkpoint_loaded_at"] + 25.:
         return False
+    if trait_checkpoint_resume:
+        resume = json.loads(runtime.capture_population_traits())["completed_seconds"]
+        if resume <= result["checkpoint_traits_time"] + 20.:
+            raise RuntimeError("The restored authority clock did not advance")
+        payments = [event for agent in inspect.get_authority_agent_ids(world)
+                    for event in (read_agent(world, agent) or {}).get("gameplay_reason_history", ())
+                    if event["reason"] == "HabitatPatchEaten" and event["time"] > result["checkpoint_traits_time"]]
+        if not payments:
+            raise RuntimeError("No habitat food payment after restoring the trait checkpoint")
+        result["checkpoint_trait_resume"] = {"authority_seconds": resume, "habitat_payments": len(payments)}
+        return True
     if result.get("meadow_layout") == "Shared":
         return True
     hatches = {event["related_id"] for agent in inspect.get_authority_agent_ids(world)
@@ -3782,17 +5293,28 @@ def sample_nursery_drawdown(world, runtime, now):
             or ("sampled_at" in trial and now - trial["sampled_at"] < .25)):
         return
     trial["sampled_at"] = now
-    agent = read_agent(world, 104)
-    if not agent or agent["species"] != "CommonCarp":
-        return
-    history = agent.get("gameplay_reason_history", ())
     inlet_id = "IslandRiverInletPlants"
     if "reservation" not in trial:
-        reservation = next((event for event in history if event["reason"] == "BirthAquaticNurseryReserved"
-                            and event.get("resource_id") == inlet_id), None)
-        if reservation is None:
+        if not result["samples"]:
             return
-        trial["reservation"] = reservation
+        # Founder IDs can move when the island roster changes. Follow the real reservation.
+        if "carp_founders" not in trial:
+            trial["carp_founders"] = [int(row["stable_id"]) for row in result["samples"][0]["agents"]
+                                      if row["species"] == "CommonCarp"]
+        for agent_id in trial["carp_founders"]:
+            candidate = read_agent(world, agent_id)
+            history = candidate.get("gameplay_reason_history", ()) if candidate else ()
+            reservation = next((event for event in history if event["reason"] == "BirthAquaticNurseryReserved"
+                                and event.get("resource_id") == inlet_id), None)
+            if reservation is not None:
+                trial.update(reservation=reservation, reservation_parent=agent_id)
+                break
+        else:
+            return
+    agent = read_agent(world, trial["reservation_parent"])
+    if not agent:
+        return
+    history = agent.get("gameplay_reason_history", ())
     reservation = trial["reservation"]
     clock = u.GameplayStatics.get_game_state(world).get_ecology_summary().get_editor_property("time")
     authority_now = clock.get_editor_property("server_time_seconds")
@@ -4789,6 +6311,920 @@ def add_eagle_perch_trial(world, runtime):
     runtime.set_editor_property("fauna_perches", perches)
 
 
+def stage_buffalo_guard_trial(runtime):
+    """Move one founder in the editor's unsaved level so the two species can meet in PIE."""
+    groups = list(runtime.get_editor_property("groups"))
+    by_region = {str(group.get_editor_property("region_id")): group for group in groups}
+    stage = runtime.get_editor_property("fauna_habitat_stage")
+
+    def placement_for(region, kind):
+        placements = list(by_region[region].get_editor_property("fauna"))
+        row, = (item for item in placements if str(item.get_editor_property("species_id")) == kind)
+        field = ("habitat_spawn_points" if row.get_editor_property("habitat_spawn_points")
+                 and stage >= row.get_editor_property("habitat_spawn_stage") else "spawn_points")
+        return placements, row, field, list(row.get_editor_property(field))
+
+    grassland, _, _, herd = placement_for("Grassland", "Buffalo")
+    riverbank, leopard, field, founders = placement_for("Riverbank", "Leopard")
+    if len(herd) != 4 or len(founders) != 2 or any(str(row.get_editor_property("species_id")) == "Leopard" for row in grassland):
+        raise RuntimeError("The guard trial requires the existing four-buffalo herd and two Riverbank leopards")
+    center = sum(herd, u.Vector()) * .25
+    # The World Partition ground that resolves the authored spawn is available during PIE.
+    start = center + u.Vector(-1250., -450., 0.)
+    moved = leopard.copy()
+    moved.set_editor_property("spawn_points", [start])
+    moved.set_editor_property("habitat_spawn_points", [])
+    leopard.set_editor_property(field, founders[1:])
+    by_region["Grassland"].set_editor_property("fauna", grassland + [moved])
+    by_region["Riverbank"].set_editor_property("fauna", riverbank)
+    runtime.set_editor_property("groups", groups)
+    if buffalo_guard_trial[1] == "Calf":
+        profiles = list(runtime.get_editor_property("fauna_species"))
+        profile, = (row for row in profiles if str(row.get_editor_property("species_id")) == "Leopard")
+        rules = [rule for rule in profile.get_editor_property("prey_rules") if str(rule.get_editor_property("species_id")) == "Buffalo"]
+        if len(rules) != 1:
+            raise RuntimeError("The calf-only comparison requires the saved leopard prey rule for buffalo")
+        profile.set_editor_property("prey_rules", rules)
+        runtime.set_editor_property("fauna_species", profiles)
+    result["buffalo_guard_trial"] = {"prey_mode": buffalo_guard_trial[1] or "Saved",
+                                     "leopard_start": list(start.to_tuple()), "source_start": list(founders[0].to_tuple()),
+                                     "herd_center": list(center.to_tuple()), "samples": []}
+
+
+def verify_buffalo_guard_trial(world, agents, regional):
+    if (regional.get("Grassland", {}).get("Leopard") != 1 or regional.get("Riverbank", {}).get("Leopard") != 1
+            or regional.get("Grassland", {}).get("Buffalo") != 4):
+        raise RuntimeError("The guard trial did not start with the saved herd and one leopard in each region")
+    herd = [u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", row["position"])))
+            for row in agents if row["species"] == "Buffalo" and row["region"] == "Grassland"]
+    leopard, = (row for row in agents if row["species"] == "Leopard" and row["region"] == "Grassland")
+    origin = u.Vector(*map(float, re.findall(r"[XYZ]=([-+\d.eE]+)", leopard["position"])))
+    trial = result["buffalo_guard_trial"]
+    if math.hypot(origin.x - trial["leopard_start"][0], origin.y - trial["leopard_start"][1]) > 200.:
+        raise RuntimeError("The authority did not place the leopard in the planned Grassland neighborhood")
+    target = min(herd, key=lambda point: (origin - point).length())
+    geometry = u.EcoCreatureAnimationBuilder
+    distance = (origin - target).length()
+    pieces = max(1, math.ceil(distance / 350.))
+    route = [geometry.project_placement_point(world, origin + (target - origin) * (i / pieces)) for i in range(pieces + 1)]
+    if any(point is None for point in route) or not all(geometry.validate_fauna_ground_segment(
+            world, "Grassland", "Leopard", start, end, 1.) for start, end in zip(route, route[1:])):
+        raise RuntimeError("The starting leopard and herd have no direct connected ground in the authority world")
+    trial.update(authority_leopard_id=leopard["stable_id"], authority_leopard_start=list(origin.to_tuple()),
+                 authority_nearest_herd_cm=distance, authority_ground_segments=pieces)
+
+
+def sample_buffalo_guard_trial(world, runtime, completed):
+    samples = result["buffalo_guard_trial"]["samples"]
+    if samples and completed < samples[-1]["at"] + 1.:
+        return
+    family = json.loads(runtime.capture_population_traits())["agents"]
+    agents = []
+    for row in family:
+        if row["region"] != "Grassland" or row["species"] not in ("Buffalo", "Leopard"):
+            continue
+        agent = read_agent(world, int(row["id"]))
+        if agent:
+            agents.append({key: row[key] for key in ("id", "species", "parent_a", "parent_b", "generation", "maturity", "hp",
+                                                     "energy", "stamina", "body_scale", "horizontal_speed_cm_s")}
+                          | {"position": agent["position"], "activity": agent["activity"], "prey": agent["rule_fauna"]["prey"]})
+    samples.append({"at": completed, "agents": agents})
+
+
+def stage_predator_breeding_habitat(world, runtime, *, managed_food, pair_at_roots):
+    """Place breeding sites, with optional finite food pools for the managed fixture."""
+    project = u.EcoCreatureAnimationBuilder.project_placement_point
+    groups = list(runtime.get_editor_property("groups"))
+    by_region = {str(group.get_editor_property("region_id")): group for group in groups}
+    patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+    perches = list(runtime.get_editor_property("fauna_perches"))
+    evidence_key = "predator_habitat" if managed_food else "predator_sites"
+    result[evidence_key] = {}
+
+    def ground(hint):
+        point = project(world, hint)
+        if point is None or abs(point.z - hint.z) > 55.:
+            raise RuntimeError(f"Predator habitat lacks matching ground at {hint}")
+        return point
+
+    territories = [("GoldenEagle", "Highland"), ("Mink", "LowerRiver")]
+    if managed_food:
+        territories.insert(0, ("Leopard", "Riverbank"))
+    for kind, region in territories:
+        group = by_region[region]
+        placements = list(group.get_editor_property("fauna"))
+        placement, = (row for row in placements if str(row.get_editor_property("species_id")) == kind)
+        founders = list(placement.get_editor_property("spawn_points"))
+        if len(founders) < 2:
+            raise RuntimeError(f"Expected opposite-sex founder slots for {kind}")
+        original = [list(point.to_tuple()) for point in founders[:2]]
+        if kind == "Mink":
+            # The saved founder slots are on opposite banks. Preserve the first bank for the Roots trial.
+            if pair_at_roots:
+                founders[1] = ground(founders[0] - u.Vector(130., 0., 0.))
+            else:
+                founders[0] = ground(founders[1] + u.Vector(130., 0., 0.))
+            placement.set_editor_property("spawn_points", founders)
+            group.set_editor_property("fauna", placements)
+        center = ground((founders[0] + founders[1]) * .5)
+        entry = {"region": region, "original_parent_start_cm": original,
+                 "center_cm": list(center.to_tuple()),
+                 "parent_start_cm": [list(point.to_tuple()) for point in founders[:2]]}
+        result[evidence_key][kind] = entry
+        if kind == "GoldenEagle":
+            if any(str(site.get_editor_property("nest_id")) == "IslandHighlandBreedingNest" for site in perches):
+                raise RuntimeError("Unexpected breeding nest in the saved island")
+            site = u.EcoFaunaPerch()
+            site.set_editor_property("region_id", region)
+            site.set_editor_property("species_id", kind)
+            site.set_editor_property("location", center)
+            site.set_editor_property("nest_id", "IslandHighlandBreedingNest")
+            perches.append(site)
+            entry["nest_id"] = "IslandHighlandBreedingNest"
+        if not managed_food:
+            continue
+        patch = u.EcoFaunaHabitatPatch()
+        patch_id = "IslandManagedForage" + kind
+        for field, value in {"id": patch_id, "region_id": region, "center": center, "consumers": [kind],
+                             "capacity": 36., "regrowth_per_second": .55,
+                             "energy_per_meal": 6.}.items():
+            patch.set_editor_property(field, value)
+        patches.append(patch)
+        entry.update(patch_id=patch_id, capacity=36.)
+    runtime.set_editor_property("groups", groups)
+    if managed_food:
+        runtime.set_editor_property("fauna_habitat_patches", patches)
+    runtime.set_editor_property("fauna_perches", perches)
+
+
+def stage_eagle_families(world, runtime):
+    region_name = "Highland"
+    species_name = "GoldenEagle"
+    groups = [group.copy() for group in runtime.get_editor_property("groups")]
+    highland, = (group for group in groups if str(group.get_editor_property("region_id")) == region_name)
+    fauna = [placement.copy() for placement in highland.get_editor_property("fauna")]
+    eagles, = (placement for placement in fauna if str(placement.get_editor_property("species_id")) == species_name)
+    founders = list(eagles.get_editor_property("spawn_points"))
+    profile, = (entry for entry in runtime.get_editor_property("fauna_species")
+                if str(entry.get_editor_property("species_id")) == species_name)
+    cap = profile.get_editor_property("regional_limit")
+    if len(founders) != 2 or eagles.get_editor_property("habitat_spawn_points") or cap < 5:
+        raise RuntimeError("The eagle family trial needs the two saved eagle positions and room for offspring")
+    region, = (actor for actor in u.GameplayStatics.get_all_actors_of_class(world, u.EcologyRegion)
+               if str(actor.get_editor_property("region_id")) == region_name)
+    bounds = region.get_editor_property("region_bounds")
+    bounds_transform = bounds.get_world_transform()
+    extent = bounds.get_unscaled_box_extent().to_tuple()
+
+    def project(hint):
+        point = u.EcoCreatureAnimationBuilder.project_placement_point(world, hint)
+        if point is None or abs(point.z - hint.z) > 55.:
+            return None
+        local = u.MathLibrary.inverse_transform_location(bounds_transform, point).to_tuple()
+        return point if all(abs(value) <= half for value, half in zip(local, extent)) else None
+
+    original_nest = project((founders[0] + founders[1]) * .5)
+    if original_nest is None:
+        raise RuntimeError("The original pair needs a stable Highland nest")
+    second_site = None
+    for course in (0., 180., 90., 270., 45., 225., 135., 315.):
+        heading = u.Vector(math.cos(math.radians(course)), math.sin(math.radians(course)), 0.)
+        center = project(original_nest + heading * 720.)
+        if center is None:
+            continue
+        side = u.Vector(-heading.y, heading.x, 0.) * 110.
+        pair = [project(center + side), project(center - side)]
+        food = [project(original_nest - heading * 125.), project(center + heading * 125.)]
+        if (all(point is not None for point in [*pair, *food])
+                and min((point - founder).length() for point in pair for founder in founders) > 225.):
+            second_site = center, pair, food
+            break
+    if second_site is None:
+        raise RuntimeError("Could not place the second nest and founder pair on verified Highland ground")
+    second_nest, pair, food_points = second_site
+    eagles.set_editor_property("spawn_points", [*founders, *pair])
+    highland.set_editor_property("fauna", fauna)
+    runtime.set_editor_property("groups", groups)
+
+    perches = list(runtime.get_editor_property("fauna_perches"))
+    nests = {"IslandHighlandFirstFamilyNest": original_nest, "IslandHighlandSecondFamilyNest": second_nest}
+    for nest_id, point in nests.items():
+        site = u.EcoFaunaPerch()
+        site.set_editor_property("region_id", region_name)
+        site.set_editor_property("species_id", species_name)
+        site.set_editor_property("location", point)
+        site.set_editor_property("nest_id", nest_id)
+        perches.append(site)
+    runtime.set_editor_property("fauna_perches", perches)
+
+    evidence = {"mode": eagle_family_trial, "regional_limit": cap,
+                "family_starts_cm": [list(point.to_tuple()) for point in [*founders, *pair]],
+                "nests_cm": {key: list(point.to_tuple()) for key, point in nests.items()}}
+    if eagle_family_trial == "Provisioned":
+        patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+        rate = .5 * cap * profile.get_editor_property("maintenance")
+        evidence["food"] = []
+        # Non-plant ground food uses one access point per stock in the runtime.
+        for ordinal, point in enumerate(food_points, 1):
+            patch = u.EcoFaunaHabitatPatch()
+            patch_id = f"IslandManagedForageEagleNest{ordinal}"
+            for field, value in {"id": patch_id, "region_id": region_name, "center": point,
+                                 "consumers": [species_name], "capacity": 60.,
+                                 "regrowth_per_second": rate, "energy_per_meal": 6.}.items():
+                patch.set_editor_property(field, value)
+            patches.append(patch)
+            evidence["food"].append({"patch": patch_id, "capacity": 60., "regrowth_per_second": rate,
+                                     "point_cm": list(point.to_tuple())})
+        runtime.set_editor_property("fauna_habitat_patches", patches)
+    result["eagle_families"] = evidence
+
+
+def sample_eagle_family_landings(world, now, completed):
+    trial = result["eagle_families"]
+    if now < trial.get("next_landing_sample", 0.):
+        return
+    trial["next_landing_sample"] = now + .25
+    samples = trial.setdefault("landing_samples", [])
+    for agent_id in trial.get("founders", ()):
+        agent = read_agent(world, int(agent_id))
+        if agent and agent["hp"] > 0. and agent.get("rule_fauna"):
+            samples.append({"id": agent_id, "game_seconds": now, "completed_seconds": completed,
+                            "position": agent["position"], "energy": agent["energy"],
+                            "flight_phase": agent["rule_fauna"]["flight_phase"]})
+
+
+def place_highland_prey_pair(world, runtime):
+    """Move two saved hare founders before their first decision, retaining their identities."""
+    species = "Jackrabbit"
+    region = "Highland"
+    geometry = u.EcoCreatureAnimationBuilder
+    initial = (read_agent(world, agent) for agent in inspect.get_authority_agent_ids(world))
+    founders = sorted((row for row in initial if row and row["species"] == species and row["region"] == "Riverbank"),
+                      key=lambda row: int(row["stable_id"]))
+    if len(founders) != 4:
+        raise RuntimeError("Expected four saved Riverbank hares, including an opposite-sex pair to relocate")
+
+    food = {str(patch.get_editor_property("id")): patch
+            for patch in runtime.get_editor_property("fauna_habitat_patches")
+            if str(patch.get_editor_property("region_id")) == region
+            and species in map(str, patch.get_editor_property("consumers"))}
+    browse = food["IslandForageScrubBrowse"].get_editor_property("center")
+    for offsets in (((180., -360.), (440., -360.)), ((100., 420.), (380., 420.)),
+                    ((320., -190.), (320., 190.))):
+        points = [geometry.project_placement_point(world, browse + u.Vector(x, y, 0.)) for x, y in offsets]
+        if (all(point is not None for point in points)
+                and all(geometry.validate_fauna_ground_segment(world, region, species, point, browse, 1.)
+                        for point in points)):
+            break
+    else:
+        raise RuntimeError("The Highland hare pair needs two dry approaches to saved browse")
+    placements = []
+    for founder, destination in zip(founders[-2:], points, strict=True):
+        stable_id = int(founder["stable_id"])
+        if not geometry.set_island_audit_founder_placement(runtime, stable_id, region, destination):
+            raise RuntimeError(f"Authority rejected the Highland hare placement for {stable_id}")
+        after = read_agent(world, stable_id)
+        if not after or after["region"] != region:
+            raise RuntimeError(f"Could not confirm the Highland region for hare {stable_id}")
+        placements.append({"id": str(stable_id), "from_region": founder["region"], "to_region": region,
+                           "from": founder["position"], "to": after["position"], "food_site": "IslandForageScrubBrowse"})
+    return placements
+
+
+def stage_mink_near_prey(world, runtime):
+    """Connect one existing fish to a saved bank without creating food or animals."""
+    patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+    by_name = {str(patch.get_editor_property("id")): patch for patch in patches}
+    donor = by_name["IslandRiverDrift" if mink_near_surface_prey else "IslandRiverGravelNearRoots"]
+    shore_id = "IslandRiverRootsShore" if mink_roots_watch else "IslandRiverSecondMinkShore"
+    shore = by_name[shore_id]
+    old_center = donor.get_editor_property("center")
+    old_center_cm = list(old_center.to_tuple())
+    entry = shore.get_editor_property("water_entry_point")
+    bank = shore.get_editor_property("shore_point")
+    wet_center = shore.get_editor_property("center")
+    region = str(donor.get_editor_property("region_id"))
+    profiles = runtime.get_editor_property("fauna_species")
+    prey_id = "UnidentifiedFish" if mink_near_surface_prey else "AriakeCatfish"
+    prey, = (row for row in profiles if str(row.get_editor_property("species_id")) == prey_id)
+    clearance = .65 * prey.get_editor_property("body_radius")
+
+    def clear_sight(start, end):
+        ignored = []
+        while hit := u.SystemLibrary.line_trace_single_for_objects(
+                world, start, end, [u.ObjectTypeQuery.OBJECT_TYPE_QUERY1], False, ignored, u.DrawDebugTrace.NONE, True):
+            actor = hit.to_tuple()[9]
+            if not actor or not isinstance(actor, u.WaterBody) or actor in ignored:
+                return False
+            ignored.append(actor)
+        return True
+
+    if mink_near_surface_prey:
+        candidates = (entry + u.Vector(math.cos(angle) * radius, math.sin(angle) * radius, 0.)
+                      for radius in (32., 64., 96., 128.) for angle in (i * math.tau / 8 for i in range(8)))
+    else:
+        candidates = (entry + (wet_center - entry) * fraction for fraction in (.45, .3, .6, .75))
+    for point in candidates:
+        column = inspect.inspect_fauna_water(world, region, point, clearance)
+        if not column:
+            continue
+        bottom, surface = column[0].x, column[0].y
+        point.z = (surface - max(clearance + 4., (surface - bottom) * .21) if mink_near_surface_prey
+                   else bottom + max(clearance + 4., (surface - bottom) * .18))
+        if not (bottom + clearance < point.z < surface - clearance
+                and (point - entry).length() < 325. and (point - bank).length() < 325.):
+            continue
+        if mink_near_surface_prey and (not clear_sight(bank + u.Vector(0., 0., 15.), point)
+                                       or not clear_sight(entry, point)):
+            continue
+        break
+    else:
+        raise RuntimeError("No wet prey pocket within the existing mink sight radius")
+
+    groups = list(runtime.get_editor_property("groups"))
+    group, = (row for row in groups if str(row.get_editor_property("region_id")) == region)
+    placements = list(group.get_editor_property("fauna"))
+    fish, = (row for row in placements if str(row.get_editor_property("species_id")) == prey_id)
+    points = list(fish.get_editor_property("spawn_points"))
+    nearest = min(range(len(points)), key=lambda index: (points[index] - old_center).length())
+    if (points[nearest] - old_center).length() > 250.:
+        raise RuntimeError("The existing fish founder does not belong to the donor food patch")
+    old_spawn_cm = list(points[nearest].to_tuple())
+    points[nearest] = point
+    nursery = None
+    if mink_roots_nursery:
+        # Move an existing nursery and its remaining two local founders. The old
+        # feeding point stays available and both access points share the same stock.
+        adult_radius = prey.get_editor_property("body_radius")
+
+        def middle_water(hint):
+            water = inspect.inspect_fauna_water(world, region, hint, adult_radius)
+            if not water:
+                return None
+            bottom, surface = water[0].x, water[0].y
+            return u.Vector(hint.x, hint.y, (bottom + surface) * .5)
+
+        for distance in (280., 240., 200.):
+            for angle in (i * math.tau / 16 for i in range(16)):
+                direction = u.Vector(math.cos(angle), math.sin(angle), 0.)
+                middle = middle_water(entry + direction * distance)
+                if middle is None or (middle - point).length() <= 70. or not clear_sight(entry, middle):
+                    continue
+                cross = u.Vector(-direction.y, direction.x, 0.) * 40.
+                pair = [middle_water(middle + offset) for offset in (cross * -1., cross)]
+                if all(wet is not None and clear_sight(middle, wet) for wet in pair) and all(
+                        middle_water(entry + (middle - entry) * (segment / 12.)) is not None
+                        for segment in range(1, 12)):
+                    break
+            else:
+                continue
+            break
+        else:
+            raise RuntimeError("No continuous wet pocket for the existing Roots nursery and two founders")
+        shelf = None
+        if mink_roots_shelf:
+            mink_profile, = (row for row in profiles if str(row.get_editor_property("species_id")) == "Mink")
+            shelf, middle, pair = stage_roots_shallow_shelf(world, region, entry, middle, pair, adult_radius, mink_profile)
+        # The authoritative founder spawn alternates sex by placement slot.
+        local_slots = sorted((index for index in range(len(points)) if index != nearest
+                              and (points[index] - old_center).length() <= 250.),
+                             key=lambda index: (points[index] - old_center).length())
+        slots = {index % 2: index for index in reversed(local_slots)}
+        if len(slots) != 2:
+            raise RuntimeError("Expected two other founders from the existing Drift nursery")
+        slots = [slots[0], slots[1]]
+        nursery = {"center_cm": list(middle.to_tuple()), "former_center_cm": old_center_cm,
+                   "founders": [{"slot": index, "before_cm": list(points[index].to_tuple()),
+                                 "after_cm": list(wet.to_tuple())} for index, wet in zip(slots, pair)]}
+        if shelf:
+            nursery["shallow_shelf"] = shelf
+        for index, wet in zip(slots, pair):
+            points[index] = wet
+        former_center = u.Vector(*old_center_cm)
+        access_points = [u.Vector(*access.to_tuple()) for access in donor.get_editor_property("forage_access_points")]
+        if mink_roots_seasonal_shelf:
+            access_points.append(u.Vector(*shelf["rim_cm"]))
+        donor.set_editor_property("center", middle)
+        donor.set_editor_property("forage_access_points", [*access_points, former_center])
+    fish.set_editor_property("spawn_points", points)
+    watch = None
+    if mink_bank_watch:
+        mink, = (row for row in placements if str(row.get_editor_property("species_id")) == "Mink")
+        mink_points = list(mink.get_editor_property("spawn_points"))
+        slot = min(range(len(mink_points)), key=lambda index: (mink_points[index] - bank).length())
+        original = list(mink_points[slot].to_tuple())
+        watch_point = u.EcoCreatureAnimationBuilder.project_placement_point(world, bank)
+        if watch_point is None or not clear_sight(watch_point + u.Vector(0., 0., 15.), point):
+            raise RuntimeError("Mink watch point needs real ground and sight from the founder's eye")
+        mink_points[slot] = watch_point
+        mink.set_editor_property("spawn_points", mink_points)
+        watch = {"slot": slot, "before_cm": original, "after_cm": list(watch_point.to_tuple())}
+    group.set_editor_property("fauna", placements)
+    runtime.set_editor_property("groups", groups)
+    if mink_near_surface_prey:
+        donor.set_editor_property("forage_access_points", [*donor.get_editor_property("forage_access_points"), point])
+    else:
+        donor.set_editor_property("center", point)
+    runtime.set_editor_property("fauna_habitat_patches", patches)
+    result["mink_near_prey"] = {"patch_id": str(donor.get_editor_property("id")), "shore_id": shore_id,
+                               "slot": nearest, "species": prey_id,
+                               "before_spawn_cm": old_spawn_cm,
+                               "before_food_cm": old_center_cm,
+                               "after_cm": list(point.to_tuple()), "entry_distance_cm": (point - entry).length(),
+                               "capacity": donor.get_editor_property("capacity"),
+                               "regrowth_per_second": donor.get_editor_property("regrowth_per_second")}
+    if watch:
+        result["mink_near_prey"]["watch_founder"] = watch
+    if nursery:
+        nursery["forage_access_points_cm"] = [list(access.to_tuple())
+                                              for access in donor.get_editor_property("forage_access_points")]
+        result["mink_near_prey"]["nursery"] = nursery
+
+
+def stage_roots_shelf_floor(actors, label, center, top, size_cm):
+    scale = u.Vector(*(length / 100. for length in size_cm))
+    shelf = actors.spawn_actor_from_class(u.StaticMeshActor,
+        u.Vector(center.x, center.y, top - .5 * size_cm[2]), u.Rotator())
+    if shelf is None:
+        raise RuntimeError("Could not add the test shelf to the editor world")
+    shelf.set_actor_label(label)
+    shelf.set_editor_property("is_spatially_loaded", False)
+    mesh = shelf.static_mesh_component
+    mesh.set_mobility(u.ComponentMobility.MOVABLE)
+    mesh.set_static_mesh(u.load_asset("/Engine/BasicShapes/Cube"))
+    mesh.set_collision_profile_name("BlockAll")
+    shelf.set_actor_scale3d(scale)
+    return shelf
+
+
+def stage_roots_shallow_shelf(world, region, entry, center, founders, fish_radius, mink_profile):
+    column = inspect.inspect_fauna_water(world, region, center, fish_radius)
+    surface = column[0].y
+    # Use the smallest permitted adult body, matching the movement writer's clearance.
+    mink_clearance = .65 * .9 * mink_profile.get_editor_property("body_radius")
+    shelf_depth = fish_radius + mink_clearance
+    if mink_clearance <= fish_radius:
+        raise RuntimeError("The two species have no non-overlapping adult water clearance")
+    actors = u.get_editor_subsystem(u.EditorActorSubsystem)
+    label = "PIE Roots Shallow Nursery Shelf"
+    size_cm = [220., 200., 24.]
+    report = {"label": label, "size_cm": size_cm, "adult_mink_minimum_depth_cm": 2. * mink_clearance}
+    if mink_roots_seasonal_shelf:
+        shelf_depth = stage_roots_seasonal_shelf(actors, region, entry, center, surface,
+                                                size_cm, fish_radius, mink_clearance, report)
+    else:
+        stage_roots_shelf_floor(actors, label, center, surface - shelf_depth, size_cm)
+    positions = []
+    depths = []
+    for point in [center, *founders]:
+        origin = u.Vector(point.x, point.y, surface - .5 * shelf_depth)
+        wet = inspect.inspect_fauna_water(world, region, origin, fish_radius)
+        if not wet or inspect.inspect_fauna_water(world, region, origin, mink_clearance):
+            raise RuntimeError("The collision shelf must admit the fish nursery and exclude an adult mink body")
+        bottom, top = wet[0].x, wet[0].y
+        depths.append(top - bottom)
+        positions.append(u.Vector(point.x, point.y, (bottom + top) * .5))
+    report["food_and_founder_depths_cm"] = depths
+    return report, positions[0], positions[1:]
+
+
+def stage_roots_seasonal_shelf(actors, region, entry, center, surface, size_cm, fish_radius, mink_clearance, report):
+    # Low water protects both feeding points. At high water only the rim is deep enough for mink.
+    core_depth = 2. * fish_radius + .35
+    rim_depth = 2. * mink_clearance - .28
+    rise = 2. * mink_clearance - core_depth - .18
+    if rise <= .28:
+        raise RuntimeError("The species have insufficient water clearance separation for a seasonal shelf")
+    stage_roots_shelf_floor(actors, report["label"], center, surface - rim_depth, size_cm)
+    stage_roots_shelf_floor(actors, "PIE Roots Raised Nursery Core", center, surface - core_depth, [140., 135., 24.])
+
+    source, = (actor for actor in actors.get_all_level_actors() if isinstance(actor, u.EcoVegetationHabitat)
+               and str(actor.get_editor_property("habitat_id")) == "IslandLowerRiver05")
+    local_water = actors.spawn_actor_from_class(u.EcoVegetationHabitat, u.Vector(center.x, center.y, surface - 35.))
+    if local_water is None:
+        raise RuntimeError("Could not add the seasonal water habitat")
+    local_water.get_editor_property("bounds").set_box_extent(u.Vector(111., 101., 65.), False)
+    for name in ("fauna_water_current", "fauna_water_temperature_c", "fauna_water_cover_density",
+                 "fauna_water_cover_height_cm", "plant", "drainage", "shade"):
+        local_water.set_editor_property(name, source.get_editor_property(name))
+    for name, value in {"habitat_id": "PIERootsSeasonalShelf", "region_id": region,
+                        "connected_fresh_water": True, "supports_fauna_swimming": True, "draw_water_surface": False,
+                        "is_spatially_loaded": False, "water_surface_z": surface,
+                        "priority": source.get_editor_property("priority") + 1,
+                        "water_level_rise": rise, "water_low_seconds": 345., "water_rise_seconds": 20.,
+                        "water_high_seconds": 90., "water_fall_seconds": 25.}.items():
+        local_water.set_editor_property(name, value)
+    if not local_water.is_valid_habitat():
+        raise RuntimeError("The seasonal water habitat did not pass the existing habitat contract")
+    towards_bank = u.Vector(entry.x - center.x, entry.y - center.y, 0.)
+    rim = center + towards_bank * (96. / towards_bank.length())
+    rim.z = surface - .5 * rim_depth
+    report.update(core_cm=[center.x, center.y, surface - .5 * core_depth],
+                  rim_cm=list(rim.to_tuple()), low_water_depth_cm=[core_depth, rim_depth], rise_cm=rise)
+    return core_depth
+
+
+def stage_covered_refuge_food(runtime):
+    """Move finite Riverbank food into the two existing, physically covered rat refuges."""
+    patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+    by_id = {str(patch.get_editor_property("id")): patch for patch in patches}
+    sources = {"IslandForageWestForbs": (3., .045), "IslandForageWestBrowse": (5., .095)}
+    for key, (capacity, regrowth) in sources.items():
+        patch = by_id[key]
+        patch.set_editor_property("capacity", patch.get_editor_property("capacity") - capacity)
+        patch.set_editor_property("regrowth_per_second", patch.get_editor_property("regrowth_per_second") - regrowth)
+    # The budget trial isolates sustained income after the same starting reserves are consumed.
+    # Four founder rats cost about 0.57 energy/s. At the 0.75 dry multiplier, 0.96 yields 0.72/s.
+    ordinary_regrowth = sum(regrowth for _, regrowth in sources.values())
+    tested_regrowth = .96 if covered_refuge_energy_budget else ordinary_regrowth
+    site_regrowth = tested_regrowth / 2.
+    report = {}
+    for key in ("IslandRiverRatRefuge0", "IslandRiverRatRefuge1"):
+        patch = by_id[key]
+        if str(patch.get_editor_property("sheltered_species")) != "Rat" or not patch.get_editor_property("shelter_approach_points"):
+            raise RuntimeError(f"Missing saved covered refuge {key}")
+        patch.set_editor_property("capacity", patch.get_editor_property("capacity") + 4.)
+        patch.set_editor_property("regrowth_per_second", site_regrowth)
+        patch.set_editor_property("energy_per_meal", .8)
+        patch.set_editor_property("consumers", ["Rat"])
+        report[key] = {"center_cm": list(patch.get_editor_property("center").to_tuple()),
+                       "capacity": patch.get_editor_property("capacity"), "regrowth_per_second": site_regrowth}
+    runtime.set_editor_property("fauna_habitat_patches", patches)
+    profiles = list(runtime.get_editor_property("fauna_species"))
+    rat, = (profile for profile in profiles if str(profile.get_editor_property("species_id")) == "Rat")
+    caregiver_range = rat.get_editor_property("caregiver_follow_range")
+    if covered_refuge_caregiver:
+        if caregiver_range != 0.:
+            raise RuntimeError("The caregiver comparison requires the saved rat follow range to be zero")
+        caregiver_range = 450.
+        rat.set_editor_property("caregiver_follow_range", caregiver_range)
+        runtime.set_editor_property("fauna_species", profiles)
+    result["covered_refuge_food"] = {"sites": report, "sources": sources,
+                                      "caregiver_follow_range_cm": caregiver_range,
+                                      "added_nominal_regrowth_per_second": tested_regrowth - ordinary_regrowth}
+
+
+def stage_land_forage_regrowth(runtime):
+    targets = {
+        "Buffalo": ("IslandForageApproachForbs", "IslandForageFloodplainApproach",
+                    "IslandForageOpenMeadow", "IslandForageWestMeadow"),
+        "Jackrabbit": ("IslandForageWestBrowse", "IslandForageWestForbs", "IslandTransitionForbs"),
+    }
+    patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+    by_id = {str(patch.get_editor_property("id")): patch for patch in patches}
+    changes = {}
+    for species, ids in targets.items():
+        for patch_id in ids:
+            patch = by_id[patch_id]
+            regrowth = patch.get_editor_property("regrowth_per_second")
+            if (patch.get_editor_property("submerged") or regrowth <= 0.
+                    or species not in {str(name) for name in patch.get_editor_property("consumers")}):
+                raise RuntimeError(f"{patch_id} must remain an existing land food source for {species}")
+            patch.set_editor_property("regrowth_per_second", 3. * regrowth)
+            changes[patch_id] = {"from": regrowth, "to": patch.get_editor_property("regrowth_per_second")}
+    runtime.set_editor_property("fauna_habitat_patches", patches)
+    result["land_forage_regrowth"] = changes
+
+
+def stage_aquatic_forage_regrowth(runtime):
+    # These are the five existing patches that actually paid first-generation fish on the saved island.
+    targets = {"IslandRiverInletPlants", "IslandRiverQuietMargin", "IslandRiverSlowShelf",
+               "IslandRiverGravelInsects", "IslandRiverDrift"}
+    patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+    changes = {}
+    for patch in patches:
+        patch_id = str(patch.get_editor_property("id"))
+        if patch_id not in targets:
+            continue
+        rate = patch.get_editor_property("regrowth_per_second")
+        if (patch_id in changes or not patch.get_editor_property("submerged") or rate <= 0.
+                or str(patch.get_editor_property("region_id")) != authored["river"]):
+            raise RuntimeError(f"{patch_id} must be a unique, existing LowerRiver food source")
+        patch.set_editor_property("regrowth_per_second", 3. * rate)
+        changes[patch_id] = {"from": rate, "to": patch.get_editor_property("regrowth_per_second")}
+    if changes.keys() != targets:
+        raise RuntimeError(f"Missing LowerRiver food sources: {targets - changes.keys()}")
+    runtime.set_editor_property("fauna_habitat_patches", patches)
+    result["aquatic_forage_regrowth"] = changes
+
+
+def stage_aquatic_neighborhoods(world, runtime):
+    river = authored["river"]
+    profiles = {str(profile.get_editor_property("species_id")): profile
+                for profile in runtime.get_editor_property("fauna_species")}
+    patches = [patch.copy() for patch in runtime.get_editor_property("fauna_habitat_patches")]
+    sites = {str(patch.get_editor_property("id")): patch for patch in patches}
+    groups = [group.copy() for group in runtime.get_editor_property("groups")]
+    group, = (entry for entry in groups if str(entry.get_editor_property("region_id")) == river)
+    placements = [entry.copy() for entry in group.get_editor_property("fauna")]
+    catfish, = (entry for entry in placements if str(entry.get_editor_property("species_id")) == "AriakeCatfish")
+    points = list(catfish.get_editor_property("spawn_points"))
+    if len(points) != 3 or catfish.get_editor_property("habitat_spawn_points"):
+        raise RuntimeError("Expected the three saved catfish spawn slots")
+
+    gravel = sites["IslandRiverGravelInsects"]
+    outer = sites["IslandRiverGravelNearRoots"]
+    old_point = points[2]
+    local = (points[0] + points[1]) * .5
+    cat_clearance = .65 * profiles["AriakeCatfish"].get_editor_property("body_radius")
+    # The female in slot 2 is unrelated to the descendants of the first two fish.
+    # Give the local adults two independent food stocks before comparing breeding.
+    bed = inspect.inspect_fauna_water(world, river, local, cat_clearance)
+    if not bed:
+        raise RuntimeError("The catfish spawn neighborhood lacks a body-sized water column")
+    local.z = .5 * (bed[0].x + bed[0].y)
+    if ((local - gravel.get_editor_property("center")).length() > 225.
+            or min((local - point).length() for point in points[:2]) < 4. * cat_clearance):
+        raise RuntimeError("Expected a distinct second catfish feeding point near the saved pair")
+    outer.set_editor_property("center", local)
+    outer.set_editor_property("regrowth_per_second", gravel.get_editor_property("regrowth_per_second"))
+    points[2] = local
+    catfish.set_editor_property("spawn_points", points)
+    group.set_editor_property("fauna", placements)
+    runtime.set_editor_property("groups", groups)
+
+    drift = sites["IslandRiverDrift"]
+    roots = sites["IslandRiverRoots"]
+    roots_point = roots.get_editor_property("center") + u.Vector(65., 0., 91.)
+    fish_clearance = .65 * profiles["UnidentifiedFish"].get_editor_property("body_radius")
+    water = inspect.inspect_fauna_water(world, river, roots_point, fish_clearance)
+    if not water or not water[0].x + fish_clearance < roots_point.z < water[0].y - fish_clearance:
+        raise RuntimeError("The Roots small-fish feeding point lacks valid adult water clearance")
+    roots_food = drift.copy()
+    roots_food.set_editor_property("id", "IslandRootsSmallFishNursery")
+    roots_food.set_editor_property("center", roots_point)
+    roots_food.set_editor_property("consumers", ["UnidentifiedFish"])
+    roots_food.set_editor_property("capacity", 3.)
+    roots_food.set_editor_property("aquatic_nursery", True)
+    drift.set_editor_property("capacity", drift.get_editor_property("capacity") - 3.)
+    runtime.set_editor_property("fauna_habitat_patches", [*patches, roots_food])
+    result["aquatic_neighborhoods"] = {"catfish": {"slot": 2, "from_cm": list(old_point.to_tuple()),
+                                                   "to_cm": list(local.to_tuple()), "patch": "IslandRiverGravelNearRoots"},
+                                       "small_fish": {"patch": "IslandRootsSmallFishNursery", "source": "IslandRiverDrift",
+                                                      "point_cm": list(roots_point.to_tuple()), "capacity": 3.}}
+
+
+def place_small_fish_encounter_founder(world, runtime):
+    river = authored["river"]
+    species = "UnidentifiedFish"
+    profile, = (p for p in runtime.get_editor_property("fauna_species") if str(p.get_editor_property("species_id")) == species)
+    sites = {str(p.get_editor_property("id")): p for p in runtime.get_editor_property("fauna_habitat_patches")}
+    roots = sites["IslandRootsSmallFishNursery"].get_editor_property("center")
+    drift = sites["IslandRiverDrift"].get_editor_property("center")
+    clearance = .65 * profile.get_editor_property("body_radius") * 1.1
+    geometry = u.EcoCreatureAnimationBuilder
+    water_surfaces = u.GameplayStatics.get_all_actors_of_class(world, u.WaterBody)
+
+    def clear_water(start, end):
+        return not u.SystemLibrary.line_trace_single_for_objects(
+            world, start, end, [u.ObjectTypeQuery.OBJECT_TYPE_QUERY1], False, water_surfaces, u.DrawDebugTrace.NONE, True)
+
+    def wet_segment(start, end):
+        segments = max(1, math.ceil((end - start).length() / 25.))
+        samples = []
+        for index in range(segments + 1):
+            point = start + (end - start) * (index / segments)
+            water = inspect.inspect_fauna_water(world, river, point, clearance)
+            samples.append({"cm": list(point.to_tuple()), "wet": bool(water and water[0].x + clearance < point.z < water[0].y - clearance)})
+        return samples
+
+    corridor = wet_segment(roots, drift)
+    founder = read_agent(world, 116)
+    if not founder or founder["species"] != species or founder["region"] != river:
+        raise RuntimeError("Expected the original LowerRiver founder 116")
+    direction = roots - drift
+    direction.z = 0.
+    direction = direction * (1. / direction.length())
+    sideways = u.Vector(-direction.y, direction.x, 0.)
+    probes = []
+    for distance, offset in product((220., 180., 140., 100., 70.), (0., 70., -70., 135., -135.)):
+        destination = drift + direction * distance + sideways * offset
+        water = inspect.inspect_fauna_water(world, river, destination, clearance)
+        if not water:
+            probes.append({"offset_cm": [distance, offset], "column": False})
+            continue
+        destination.z = max(water[0].x + 2. * clearance, min(water[0].y - 2. * clearance, drift.z))
+        approach = wet_segment(destination, drift)
+        clear = clear_water(destination, drift)
+        probes.append({"offset_cm": [distance, offset], "firm_water_samples": sum(row["wet"] for row in approach),
+                       "samples": len(approach), "clear_non_water_static": clear})
+        if all(row["wet"] for row in approach) and clear:
+            break
+    else:
+        result["small_fish_encounter_survey"] = {"probes": probes, "roots_to_drift_samples": corridor,
+                                                "roots_to_drift_clear_sight": clear_water(roots, drift)}
+        raise RuntimeError("No surveyed wet placement can reach the existing Drift nursery without crossing terrain")
+    if not geometry.set_island_audit_founder_placement(runtime, 116, river, destination):
+        raise RuntimeError("Could not place founder 116 before her first authority decision")
+    moved = read_agent(world, 116)
+    return {"founder": 116, "from": founder["position"], "to": moved["position"], "body_clearance_cm": clearance,
+            "roots_to_drift_samples": corridor, "roots_to_drift_clear_sight": clear_water(roots, drift),
+            "wet_approach_samples": approach, "drift_site_cm": list(drift.to_tuple()), "probes": probes}
+
+
+def small_fish_meal_snapshot(runtime, child):
+    traits = json.loads(runtime.capture_population_traits())
+    fields = ("species", "region", "born", "generation", "parent_a", "parent_b", "offspring", "origin", "sex",
+              "size_gene", "speed_gene", "coat_gene", "caution_gene", "sociability_gene", "hp", "energy", "visual_body_scale")
+    stocks = {}
+    for patch in runtime.get_editor_property("fauna_habitat_patches"):
+        site = str(patch.get_editor_property("id"))
+        stock = runtime.inspect_fauna_habitat_stock(site)
+        stocks[site] = stock[-1] if isinstance(stock, tuple) else stock
+    return {"at": traits["completed_seconds"], "epoch": traits["epoch"], "child": child, "stocks": stocks,
+            "living": {row["id"]: {key: row[key] for key in fields} for row in traits["agents"]}}
+
+
+def save_small_fish_meal_fork(runtime, child):
+    slot = f"IslandMeal_{meal_fork_match[2]}"
+    evidence = out.parent / "IslandAccessBaseline" / f"{slot}_snapshot.json"
+    if evidence.exists() or (out.parent.parent / "Ecosystem" / f"{slot}.eco").exists():
+        raise RuntimeError("The post-hatch comparison slot already exists")
+    if not runtime.save_ecosystem(slot):
+        return False
+    snapshot = small_fish_meal_snapshot(runtime, child)
+    result["small_fish_meal_fork"] = {"slot": slot, "mode": "Save", "snapshot": snapshot}
+    evidence.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+    return True
+
+
+def tick_loaded_meal_fork(world, runtime, completed):
+    if "small_fish_meal_fork" not in result:
+        raw = runtime.capture_population_traits()
+        if not raw or not any(row.get("native_adopted") for row in json.loads(raw)["agents"]):
+            return
+        slot = f"IslandMeal_{meal_fork_match[2]}"
+        evidence = out.parent / "IslandAccessBaseline" / f"{slot}_snapshot.json"
+        expected = json.loads(evidence.read_text(encoding="utf-8"))
+        profiles = [profile.copy() for profile in runtime.get_editor_property("fauna_species")]
+        fish, = (profile for profile in profiles if str(profile.get_editor_property("species_id")) == "UnidentifiedFish")
+        fish.set_editor_property("regional_limit", fish.get_editor_property("regional_limit") + small_fish_capacity_increase)
+        runtime.set_editor_property("fauna_species", profiles)
+        if not runtime.load_ecosystem(slot):
+            raise RuntimeError(f"Fresh authority failed to load {slot}")
+        snapshot = small_fish_meal_snapshot(runtime, expected["child"])
+        if snapshot["epoch"] == expected["epoch"] or any(snapshot[key] != value for key, value in expected.items() if key != "epoch"):
+            mismatched = [key for key, value in expected.items() if key != "epoch" and snapshot[key] != value]
+            raise RuntimeError(f"The control did not restore the exact pre-treatment snapshot: {mismatched}")
+        result["small_fish_meal_fork"] = {"slot": slot, "mode": "Load", "snapshot": snapshot}
+        result["initial_patch_inputs"] = snapshot_population_patch_inputs(runtime)
+        if meal_regrowth_transfer:
+            child = snapshot["child"]
+            fry = dict(snapshot["living"][child], id=child)
+            result["small_fish_meal_access"] = open_small_fish_meal_access(world, runtime, snapshot["at"], fry,
+                                                                        transfer=meal_regrowth_transfer)
+        u.GameplayStatics.set_global_time_dilation(world, 4.)
+        return
+    if completed >= population_duration:
+        fork = result["small_fish_meal_fork"]
+        fork["end"] = small_fish_meal_snapshot(runtime, fork["snapshot"]["child"])
+        agents = [row for agent in inspect.get_authority_agent_ids(world) if (row := read_agent(world, agent))]
+        result["samples"].append({"completed_clock": {"authority_seconds": completed},
+                                  "agents": agents, "vegetation": sample_vegetation(world)})
+        finish()
+
+
+def open_small_fish_meal_access(world, runtime, now, fry, *, transfer=0.):
+    site = "IslandRiverDrift"
+    patches = [patch.copy() for patch in runtime.get_editor_property("fauna_habitat_patches")]
+    drift, = (patch for patch in patches if str(patch.get_editor_property("id")) == site)
+    if drift.get_editor_property("forage_access_points"):
+        raise RuntimeError("Expected the unmodified Drift access layout through the first 2nd-generation hatch")
+    center = drift.get_editor_property("center")
+    river = authored["river"]
+    species, = (row for row in runtime.get_editor_property("fauna_species") if str(row.get_editor_property("species_id")) == fry["species"])
+    clearance = .65 * species.get_editor_property("body_radius") * 1.1
+    water_surfaces = u.GameplayStatics.get_all_actors_of_class(world, u.WaterBody)
+    points = []
+    for x, y in ((-24., 0.), (24., 0.), (0., -24.), (0., 24.)):
+        point = center + u.Vector(x, y, 4.)
+        for sample in (point, (point + center) * .5):
+            column = inspect.inspect_fauna_water(world, river, sample, clearance)
+            if not column or not column[0].x + clearance < sample.z < column[0].y - clearance:
+                raise RuntimeError("The added Drift access needs a continuous body-sized water approach")
+        if u.SystemLibrary.line_trace_single_for_objects(world, center, point, [u.ObjectTypeQuery.OBJECT_TYPE_QUERY1],
+                                                        False, water_surfaces, u.DrawDebugTrace.NONE, True):
+            raise RuntimeError("Solid geometry blocks an added Drift access point")
+        points.append(point)
+    before = runtime.inspect_fauna_habitat_stock(site)
+    drift.set_editor_property("forage_access_points", points)
+    changes = {}
+    if transfer:
+        donor_site = "IslandRootsSmallFishNursery"
+        donor, = (patch for patch in patches if str(patch.get_editor_property("id")) == donor_site)
+        rate = "regrowth_per_second"
+        donor_rate = donor.get_editor_property(rate)
+        if (donor_rate <= transfer or any(not patch.get_editor_property("submerged")
+                or str(patch.get_editor_property("region_id")) != river
+                or patch.get_editor_property("seasonal_full_growth_depth_cm") > 0. for patch in (donor, drift))):
+            raise RuntimeError("The transfer requires two permanent water stocks with the same regional regrowth conditions")
+        donor_before = runtime.inspect_fauna_habitat_stock(donor_site)
+        for patch, delta in ((donor, -transfer), (drift, transfer)):
+            original = patch.get_editor_property(rate)
+            patch.set_editor_property(rate, original + delta)
+            changes[str(patch.get_editor_property("id"))] = {"from": original, "to": patch.get_editor_property(rate)}
+        if abs(sum(pair["to"] - pair["from"] for pair in changes.values())) > 1e-7:
+            raise RuntimeError("The transfer changed combined regrowth")
+    runtime.set_editor_property("fauna_habitat_patches", patches)
+    after = runtime.inspect_fauna_habitat_stock(site)
+    if before != after or (transfer and donor_before != runtime.inspect_fauna_habitat_stock(donor_site)):
+        raise RuntimeError("Adding access points changed the Drift stock balance")
+    return {"site": site, "at": now, "child": fry["id"], "born": fry["born"],
+            "parents": [fry["parent_a"], fry["parent_b"]], "points_cm": [list(point.to_tuple()) for point in points],
+            "stock_before": float(before[-1] if isinstance(before, tuple) else before),
+            "stock_after": float(after[-1] if isinstance(after, tuple) else after), **({"regrowth_transfer": changes} if changes else {})}
+
+
+def stage_aquatic_neighborhood_supply(runtime):
+    profiles = {str(row.get_editor_property("species_id")): row
+                for row in runtime.get_editor_property("fauna_species")}
+    patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+    sites = {str(row.get_editor_property("id")): row for row in patches}
+    neighborhoods = {"AriakeCatfish": ("IslandRiverGravelInsects", "IslandRiverGravelNearRoots"),
+                     "UnidentifiedFish": ("IslandRiverDrift", "IslandRootsSmallFishNursery")}
+    changes = {}
+    for species, ids in neighborhoods.items():
+        profile = profiles[species]
+        # Add the maintenance budget for the profiled regional limit at the dry-water multiplier.
+        demand = profile.get_editor_property("regional_limit") * profile.get_editor_property("maintenance")
+        additional_rate = demand / (len(ids) * .75)
+        for patch_id in ids:
+            patch = sites[patch_id]
+            if (not patch.get_editor_property("submerged") or patch.get_editor_property("seasonal_full_growth_depth_cm") > 0.
+                    or species not in {str(kind) for kind in patch.get_editor_property("consumers")}):
+                raise RuntimeError(f"{patch_id} needs a compatible, continuously submerged stock")
+            previous = patch.get_editor_property("regrowth_per_second")
+            patch.set_editor_property("regrowth_per_second", previous + additional_rate)
+            changes[patch_id] = {"species": species, "from": previous, "additional_rate": additional_rate,
+                                 "to": patch.get_editor_property("regrowth_per_second")}
+    runtime.set_editor_property("fauna_habitat_patches", patches)
+    result["aquatic_neighborhood_supply"] = changes
+
+
+def stage_land_forage_guild(runtime, patch_id, target_guild):
+    patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+    meadow, = (patch for patch in patches if str(patch.get_editor_property("id")) == patch_id)
+    grass = u.EcoFaunaPlantGuild.GRASS
+    if meadow.get_editor_property("plant_guild") != grass:
+        raise RuntimeError("Forage guild trial requires a saved grass meadow")
+    guild = getattr(u.EcoFaunaPlantGuild, target_guild)
+    change = {"patch": patch_id, "from": "GRASS", "to": target_guild}
+    if target_guild == "WET_MEADOW":
+        preferences = {}
+        for profile in runtime.get_editor_property("fauna_species"):
+            species = str(profile.get_editor_property("species_id"))
+            if species in ("Buffalo", "Horse"):
+                weights = profile.get_editor_property("plant_preferences")
+                preferences[species] = {"grass": weights[grass], "wet_meadow": weights[guild]}
+        if (len(preferences) != 2 or preferences["Buffalo"]["wet_meadow"] <= preferences["Buffalo"]["grass"]
+                or preferences["Horse"]["wet_meadow"] >= preferences["Horse"]["grass"]):
+            raise RuntimeError("The meadow comparison needs the saved buffalo and horse diet preferences")
+        change["preferences"] = preferences
+    meadow.set_editor_property("plant_guild", guild)
+    runtime.set_editor_property("fauna_habitat_patches", patches)
+    result["forage_guild_trial"] = change
+
+
+def stage_land_forage_access(runtime):
+    targets = {"IslandForageApproachForbs": ((0., -260.), (-115., -145.))}
+    if dispersed_land_forage:
+        targets["IslandForageWestMeadow"] = ((-120., 250.), (260., -150.))
+    else:
+        targets["IslandForageFloodplainApproach"] = ((-220., 150.), (-330., 235.))
+    patches = list(runtime.get_editor_property("fauna_habitat_patches"))
+    changes = {}
+    for patch in patches:
+        patch_id = str(patch.get_editor_property("id"))
+        if patch_id not in targets:
+            continue
+        consumers = {str(species) for species in patch.get_editor_property("consumers")}
+        if (str(patch.get_editor_property("region_id")) != "Grassland" or patch.get_editor_property("submerged")
+                or patch.get_editor_property("forage_access_points") or not {"Buffalo", "Horse"} <= consumers):
+            raise RuntimeError(f"Unexpected existing shared forage configuration for {patch_id}")
+        center = patch.get_editor_property("center")
+        points = [center + u.Vector(dx, dy, 0.) for dx, dy in targets[patch_id]]
+        patch.set_editor_property("forage_access_points", points)
+        changes[patch_id] = {"points_cm": [list(point.to_tuple()) for point in points]}
+    if changes.keys() != targets.keys():
+        raise RuntimeError(f"Expected both existing shared forage sites, found {list(changes)}")
+    runtime.set_editor_property("fauna_habitat_patches", patches)
+    result["land_forage_access"] = changes
+
+
+def verify_land_forage_access(world, authority_patches):
+    geometry = u.EcoCreatureAnimationBuilder
+    for patch_id, staged in result["land_forage_access"].items():
+        patch = authority_patches[patch_id]
+        center = u.Vector(*patch["center"])
+        points = patch["forage_access_points"]
+        if [point[:2] for point in points] != [point[:2] for point in staged["points_cm"]]:
+            raise RuntimeError(f"Authority access point assignment differed at {patch_id}")
+        if not all(geometry.validate_fauna_ground_segment(world, patch["region_id"], species, center, u.Vector(*point), scale)
+                   for point in points for species in ("Buffalo", "Horse") for scale in (.75, 1.)):
+            raise RuntimeError(f"Ground access for both body sizes failed at {patch_id}")
+        staged["authority_points_cm"] = points
+
+
 def try_second_eagle_perch(world, runtime):
     # Both saved-map seeds show these natural landing neighborhoods for eagle 100.
     hints = ((52187., 50258., 3765.), (51865.31, 50506.02, 3879.94), (52495., 50567., 3728.))
@@ -5346,18 +7782,51 @@ def begin():
         else:
             settings.set_editor_property("default_game_mode", mode)
             runtime.set_editor_property("enable_player_combat", True)
+        if recovery_pair_fixture:
+            groups = [group.copy() for group in runtime.get_editor_property("groups")]
+            group, = (group for group in groups if str(group.get_editor_property("region_id")) == "Grassland")
+            placements = [placement.copy() for placement in group.get_editor_property("fauna")]
+            pigs, = (placement for placement in placements if str(placement.get_editor_property("species_id")) == "Pig")
+            points = list(pigs.get_editor_property("spawn_points"))
+            habitat = list(pigs.get_editor_property("habitat_spawn_points"))
+            if len(points) != 4 or len(habitat) not in (0, 4):
+                raise RuntimeError("Expected the original four Grassland pig placements")
+            pigs.set_editor_property("spawn_points", points[:2])
+            pigs.set_editor_property("habitat_spawn_points", habitat[:2])
+            group.set_editor_property("fauna", placements)
+            runtime.set_editor_property("groups", groups)
+            result["recovery_pair_fixture"] = {"original_pigs": 4, "trial_pigs": 2}
+        if combat_selection:
+            profiles = dict(runtime.get_editor_property("region_habitat_profiles"))
+            region_key = next((key for key in profiles if str(key) == COMBAT_SELECTION_REGION),
+                              u.Name(COMBAT_SELECTION_REGION))
+            source = profiles.get(region_key) or runtime.get_editor_property("natural_habitat_profile")
+            if source is None:
+                raise RuntimeError("Selection trial needs an existing Grassland profile")
+            original_seed = source.get_editor_property("layout_seed")
+            if original_seed != combat_layout_seed:
+                trial_profile = u.SystemLibrary.duplicate_object(source, runtime, "SelectionGrasslandProfile")
+                if trial_profile is None:
+                    raise RuntimeError("Could not duplicate the Grassland profile into the trial actor")
+                trial_profile.set_editor_property("layout_seed", combat_layout_seed)
+                profiles[region_key] = trial_profile
+                runtime.set_editor_property("region_habitat_profiles", profiles)
+            result["combat_selection_layout"] = {"region": COMBAT_SELECTION_REGION, "source": source.get_path_name(),
+                                                 "original_seed": original_seed,
+                                                 "trial_seed": combat_layout_seed}
     if result.get("save_highland_approach"):
         save_verified_highland_approach()
         u.SystemLibrary.quit_editor()
         return None
     if (result.get("transition_habitat_author") or result["save_grassland_passage"]
             or result["hold_grassland_passage"] or save_water_forage or save_deep_shelf or save_mink_bank_layout
-            or save_island_deer_presentation or save_island_weather or save_mink_bank_surface or save_river_rat_refuge):
+            or save_island_deer_presentation or save_island_weather or save_mink_bank_surface or save_river_rat_refuge
+            or predator_habitat_trial or predator_sites_trial or eagle_family_trial or mink_near_prey_trial or aquatic_neighborhoods):
         target = "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed"
         if (editor.get_editor_world().get_path_name().split(".")[0] != target
                 or (result.get("transition_habitat_author") and (
                     not result.get("transition_habitat_river_approach") or result.get("transition_habitat_founder")))):
-            raise RuntimeError("Save only the verified layout to the owned island")
+            raise RuntimeError("This layout requires the owned island and its verified approach")
         partition = u.WorldPartitionBlueprintLibrary
         descs = partition.get_actor_descs()
         prefix = target.replace("/Game/", "/Game/__ExternalActors__/", 1) + "/"
@@ -5452,7 +7921,7 @@ def begin():
         u.log("ECO_ISLAND_GRASSLAND_PASSAGE_HELD")
         u.SystemLibrary.quit_editor()
         return None
-    if result.get("record_gameplay_reasons"):
+    if result.get("record_gameplay_reasons") or wolf_checkpoint or wolf_birth_fork:
         u.SystemLibrary.execute_console_command(editor.get_editor_world(), "eco.Inspection.GameplayReasons 1")
     if result.get("transition_habitat_saved"):
         result["transition_authoring"] = transition_geometry()
@@ -5463,6 +7932,106 @@ def begin():
     budget_shift = re.search(r"(?:^|\s)-EcoIslandGrasslandBudgetShift(?:=(Both|Capacity|Regrowth))?(?:\s|$)", command)
     if budget_shift:
         stage_grassland_budget_shift(budget_shift[1] or "Both")
+    if wolf_lineage_trial:
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        runtime.set_editor_property("global_population_limit", 208)
+    if wolf_territory_trial:
+        world = editor.get_editor_world()
+        if world.get_path_name().split(".")[0] != "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed":
+            raise RuntimeError("Wolf territory fixture needs the owned island")
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        deer_counts = {"Grassland": 28, "Highland": 10, "Riverbank": 10, "Snowfield": 8}
+        wolf_counts = dict.fromkeys(deer_counts, 2)
+        if wolf_kin_trial:
+            runtime.set_editor_property("global_population_limit", 208)
+            if wolf_kin_trial == "Shared":
+                # Grassland's existing 64 slots also include 16 rule fauna.
+                deer_counts = {"Grassland": 44, "Highland": 22, "Riverbank": 22, "Snowfield": 24}
+                wolf_counts.update(Grassland=3, Snowfield=1)
+            else:
+                deer_counts = dict.fromkeys(deer_counts, 28)
+            result["wolf_kin_layout"] = wolf_kin_trial
+        groups = list(runtime.get_editor_property("groups"))
+        native = {str(group.get_editor_property("region_id")): group for group in groups
+                  if not group.get_editor_property("rules_only")}
+        if native.keys() != deer_counts.keys():
+            raise RuntimeError(f"Unexpected Native regions for wolf territory: {list(native)}")
+        if wolf_prey_mix:
+            grassland = native["Grassland"]
+            schedule = grassland.get_editor_property("schedule")
+            limit = schedule.get_editor_property("region_population_limit")
+            if limit != 64:
+                raise RuntimeError(f"Unexpected authored Grassland population limit: {limit}")
+            placements = list(grassland.get_editor_property("fauna"))
+            stage = runtime.get_editor_property("fauna_habitat_stage")
+            before = {"Herbivore": deer_counts["Grassland"], "Horse": 5, "Buffalo": 4}
+            for species in ("Horse", "Buffalo"):
+                placement, = (row for row in placements if str(row.get_editor_property("species_id")) == species)
+                habitat = list(placement.get_editor_property("habitat_spawn_points"))
+                field = "habitat_spawn_points" if habitat and stage >= placement.get_editor_property("habitat_spawn_stage") else "spawn_points"
+                points = list(placement.get_editor_property(field))
+                if len(points) != before[species]:
+                    raise RuntimeError(f"Unexpected authored Grassland {species} placement: {len(points)}")
+                placement.set_editor_property(field, points[:-3])
+            grassland.set_editor_property("fauna", placements)
+            deer_counts["Grassland"] += 6
+            result["wolf_prey_mix"] = {"before": before, "after": {"Herbivore": deer_counts["Grassland"], "Horse": 2, "Buffalo": 1},
+                                       "region_population_limit": limit}
+        for name, group in native.items():
+            group.set_editor_property("use_authored_v3_population", True)
+            group.set_editor_property("herbivores", deer_counts[name])
+            group.set_editor_property("wolves", wolf_counts[name])
+        runtime.set_editor_property("groups", groups)
+        result["wolf_territory_layout"] = {name: {"Herbivore": count, "Wolf": wolf_counts[name]}
+                                           for name, count in deer_counts.items()}
+    if local_nurseries_trial:
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        author = runpy.run_path(str(Path(__file__).with_name("author_jyu_island_fauna.py")))
+        result["local_nurseries"] = author["enable_local_nurseries"](runtime)
+    if buffalo_guard_trial:
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        stage_buffalo_guard_trial(runtime)
+    if predator_habitat_trial or predator_sites_trial:
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        stage_predator_breeding_habitat(editor.get_editor_world(), runtime,
+                                       managed_food=predator_habitat_trial, pair_at_roots=predator_roots_trial)
+    if eagle_family_trial:
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        stage_eagle_families(editor.get_editor_world(), runtime)
+    if mink_near_prey_trial:
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        stage_mink_near_prey(editor.get_editor_world(), runtime)
+    if covered_refuge_food_trial:
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        stage_covered_refuge_food(runtime)
+    if land_forage_regrowth_trial:
+        if not audit_label or not population_duration:
+            raise RuntimeError("Land forage regrowth requires a labeled population audit")
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        stage_land_forage_regrowth(runtime)
+        if land_forage_access_trial:
+            stage_land_forage_access(runtime)
+        if forage_guild_wet:
+            stage_land_forage_guild(runtime, "IslandForageWestMeadow", "WET_MEADOW")
+    if aquatic_forage_regrowth_trial:
+        if not (audit_label and population_duration and audit_aquatic_cohorts):
+            raise RuntimeError("Aquatic forage regrowth requires a labeled population run with aquatic meal receipts")
+        actors = u.get_editor_subsystem(u.EditorActorSubsystem).get_all_level_actors()
+        runtime, = (actor for actor in actors if isinstance(actor, u.EcoCreatureIntegrationSpawner))
+        stage_aquatic_forage_regrowth(runtime)
+        if aquatic_neighborhoods:
+            stage_aquatic_neighborhoods(editor.get_editor_world(), runtime)
+            if aquatic_neighborhood_supply:
+                stage_aquatic_neighborhood_supply(runtime)
     if result["grassland_forage_network"]:
         stage_grassland_forage_network()
     if grassland_existing_route_trial:

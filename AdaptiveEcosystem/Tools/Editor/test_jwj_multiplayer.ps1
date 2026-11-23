@@ -64,12 +64,12 @@ if($Scenario -eq 'Smoke') {
 }
 elseif($Scenario -eq 'Capacity') {
     for($ecoIndex=1;$ecoIndex -le 10;$ecoIndex++) {
-        $ecoClient=Start-Eco ('Client'+$ecoIndex.ToString('00')) ('127.0.0.1:'+$Port+'?EcoProtocol=3') 200
+        $ecoClient=Start-Eco ('Client'+$ecoIndex.ToString('00')) ('127.0.0.1:'+$Port+'?EcoProtocol=5') 200
         Wait-EcoLog $ecoClient '\[Eco Integration\] NetMode=3 LogicalOwned=0 Visuals=[1-9].*Step=0'
         Write-Output ('CLIENT_READY '+$ecoIndex)
     }
     Wait-EcoLog $ecoHost '\[EcoSession\]\[Admission\] Players=11 Capacity=11 NetMode=2'
-    $ecoOverflow=Start-Eco 'Overflow' ('127.0.0.1:'+$Port+'?EcoProtocol=3') 15
+    $ecoOverflow=Start-Eco 'Overflow' ('127.0.0.1:'+$Port+'?EcoProtocol=5') 15
     Wait-EcoLog $ecoOverflow 'Server full\.|ServerFull|ECO_SESSION_FULL'
     $ecoWrong=Start-Eco 'WrongProtocol' ('127.0.0.1:'+$Port+'?EcoProtocol=0') 15
     Wait-EcoLog $ecoWrong 'ECO_INCOMPATIBLE_PROTOCOL'

@@ -35,6 +35,19 @@ namespace
     TAutoConsoleVariable<FString> CVarForageStockAudit(TEXT("eco.Fauna.ForageStockAudit"), TEXT(""),
         TEXT("Record growth and feed attempts for one authored plant patch."));
 
+    bool ProjectCoveredRefugeFloor(UWorld& World, const FEcoFaunaSpecies& Species, const FVector& Hint, FVector& Ground)
+    {
+        // Begin below the roof, at the authored floor height.
+        FHitResult Floor;
+        if (!World.LineTraceSingleByObjectType(Floor, Hint + FVector(0., 0., 1.),
+                Hint - FVector(0., 0., Species.StepHeight + 1.), FCollisionObjectQueryParams(ECC_WorldStatic),
+                FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaShelterFloor)))
+            || Floor.ImpactNormal.Z < Species.MinGroundNormalZ
+            || EcoCreatureMovement::CrossesExcludedArea(World, Floor.ImpactPoint, Floor.ImpactPoint)) return false;
+        Ground = Floor.ImpactPoint;
+        return true;
+    }
+
     TOptional<double> SampleForageSoil(const UEcoPolicyV3IntegratedSubsystem* Native, const FEcoFaunaHabitatPatch& Patch)
     {
         if (!Native || !Native->IsActive() || !Patch.IsPlantForage() || Patch.PlantMoistureNeed <= 0.f) return {};
@@ -384,7 +397,7 @@ bool AEcoCreatureIntegrationSpawner::ValidateFauna(TArray<FString>& Errors) cons
 }
 
 bool AEcoCreatureIntegrationSpawner::BuildFaunaPositions(FName RegionId,
-    const FEcoFaunaPlacement& Placement, TArray<FVector>& Out) const
+    const FEcoFaunaPlacement& Placement, TArray<FVector>& Out, double SwimBodyScale) const
 {
     Out.Reset();
     const auto& Sites = FaunaHabitatStage >= Placement.HabitatSpawnStage && !Placement.HabitatSpawnPoints.IsEmpty()
@@ -394,7 +407,7 @@ bool AEcoCreatureIntegrationSpawner::BuildFaunaPositions(FName RegionId,
     {
         if (Species && Species->IsAquatic())
         {
-            const double Clearance = FMath::Max(1., Species->BodyRadius * .65);
+            const double Clearance = Species->SwimBodyClearance(SwimBodyScale);
             EcoCreatureMovement::FFaunaWaterColumn Water;
             if (!EcoCreatureMovement::SampleFaunaWater(*GetWorld(), RegionId, Point, Clearance, Water)) return false;
             const FVector Position(Point.X, Point.Y, Water.DepthHeight(Species->SwimDepthFraction, Clearance));
@@ -451,17 +464,8 @@ bool AEcoCreatureIntegrationSpawner::InitializeFaunaHabitat()
         {
             if (Patch.ShelterApproachPoints.IsEmpty())
                 return EcoCreatureMovement::ProjectSpawnPoint(*GetWorld(), Patch.Center, Ground);
-            // Covered refuges author their floor height. A top-down spawn projection hits the roof.
             const auto* ShelterSpecies = FindFauna(Patch.ShelteredSpecies);
-            FHitResult Floor;
-            const FVector Hint = Patch.Center;
-            if (!ShelterSpecies || !GetWorld()->LineTraceSingleByObjectType(Floor, Hint + FVector(0., 0., 1.),
-                    Hint - FVector(0., 0., ShelterSpecies->StepHeight + 1.), FCollisionObjectQueryParams(ECC_WorldStatic),
-                    FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaShelterFloor)))
-                || Floor.ImpactNormal.Z < ShelterSpecies->MinGroundNormalZ
-                || EcoCreatureMovement::CrossesExcludedArea(*GetWorld(), Floor.ImpactPoint, Floor.ImpactPoint)) return false;
-            Ground = Floor.ImpactPoint;
-            return true;
+            return ShelterSpecies && ProjectCoveredRefugeFloor(*GetWorld(), *ShelterSpecies, Patch.Center, Ground);
         };
         if (Patch.Id.IsNone() || Ids.Contains(Patch.Id) || Patch.Stage < 1 || Patch.Center.ContainsNaN()
             || !FMath::IsFinite(Patch.Capacity) || Patch.Capacity <= 0.f
@@ -658,7 +662,7 @@ FIntPoint AEcoCreatureIntegrationSpawner::CountFaunaDiets(FName RegionId) const
 }
 
 int32 AEcoCreatureIntegrationSpawner::SpawnFauna(FName RegionId, const FEcoFaunaSpecies& Species,
-    const TArray<FVector>& Positions, const FEcoServerTimeSnapshot& Time)
+    const TArray<FVector>& Positions, const FEcoServerTimeSnapshot& Time, EcoLifeV3::EOrigin Origin)
 {
     if (!bAuthorityWorld || !FaunaConfig || Positions.IsEmpty()) return 0;
     auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
@@ -698,14 +702,15 @@ int32 AEcoCreatureIntegrationSpawner::SpawnFauna(FName RegionId, const FEcoFauna
         Fauna.Home = Fauna.Goal = Positions[Index];
         auto& Life = Fauna.Life;
         Life.bInitialized = Life.bNaturalPopulation = true;
+        Life.Origin = Origin;
         Life.Genome = Species.bIndividualResponse ? EcoLifeV3::NaturalFounder(FounderSeed, Id.StableAgentId, .07)
-            : EcoLifeV3::Founder(FounderSeed, Id.StableAgentId);
+            : EcoLifeV3::Founder(FounderSeed, Id.StableAgentId, CoatPalette != nullptr);
         Fauna.NextDecision = Time.ServerTimeSeconds + 2. * EcoLifeV3::Unit(EcoLifeV3::Mix(uint64(Id.StableAgentId)));
         Fauna.NextThreatSense = Time.ServerTimeSeconds + .45 * EcoLifeV3::Unit(EcoLifeV3::Mix(uint64(Id.StableAgentId) + 1));
         Life.MaturitySeconds = Species.MaturitySeconds;
         Life.Born = Time.ServerTimeSeconds - Species.MaturitySeconds;
         Life.Sex = Index % 2 ? EcoLifeV3::ESex::Male : EcoLifeV3::ESex::Female;
-        Life.NextBirth = Time.ServerTimeSeconds + 15.;
+        Life.NextBirth = Time.ServerTimeSeconds + (Origin == EcoLifeV3::EOrigin::Recovery ? 180. : 15.);
         EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform() = FTransform(Positions[Index]);
         Owned.Add(Entity);
         UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Spawn] Id=%lld Species=%s Region=%s"),
@@ -715,6 +720,11 @@ int32 AEcoCreatureIntegrationSpawner::SpawnFauna(FName RegionId, const FEcoFauna
     SuccessfulBirths += Entities.Num();
     SpeciesTotals.FindOrAdd(RegionId).FindOrAdd(Species.SpeciesId).Births += Entities.Num();
     return Entities.Num();
+}
+
+double AEcoCreatureIntegrationSpawner::FaunaBirthPlantReserve(const FRegionEcologyState& Region, int32 Count) const
+{
+    return (Region.ProjectedFoodConsumers + Count) * EcoFaunaNutrition::MinimumMeal * FaunaBirthBufferSeconds;
 }
 
 bool AEcoCreatureIntegrationSpawner::InspectFaunaHabitatStock(FName PatchId, float& Stock) const
@@ -843,6 +853,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
     auto& EM = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
     const double Now = Time.ServerTimeSeconds;
     const FName AuditPatch(*CVarForageStockAudit.GetValueOnGameThread());
+    static const bool bAuditRefugeMeals = FParse::Param(FCommandLine::Get(), TEXT("EcoIslandAuditRefugeMeals"));
+    static const bool bAuditAquaticMeals = FParse::Param(FCommandLine::Get(), TEXT("EcoIslandAuditAquaticMeals"));
     static const int64 WaterPaymentAuditAgent = [] {
         int64 Requested = 0;
         FParse::Value(FCommandLine::Get(), TEXT("EcoIslandWaterFoodAuditAgent="), Requested);
@@ -875,7 +887,64 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         It.RemoveCurrent();
     }
     FeedWolvesFromCarrion(Now);
-    for (const auto Entity : Owned)
+    if (UsesNativeWolfProvisioning()) FeedNativeWolfYoung(Now);
+    // Reassign only the contenders' positions in this feeding pass. The usual contact and stock checks apply.
+    TArray<FMassEntityHandle> RotatedOrder;
+    const bool bRotateRefugeMeals = UsesCoveredRefugeMealRotation();
+    const bool bRotateAquaticMeals = UsesAquaticPatchMealRotation();
+    const bool bRotateLandPlantMeals = UsesLandPlantMealRotation();
+    if (bRotateRefugeMeals || bRotateAquaticMeals || bRotateLandPlantMeals)
+    {
+        struct FContender
+        {
+            int32 Slot;
+            int64 StableId;
+            double LastMeal;
+        };
+        TMap<int32, TArray<FContender, TInlineAllocator<8>>> Contenders;
+        for (int32 Slot = 0; Slot < Owned.Num(); ++Slot)
+        {
+            const auto Entity = Owned[Slot];
+            const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
+            if (!Fauna || !FaunaPatchStock.IsValidIndex(Fauna->PatchTarget) || FaunaPatchStock[Fauna->PatchTarget] < .2f
+                || Fauna->Flight != EEcoFaunaFlightPhase::Grounded
+                || Now < EM.GetFragmentDataChecked<FEcoLifetimeFragment>(Entity).NextFeedTimeSeconds
+                || EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).HP <= 0.f
+                || !EM.GetFragmentDataChecked<FMassVelocityFragment>(Entity).Value.IsNearlyZero()) continue;
+            const auto& Patch = FaunaHabitatPatches[Fauna->PatchTarget];
+            const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity);
+            const bool bCovered = bRotateRefugeMeals && !Patch.ShelterApproachPoints.IsEmpty()
+                && Patch.ShelteredSpecies == Identity.SpeciesId && !Fauna->bSwimming;
+            const auto* Species = bRotateAquaticMeals && Patch.bSubmerged ? FindFauna(Identity.SpeciesId) : nullptr;
+            const bool bAquatic = Species && Fauna->TargetId <= 0 && (Species->IsAquatic()
+                || (Species->Locomotion == EEcoFaunaLocomotion::Amphibious && Fauna->bSwimming
+                    && Fauna->ShorePhase == EEcoFaunaShorePhase::None));
+            const bool bLandPlant = bRotateLandPlantMeals && Patch.IsPlantForage() && !Patch.bSubmerged
+                && Patch.ShelteredSpecies.IsNone() && !Fauna->bSwimming;
+            if ((!bCovered && !bAquatic && !bLandPlant) || !Patch.Consumers.Contains(Identity.SpeciesId)) continue;
+            const FVector Position = EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetTransform().GetLocation();
+            const int32 Access = Patch.HasForagePoint(Fauna->PatchAccessPoint) ? Fauna->PatchAccessPoint : 0;
+            if (EM.GetFragmentDataChecked<FEcoRegionFragment>(Entity).CurrentRegionId != Patch.RegionId
+                || FVector::DistSquared(Position, Patch.ForagePoint(Access)) > FMath::Square(35.)) continue;
+            Contenders.FindOrAdd(Fauna->PatchTarget).Add({Slot, Identity.StableAgentId, Fauna->LastMeal});
+        }
+        for (auto& Group : Contenders)
+        {
+            auto& Members = Group.Value;
+            if (Members.Num() < 2) continue;
+            if (RotatedOrder.IsEmpty()) RotatedOrder = Owned;
+            TArray<int32, TInlineAllocator<8>> Slots;
+            for (const auto& Member : Members) Slots.Add(Member.Slot);
+            Members.Sort([](const FContender& A, const FContender& B)
+            {
+                return A.LastMeal != B.LastMeal ? A.LastMeal < B.LastMeal : A.StableId < B.StableId;
+            });
+            for (int32 Index = 0; Index < Slots.Num(); ++Index)
+                RotatedOrder[Slots[Index]] = Owned[Members[Index].Slot];
+        }
+    }
+    const TArray<FMassEntityHandle>& FeedingOrder = RotatedOrder.IsEmpty() ? Owned : RotatedOrder;
+    for (const auto Entity : FeedingOrder)
     {
         auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
         auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity);
@@ -910,11 +979,13 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             EcoCreatureMovement::FFaunaWaterColumn Water;
             EcoCreatureMovement::FFaunaWaterColumn AtAgent;
             const bool bWaterCandidate = Patch.bSubmerged && Fauna->TargetId <= 0 && (Species->IsAquatic() || Fauna->bSwimming);
+            const double Clearance = Species->SwimBodyClearance(Fauna->Life.SwimBody(Now, UsesFunctionalTraits()));
+            // A cached target can outlive a water level change or the consumer's growth.
             const bool bMealColumn = bWaterCandidate
-                && EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId, MealPoint, 1., Water);
+                && EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId, MealPoint, Clearance, Water);
             const bool bMealSubmerged = bMealColumn && MealPoint.Z > Water.Bottom && MealPoint.Z < Water.Surface;
             const bool bAgentColumn = bMealSubmerged
-                && EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId, Position, 1., AtAgent);
+                && EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId, Position, Clearance, AtAgent);
             const bool bWaterMeal = bAgentColumn && Position.Z >= AtAgent.Bottom && Position.Z <= AtAgent.Surface;
             const bool bEligible = Patch.Stage <= FaunaHabitatStage && Patch.RegionId == Region.CurrentRegionId
                 && Patch.Consumers.Contains(Species->SpeciesId)
@@ -929,6 +1000,19 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                     FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaPatchMeal))));
             const float StockBefore = Stock;
             const float Meal = bCanFeed ? Patch.TakeMeal(Stock, Headroom) : 0.f;
+            const bool bTraceRefuge = bAuditRefugeMeals && Patch.ShelteredSpecies == Species->SpeciesId
+                && !Patch.ShelterApproachPoints.IsEmpty();
+            const bool bTraceWater = bAuditAquaticMeals && Patch.bSubmerged && (Species->IsAquatic() || Fauna->bSwimming);
+            if (bTraceRefuge || bTraceWater)
+            {
+                const TCHAR* Gate = !bEligible ? TEXT("Eligibility")
+                    : !bInReach ? TEXT("Distance") : !bCanFeed ? TEXT("Sight")
+                    : Headroom < .2f ? TEXT("Headroom") : Meal <= 0.f ? TEXT("Unavailable") : TEXT("Paid");
+                UE_LOG(LogTemp, Log, TEXT("[Eco %s Meal] Patch=%s Species=%s At=%.3f Agent=%lld Generation=%u AgeFraction=%.4f Gate=%s RangeCm=%.3f Before=%.6f Paid=%.6f After=%.6f"),
+                    bTraceWater ? TEXT("Aquatic") : TEXT("Refuge"), *Patch.Id.ToString(), *Species->SpeciesId.ToString(),
+                    Now, AgentId, Fauna->Life.Generation, Fauna->Life.AgeFraction(Now),
+                    Gate, FMath::Sqrt(DistanceSquared), StockBefore, Meal, Stock);
+            }
             if (bCanFeed && (RecordsFaunaExperience() || RecordsFoodVisits()))
                 ObserveSharedMeal(EM, AgentId, Species->SpeciesId, {EEcoEncounterKind::Patch,
                     bWaterMeal ? EEcoEncounterMedium::Water : EEcoEncounterMedium::Ground, Region.CurrentRegionId, Patch.Id},
@@ -1030,9 +1114,9 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 RecordFaunaExperience(AgentId, {EEcoExperienceActivity::Provision, Region.CurrentRegionId, Species->SpeciesId}, Now);
                 RecordFaunaAssociation(AgentId, ParentId, Now, true);
                 RecordFaunaAssociation(ParentId, AgentId, Now, true);
-                if (bAuditFaunaHunts)
-                    UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][ParentMeal] Species=%s Agent=%lld Amount=%.3f"),
-                        *Species->SpeciesId.ToString(), AgentId, Amount);
+                if (bAuditFaunaHunts || bAuditTraitOutcomes)
+                    UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][ParentMeal] Species=%s Agent=%lld Parent=%lld Amount=%.3f At=%.3f"),
+                        *Species->SpeciesId.ToString(), AgentId, ParentId, Amount, Now);
                 break;
             }
             continue;
@@ -1111,13 +1195,15 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
     {
         const FEcoFaunaHabitatPatch* Best = nullptr;
         double BestCost = TNumericLimits<double>::Max();
+        const double SearchDistance = UsesAquaticNurseryApproach() ? FMath::Max(270., double(Species.SightRange)) : 270.;
+        const double SearchDistanceSquared = FMath::Square(SearchDistance);
         for (const auto& Patch : FaunaHabitatPatches)
         {
             if (!Patch.bAquaticNursery || Patch.Stage > FaunaHabitatStage || Patch.RegionId != Region
                 || !Patch.Consumers.Contains(Species.SpeciesId)) continue;
             const double A = FVector::DistSquared(First, Patch.Center);
             const double B = FVector::DistSquared(Second, Patch.Center);
-            if (A > FMath::Square(270.) || B > FMath::Square(270.) || A + B >= 2. * FMath::Square(270.)) continue;
+            if (A > SearchDistanceSquared || B > SearchDistanceSquared || A + B >= 2. * SearchDistanceSquared) continue;
             const double Cost = (A + B) / NurseryPreference(Region, Patch.Id, ParentA, ParentB);
             if (Cost >= BestCost) continue;
             if (!IsNurserySuitable(Patch, Species)) continue;
@@ -1137,7 +1223,14 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 || (!RequiredId.IsNone() && Site.NestId != RequiredId)) continue;
             const double A = FVector::DistSquared(First, Site.Location);
             const double B = FVector::DistSquared(Second, Site.Location);
-            if (FMath::Min(A, B) > FMath::Square(125.) || FMath::Max(A, B) > FMath::Square(700.)) continue;
+            if (UsesPredatorContinuity())
+            {
+                const double Range = RequiredId.IsNone()
+                    ? FMath::Min(1000., double(Species.SightRange)) : EcoFaunaFeeding::NestArrivalRadius;
+                if (FMath::Max(A, B) > FMath::Square(Range)) continue;
+            }
+            else if (FMath::Min(A, B) > FMath::Square(EcoFaunaFeeding::NestArrivalRadius)
+                || FMath::Max(A, B) > FMath::Square(700.)) continue;
             const double Cost = (A + B) / NurseryPreference(Region, Site.NestId, ParentA, ParentB);
             if (Cost >= BestDistance) continue;
             const auto* SiteRegion = FindRegion(Site.Location);
@@ -1164,7 +1257,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         const auto& Fauna = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Hunter);
         const auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Hunter);
         const float Window = FaunaPersistence.ForageMemorySeconds;
-        const float Demand = Species.Maintenance * Fauna.MaintenanceScale * FMath::Min(Species.Gestation, Window);
+        const float Demand = float(Fauna.ScaleMaintenance(Species.Maintenance * Fauna.MaintenanceScale,
+            UsesHeritableFaunaMaintenance(), Now, UsesFunctionalTraits())) * FMath::Min(Species.Gestation, Window);
         const float Intake = Fauna.RecentForageIntake(Now, Window);
         // A potential prey count does not demonstrate that either parent can feed.
         if (!Species.UsesPlantFood() && (Fauna.LastForageIntakeAt < 0. || Now - Fauna.LastForageIntakeAt > Window))
@@ -1178,6 +1272,9 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         const auto ResidentB = Resident(Birth.ParentB, Birth.Region, Birth.Species);
         if (!ResidentA.IsSet() || !ResidentB.IsSet() || Now > Birth.Due + 20.)
         {
+            if (UsesAquaticNurseryApproach() && !Birth.NurseryId.IsNone() && ResidentA.IsSet() && ResidentB.IsSet())
+                RecordGameplayReason(Birth.ParentA, Birth.Region, Now, TEXT("BirthAquaticNurseryApproachExpired"),
+                    Birth.ParentB, 0., Birth.NurseryId);
             FaunaBirths.RemoveAtSwap(Index);
             continue;
         }
@@ -1218,6 +1315,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         const auto* BroodSite = Species->NestlingSeconds > 0.f
             ? FindBroodSite(Birth.Region, *Species, Position(A), Position(B), Birth.NestId, 0, 0) : nullptr;
         if (Species->NestlingSeconds > 0.f && !BroodSite) continue;
+        if (Nursery && UsesAquaticNurseryApproach()
+            && (!IsNurserySuitable(*Nursery, *Species)
+                || FVector::DistSquared(Position(A), Nursery->Center) > FMath::Square(120.)
+                || FVector::DistSquared(Position(B), Nursery->Center) > FMath::Square(120.))) continue;
         FaunaBirths.RemoveAtSwap(Index);
         auto& ParentA = EM.GetFragmentDataChecked<FEcoFaunaFragment>(A).Life;
         auto& ParentB = EM.GetFragmentDataChecked<FEcoFaunaFragment>(B).Life;
@@ -1243,16 +1344,42 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             Shelter = nullptr;
         if (Shelter && FaunaPatchStock[int32(Shelter - FaunaHabitatPatches.GetData())] < 3.f * Shelter->EnergyPerMeal)
             continue;
+        const bool bCoveredBirth = Shelter && UsesCoveredRefugeForage() && !Shelter->ShelterApproachPoints.IsEmpty();
+        const uint64 Seed = uint64(Birth.ParentA) ^ EcoLifeV3::Mix(Birth.ParentB) ^ EcoLifeV3::Mix(ParentA.Offspring);
+        const auto Genome = EcoLifeV3::Inherit(ParentA.Genome, ParentB.Genome, Seed, CoatPalette != nullptr);
+        EcoLifeV3::FIndividual Newborn;
+        Newborn.Genome = Genome;
+        Newborn.Born = Now;
+        Newborn.bInitialized = true;
+        const double NewbornSwimScale = Newborn.SwimBody(Now, UsesFunctionalTraits());
         for (int32 Attempt = 0; Attempt < 8; ++Attempt)
         {
             const double Angle = Attempt * 2.399963 + EcoLifeV3::Unit(uint64(Birth.ParentA)) * UE_TWO_PI;
             const FVector Hint = (BroodSite ? BroodSite->Location : Nursery ? Nursery->Center : Shelter ? Shelter->Center : Center)
                 + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.)
                 * (BroodSite ? 55. : Nursery ? 22. + Attempt * 8. : Shelter ? Shelter->ShelterRadius * .6 : 180. + Attempt * 30.);
-            FEcoFaunaPlacement Placement;
-            Placement.SpeciesId = Birth.Species;
-            Placement.SpawnPoints.Add(Hint);
-            if (!BuildFaunaPositions(Birth.Region, Placement, SpawnPoints)) continue;
+            if (bCoveredBirth)
+            {
+                FVector Ground;
+                if (!ProjectCoveredRefugeFloor(*GetWorld(), *Species, Hint, Ground)
+                    || !Shelter->Shelters(Birth.Species, Ground)
+                    || !EcoCreatureMovement::IsWadeableGround(*GetWorld(), Ground, 0.)) continue;
+                const auto* AtGround = FindRegion(Ground);
+                if (!AtGround || AtGround->RegionId != Birth.Region) continue;
+                const float Radius = FMath::Clamp(Species->BodyRadius * float(Newborn.BodyWidth(Now, UsesFunctionalTraits())), 1.f, 120.f);
+                const float Height = Species->SweepHeight * float(Newborn.BodyHeight(Now, UsesFunctionalTraits()));
+                const FVector Lift(0., 0., FMath::Max(Radius + 1.f, Height));
+                if (GetWorld()->OverlapBlockingTestByChannel(Ground + Lift, FQuat::Identity, ECC_WorldStatic,
+                    FCollisionShape::MakeSphere(Radius), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaShelterBirth)))) continue;
+                SpawnPoints.Add(Ground);
+            }
+            else
+            {
+                FEcoFaunaPlacement Placement;
+                Placement.SpeciesId = Birth.Species;
+                Placement.SpawnPoints.Add(Hint);
+                if (!BuildFaunaPositions(Birth.Region, Placement, SpawnPoints, NewbornSwimScale)) continue;
+            }
             if (BroodSite && FMath::Abs(SpawnPoints[0].Z - BroodSite->Location.Z) > 10.)
             {
                 SpawnPoints.Reset();
@@ -1272,15 +1399,12 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             continue;
         }
 
-        const uint64 Seed = uint64(Birth.ParentA) ^ EcoLifeV3::Mix(Birth.ParentB) ^ EcoLifeV3::Mix(ParentA.Offspring);
-        const auto Genome = EcoLifeV3::Inherit(ParentA.Genome, ParentB.Genome, Seed);
         const uint32 Generation = FMath::Max(ParentA.Generation, ParentB.Generation) + 1;
         const int64 Caregiver = ParentA.Sex == EcoLifeV3::ESex::Female ? Birth.ParentA : Birth.ParentB;
         FRegionEcologyState Region;
         if (!Ecology->GetRegionState(Birth.Region, Region)) return false;
         const double RequiredPlantReserve = Species->UsesPlantFood() && !Shelter
-            ? (Region.ProjectedFoodConsumers + 1) * EcoFaunaNutrition::MinimumMeal * FaunaBirthBufferSeconds
-            : 0.;
+            ? FaunaBirthPlantReserve(Region, 1) : 0.;
         FEcoSpawnRequest Reservation;
         if (!Ecology->RequestFaunaBirth(Birth.Region, Time, Reservation, RequiredPlantReserve))
         {
@@ -1327,9 +1451,14 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             Vitals.Energy -= Transfer;
             ChildVitals.Energy += Transfer;
         }
+        RecordTraitOutcome(EM, Child, Time, TEXT("birth"));
         UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][NaturalBirth] Child=%lld Species=%s Parents=%lld,%lld Generation=%u"),
             EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId, *Birth.Species.ToString(),
             Birth.ParentA, Birth.ParentB, Generation);
+        if (bCoveredBirth)
+            UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][RefugeBirth] Shelter=%s Child=%lld Species=%s HeightZ=%.3f At=%.3f"),
+                *Shelter->Id.ToString(), EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId,
+                *Birth.Species.ToString(), SpawnPoints[0].Z, Now);
         if (Nursery)
         {
             for (const int64 ParentId : {Birth.ParentA, Birth.ParentB})
@@ -1383,6 +1512,17 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                     return Birth.Region == Group.RegionId && Birth.Species == SpeciesId;
                 })) continue;
             Candidates.Sort();
+            // Committed births are already stored with each individual. Use them
+            // to distribute scarce breeding places among otherwise eligible animals.
+            const auto HasFewerOffspring = [&](int64 Left, int64 Right)
+            {
+                return EM.GetFragmentDataChecked<FEcoFaunaFragment>(AgentLookup.FindChecked(Left)).Life.Offspring
+                    < EM.GetFragmentDataChecked<FEcoFaunaFragment>(AgentLookup.FindChecked(Right)).Life.Offspring;
+            };
+            const bool bDistributeBreeding = UsesFaunaBreedingOpportunity();
+            if (bDistributeBreeding) Candidates.StableSort(HasFewerOffspring);
+            // For a shared nest, FindBroodSite checks each parent's approach range individually.
+            const bool bUseNestApproachRange = UsesPredatorContinuity() && Species->NestlingSeconds > 0.f;
             bool bPaired = false;
             for (int32 I = 0; I < Candidates.Num() && !bPaired; ++I)
             {
@@ -1392,6 +1532,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 TArray<int64, TInlineAllocator<16>> Partners;
                 Partners.Append(Candidates.GetData() + I + 1, Candidates.Num() - I - 1);
                 RankFaunaPartners(Candidates[I], Partners, Now);
+                if (bDistributeBreeding) Partners.StableSort(HasFewerOffspring);
                 for (const int64 Partner : Partners)
                 {
                     const auto B = AgentLookup.FindChecked(Partner);
@@ -1401,7 +1542,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                         || LB.ParentA == Candidates[I] || LB.ParentB == Candidates[I]
                         || (LA.ParentA && (LA.ParentA == LB.ParentA || LA.ParentA == LB.ParentB))
                         || (LA.ParentB && (LA.ParentB == LB.ParentA || LA.ParentB == LB.ParentB))
-                        || FVector::DistSquared(Position(A), Position(B)) > FMath::Square(1000.)) continue;
+                        || (!bUseNestApproachRange && FVector::DistSquared(Position(A), Position(B)) > FMath::Square(1000.)))
+                        continue;
                     const FVector APosition = Position(A);
                     const FVector BPosition = Position(B);
                     const auto* Nursery = Species->IsAquatic()
@@ -1415,10 +1557,13 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                     if (Nursery)
                         RecordGameplayReason(Candidates[I], Group.RegionId, Now, TEXT("BirthAquaticNurseryReserved"),
                             Partner, Now + Species->Gestation, Nursery->Id);
-                    EM.GetFragmentDataChecked<FEcoFaunaFragment>(A).Goal = BroodSite ? APosition
-                        : Nursery ? Nursery->Center : FMath::Lerp(APosition, BPosition, .35);
-                    EM.GetFragmentDataChecked<FEcoFaunaFragment>(B).Goal = BroodSite ? BPosition
-                        : Nursery ? Nursery->Center : FMath::Lerp(APosition, BPosition, .65);
+                    if (!Nursery || !UsesAquaticNurseryApproach())
+                    {
+                        EM.GetFragmentDataChecked<FEcoFaunaFragment>(A).Goal = BroodSite ? APosition
+                            : Nursery ? Nursery->Center : FMath::Lerp(APosition, BPosition, .35);
+                        EM.GetFragmentDataChecked<FEcoFaunaFragment>(B).Goal = BroodSite ? BPosition
+                            : Nursery ? Nursery->Center : FMath::Lerp(APosition, BPosition, .65);
+                    }
                     UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][BirthQueued] Species=%s Parents=%lld,%lld Due=%.2f Nursery=%s"),
                         *SpeciesId.ToString(), Candidates[I], Partner, Now + Species->Gestation,
                         Nursery ? *Nursery->Id.ToString() : TEXT("None"));

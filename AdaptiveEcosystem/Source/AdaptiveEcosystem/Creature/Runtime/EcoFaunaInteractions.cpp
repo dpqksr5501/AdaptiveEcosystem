@@ -5,11 +5,14 @@
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "Creature/Runtime/EcoFaunaDecision.h"
 #include "Engine/World.h"
+#include "GameFramework/Pawn.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassEntityManager.h"
 #include "MassMovementFragments.h"
 #include "MassSpawnerSubsystem.h"
+#include "World/EcologyRegion.h"
+#include "World/EcoWorldClockSubsystem.h"
 
 namespace
 {
@@ -68,6 +71,55 @@ namespace
             && Vitals.Energy >= .25f * Vitals.MaxEnergy && Fauna.AttackContact < 0.
             && Now >= Fauna.ThreatUntil
             && !Fauna.bSwimming && Fauna.Flight == EEcoFaunaFlightPhase::Grounded;
+    }
+}
+
+void AEcoCreatureIntegrationSpawner::ObservePlayerDamageWitnesses(FMassEntityManager& Manager,
+    FMassEntityHandle Victim, const FVector& VictimPosition, const APawn& Attacker, const FEcoServerTimeSnapshot& Time)
+{
+    if (!bAuthorityWorld || FaunaInteractionMode == 0 || !Attacker.HasAuthority()) return;
+    const FName Region = Manager.GetFragmentDataChecked<FEcoRegionFragment>(Victim).CurrentRegionId;
+    const FVector AttackerPosition = Attacker.GetActorLocation();
+    const auto* AttackerRegion = FindRegion(AttackerPosition);
+    if (!AttackerRegion || AttackerRegion->RegionId != Region || EncounterMedium(Manager, Victim) != EEcoEncounterMedium::Ground)
+        return;
+
+    const auto& VictimId = Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Victim);
+    const auto* VictimProfile = FindFauna(VictimId.SpeciesId);
+    const double VictimHeight = VictimProfile ? VictimProfile->EyeHeight : 65.;
+    const float Darkness = float(FMath::Clamp(EcoClock::Darkness(Time), 0., 1.));
+    const double Now = Time.ServerTimeSeconds;
+    auto& World = *GetWorld();
+    for (const auto Entity : Owned)
+    {
+        if (Entity == Victim || !Manager.IsEntityValid(Entity)) continue;
+        auto* Fauna = Manager.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
+        if (!Fauna || Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).HP <= 0.f
+            || Manager.GetFragmentDataChecked<FEcoRegionFragment>(Entity).CurrentRegionId != Region
+            || Manager.GetFragmentDataChecked<FEcoTravelFragment>(Entity).State == EEcoResidenceState::Traveling
+            || EncounterMedium(Manager, Entity) != EEcoEncounterMedium::Ground) continue;
+        const auto& Identity = Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Entity);
+        const auto* Profile = FindFauna(Identity.SpeciesId);
+        if (!Profile) continue;
+        const auto& Body = Manager.GetFragmentDataChecked<FTransformFragment>(Entity).GetTransform();
+        const auto Ground = EEcoEncounterMedium::Ground;
+        const double Sight = FMath::Min(ExposureDistance,
+            double(Profile->ThreatSenseRange * FMath::Lerp(1.f, Profile->NightVision, Darkness)));
+        if (!CanPerceive(World, Region, Ground, Body, VictimPosition, Sight, Profile->ThreatSightHalfAngle,
+                Profile->EyeHeight, VictimHeight)
+            || !CanPerceive(World, Region, Ground, Body, AttackerPosition, Sight, Profile->ThreatSightHalfAngle,
+                Profile->EyeHeight, 0.)) continue;
+
+        RecordGameplayReason(Identity.StableAgentId, Region, Now, TEXT("PlayerAttackWitnessed"), VictimId.StableAgentId);
+        if (RecordsFaunaExperience())
+            FaunaExperience.FindOrAdd(Identity.StableAgentId).ObserveEncounter({EEcoEncounterKind::Risk, Ground,
+                Region, TEXT("Player"), NAME_None, FEcoExperienceKey::PlantCell(Body.GetLocation())}, Now, 0.);
+        if (FaunaInteractionMode != 2 || Now < Fauna->ThreatUntil || Fauna->AttackContact >= 0. || Fauna->GuardThreatId > 0)
+            continue;
+        const double Caution = Profile->bIndividualResponse ? Fauna->Life.Genome.Caution : 1.;
+        Fauna->LastThreatPosition = AttackerPosition;
+        Fauna->ThreatUntil = Now + 1.5 * Caution;
+        RecordGameplayReason(Identity.StableAgentId, Region, Now, TEXT("PlayerAttackWitnessEscape"), VictimId.StableAgentId);
     }
 }
 
@@ -379,5 +431,6 @@ void AEcoCreatureIntegrationSpawner::ResetFaunaInteractions()
     FaunaHuntSignals.Reset();
     FaunaReactions.Reset();
     FaunaInterpositions.Reset();
+    FamilyGuardWatches.Reset();
     NextFaunaInteractionScan = 0.;
 }

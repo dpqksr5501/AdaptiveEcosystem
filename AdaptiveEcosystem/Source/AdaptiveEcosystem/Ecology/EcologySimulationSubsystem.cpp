@@ -389,18 +389,30 @@ bool UEcologySimulationSubsystem::RequestNaturalBirth(FName RegionId,const FEcoS
 bool UEcologySimulationSubsystem::RequestFaunaBirth(FName RegionId, const FEcoServerTimeSnapshot& Time,
     FEcoSpawnRequest& Out, double RequiredPlantReserve)
 {
+    return RequestFaunaSpawn(RegionId, Time, Out, RequiredPlantReserve, EEcoSpawnOrigin::NaturalBirth, 1);
+}
+
+bool UEcologySimulationSubsystem::RequestFaunaRecovery(FName RegionId, const FEcoServerTimeSnapshot& Time,
+    FEcoSpawnRequest& Out, double RequiredPlantReserve)
+{
+    return RequestFaunaSpawn(RegionId, Time, Out, RequiredPlantReserve, EEcoSpawnOrigin::Recovery, 2);
+}
+
+bool UEcologySimulationSubsystem::RequestFaunaSpawn(FName RegionId, const FEcoServerTimeSnapshot& Time,
+    FEcoSpawnRequest& Out, double RequiredPlantReserve, EEcoSpawnOrigin Origin, int32 Count)
+{
     const auto* State = RegionalStates.Find(RegionId);
-    if (!CanMutateAuthoritativeState(TEXT("RequestFaunaBirth")) || ResourceEpoch <= 0 || Time.WorldEpoch != ResourceEpoch
+    if (!CanMutateAuthoritativeState(TEXT("RequestFaunaSpawn")) || ResourceEpoch <= 0 || Time.WorldEpoch != ResourceEpoch
         || !State || !FMath::IsFinite(Time.ServerTimeSeconds) || Time.ServerTimeSeconds < 0.
         || !FMath::IsFinite(RequiredPlantReserve) || RequiredPlantReserve < 0.) return false;
     const auto* Spatial = SpatialFood.Find(RegionId);
     const double AvailablePlantFood = Spatial ? Spatial->Amount : State->FoodAmount;
     Out = {};
     Out.WorldEpoch = Time.WorldEpoch;
-    Out.Count = AvailablePlantFood >= RequiredPlantReserve ? 1 : 0;
+    Out.Count = AvailablePlantFood >= RequiredPlantReserve ? Count : 0;
     if (Out.Count == 0) Out.DiagnosticReason = TEXT("BirthFoodBudget");
     Out.ScheduledTime = Time.ServerTimeSeconds;
-    Out.Origin = EEcoSpawnOrigin::NaturalBirth;
+    Out.Origin = Origin;
     return ReserveSpawn(RegionId, Out, true, RequiredPlantReserve == 0.);
 }
 bool UEcologySimulationSubsystem::RequestRecoverySpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator,FIntPoint ExcludedFauna)

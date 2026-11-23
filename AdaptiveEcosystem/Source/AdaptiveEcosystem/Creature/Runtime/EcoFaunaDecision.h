@@ -15,4 +15,5 @@ namespace EcoFaunaDecision
         const EcoLifeV3::FIndividual& PreyLife, const FEcoVitalsFragment& Health, double Now);
     bool HasClearSight(const UWorld& World, const FVector& Start, const FVector& End,
         float EyeHeight = 35.f, float TargetHeight = 35.f);
+    bool HasClearWaterHuntSight(const UWorld& World, const FVector& Start, const FVector& End);
 }

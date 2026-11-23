@@ -81,7 +81,7 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 			{
 				double ContactTime = MAX_dbl;
 				for (const auto& Request : ComboDamage) ContactTime = FMath::Min(ContactTime, Request.Issued);
-				for (const auto& Pair : WolfCombat)
+				for (const auto& Pair : PlayerCombat)
 					if (Pair.Value.bPending) ContactTime = FMath::Min(ContactTime, Pair.Value.ContactTime);
 				if (ContactTime < MAX_dbl) NextTime = FMath::Min(NextTime, FMath::Max(LastResourceTime + .001, ContactTime));
 			}
@@ -177,11 +177,14 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
     ProcessCombatDamage(Time);
     ProcessFaunaPredation(Time.ServerTimeSeconds);
 	FEcoSurvivalSettings Fallback;
-	if (!EcoMassSurvival::Advance(EM, Time, ObservedTime, NextStep, Fallback, Deaths, true)
+	if (!EcoMassSurvival::Advance(EM, Time, ObservedTime, NextStep, Fallback, Deaths, true, UsesHeritableFaunaMaintenance(), UsesFunctionalTraits())
 		|| !Ecology->RecordDeaths(Deaths, NextStep)) return false;
 	CommittedDeaths += Deaths.Num();
 	for (const auto& Death : Deaths)
 	{
+        if (const auto* Entity = AgentLookup.Find(Death.StableAgentId))
+            RecordTraitOutcome(EM, *Entity, Time, TEXT("death"), Death.PredatorStableAgentId,
+                int32(Death.Cause), PendingHuntingDeaths.Contains(Death.StableAgentId));
         if (Death.PredatorStableAgentId > 0)
         {
             RecordFaunaExperience(Death.PredatorStableAgentId,
@@ -333,6 +336,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
             Arrival.DestinationRegionId}, Time.ServerTimeSeconds);
 		++SpeciesTotals.FindOrAdd(Arrival.OriginRegionId).FindOrAdd(Species).Outgoing;
 		++SpeciesTotals.FindOrAdd(Arrival.DestinationRegionId).FindOrAdd(Species).Incoming;
+        RecordTraitOutcome(EM, *Entity, Time, TEXT("migration"), 0, INDEX_NONE, false, Arrival.OriginRegionId);
 	}
 	if (Time.ServerTimeSeconds >= NextMigrationTime)
 	{
@@ -372,6 +376,14 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
     const bool bEmitFootsteps = FootstepAudioSet && FootstepAudioSet->IsValidConfiguration();
     const double PresentationTime = FaunaInteractionMode == 2
         ? GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds : 0.;
+    const bool bFunctionalTraits = UsesFunctionalTraits();
+    const auto PackProportions = [bFunctionalTraits](const EcoLifeV3::FIndividual& Individual, double AgeTime, bool bFlightAnimal)
+    {
+        const auto Traits = Individual.FunctionalTraits(AgeTime, bFunctionalTraits);
+        const double Length = bFlightAnimal ? Traits.WholeBodyWidthScale() : Traits.LengthScale();
+        const double Width = bFlightAnimal ? Traits.LengthScale() : Traits.WholeBodyWidthScale();
+        return uint16(EcoLifeV3::QuantizeTraitScale(Length) | (uint16(EcoLifeV3::QuantizeTraitScale(Width)) << 8));
+    };
 	for (const auto E : Owned)
 	{
 		const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
@@ -380,6 +392,8 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
         const uint8 PreviousActivity = Present.Activity;
         Present.BodyScale=128;Present.Maturity=255;Present.CoatTone=128;
         Present.BodyCondition = 128;
+        Present.InheritedProportions = 0x8080;
+        Present.InheritedBody = EcoLifeV3::FBodyDevelopment::Neutral;
         Present.SocialPresentation = 0;
         if (FaunaExperienceMode == 2)
             if (const auto* Memory = FindFaunaExperience(EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId))
@@ -387,8 +401,11 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
         if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized)
             {
             const double AgeNow=V.HP<=0&&Life.DeathTime>=0?Life.DeathTime:GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
-            if(Link->Individual.bNaturalPopulation)Present.CoatTone=uint8(FMath::RoundToInt(FMath::Clamp((Link->Individual.Genome.Coat-.85)/.3,0.,1.)*255));
+            if (CoatPalette || Link->Individual.bNaturalPopulation)
+                Present.CoatTone = UEcoCreatureCoatPalette::PackTone(Link->Individual.Genome.Coat);
             Present.Maturity=uint8(FMath::RoundToInt(Link->Individual.AgeFraction(AgeNow)*255));
+            Present.InheritedProportions = PackProportions(Link->Individual, AgeNow, false);
+            Present.InheritedBody = Link->Individual.FunctionalTraits(AgeNow, bFunctionalTraits).Development.Pack();
             Present.BodyScale=uint8(FMath::RoundToInt(Link->Individual.BodyScale(
                 V.HP<=0 && Life.DeathTime>=0 ? Life.DeathTime :
                 GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds)*128));
@@ -402,10 +419,16 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 		Present.Activity = Execution ? uint8(Execution->Activity) : uint8(EEcoSpeciesActivity::Hold);
         if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E))
         {
+            if (CoatPalette) Present.CoatTone = UEcoCreatureCoatPalette::PackTone(Fauna->Life.Genome.Coat);
             const double Now = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
             const double AgeTime = V.HP <= 0 && Life.DeathTime >= 0. ? Life.DeathTime : Now;
             Present.BodyScale = uint8(FMath::RoundToInt(Fauna->Life.BodyScale(AgeTime) * 128.));
             Present.Maturity = EcoRepresentation::QuantizeUnit(Fauna->Life.AgeFraction(AgeTime));
+            static const FName Crow(TEXT("Crow"));
+            static const FName GoldenEagle(TEXT("GoldenEagle"));
+            const FName Species = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).SpeciesId;
+            Present.InheritedProportions = PackProportions(Fauna->Life, AgeTime, Species == Crow || Species == GoldenEagle);
+            Present.InheritedBody = Fauna->Life.FunctionalTraits(AgeTime, bFunctionalTraits).Development.Pack();
             const bool bMeal = Fauna->LastMeal >= 0. && Now - Fauna->LastMeal < 1. && V.HP > 0;
             if (bMeal) Present.Flags |= 2;
             switch (Fauna->Flight)
@@ -513,8 +536,10 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 else if(Response==EcoLifeV3::EResponse::Retreat)Present.Activity=uint8(EEcoSpeciesActivity::Flee);
             }
         }
-        if (const auto* Combat=WolfCombat.Find(EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId);Combat&&Combat->Target.IsValid())
-            Present.Activity=uint8(Combat->Due>=0||Combat->bPending?EEcoSpeciesActivity::Attack:EEcoSpeciesActivity::Pursue);
+        if (const auto* Combat = PlayerCombat.Find(EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId);
+            V.HP > 0.f && Combat && Combat->Target.IsValid())
+            Present.Activity = uint8(Combat->Due >= 0. || Combat->bPending ? EEcoSpeciesActivity::Attack
+                : Combat->bStalking ? EEcoSpeciesActivity::Stalk : EEcoSpeciesActivity::Pursue);
         if(auto* Audit=EM.GetFragmentDataPtr<FEcoV3SocialBridgeFragment>(E)){
             FName Reason=TEXT("NativePolicy");
             const auto* B=EM.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E);

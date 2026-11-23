@@ -61,6 +61,10 @@ public:
 	/** Anatomical forward in the imported mesh's local space; independent of Actor +X. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") FVector MeshForwardAxis = FVector::ForwardVector;
 	UFUNCTION(BlueprintPure, Category="Creature|Visual") FVector GetVisualForwardDirection() const;
+    UFUNCTION(BlueprintPure, Category="Creature|Visual") int64 GetVisualBodyDevelopment() const { return VisualState.InheritedBody; }
+    UFUNCTION(BlueprintPure, Category="Creature|Visual") int32 GetDisplacedJointCount() const;
+    UFUNCTION(BlueprintCallable, Category="Creature|Diagnostics") int32 ShowCoatComparison(float Tone);
+    void SetCoatPalette(class UEcoCreatureCoatPalette* Palette);
 	/** Native single-node Blend Space playback; can later be replaced by a skeleton-specific AnimBP. */
 	void UpdateAnimation();
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0", Units="cm/s")) float IdleSpeed = 5.0f;
@@ -94,6 +98,10 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	void RefreshAppearance();
     void ApplyAppearance(uint8 Variant);
+    void ApplyBodyDevelopment();
+    void ApplyCoatMaterials();
+    void ApplyCoatTint(float Tone);
+    UPROPERTY(Transient) TObjectPtr<class UEcoCreatureCoatPalette> CoatPalette;
     uint8 AppliedAppearance=255;
     TOptional<FVector> BaseCreatureMeshScale;
     TOptional<FVector> BasePlaceholderScale;

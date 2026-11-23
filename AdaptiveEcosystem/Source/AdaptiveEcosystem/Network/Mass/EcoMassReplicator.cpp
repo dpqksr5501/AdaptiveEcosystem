@@ -112,7 +112,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		if (!VisualFragments.IsEmpty())
 		{
 			const auto& V = VisualFragments[EntityIndex];
-			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy, V.Activity, V.FocusYaw, V.BodyScale, V.Maturity, V.CoatTone, V.BodyCondition, V.SocialPresentation);
+			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy, V.Activity, V.FocusYaw, V.BodyScale, V.Maturity, V.CoatTone, V.BodyCondition, V.SocialPresentation, V.InheritedProportions, V.InheritedBody);
 		}
 
 		FEcoMassClientBubbleHandler& Bubble = BubbleInfo.GetSerializer().Bubble;
@@ -157,7 +157,9 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		const FEcoCreaturePresentationFragment* Presentation = VisualFragments.IsEmpty() ? nullptr : &VisualFragments[EntityIndex];
 		const bool bPresentationPriority = Presentation && (Item.Agent.GetVisualFlags() != Presentation->Flags
 			|| Item.Agent.GetHealth() != Presentation->Health || Item.Agent.GetEnergy() != Presentation->Energy || Item.Agent.GetActivity() != Presentation->Activity || Item.Agent.GetBodyScale()!=Presentation->BodyScale || Item.Agent.GetMaturity()!=Presentation->Maturity || Item.Agent.GetCoatTone()!=Presentation->CoatTone
-			|| Item.Agent.GetBodyCondition() != Presentation->BodyCondition || Item.Agent.GetSocialPresentation() != Presentation->SocialPresentation);
+			|| Item.Agent.GetBodyCondition() != Presentation->BodyCondition || Item.Agent.GetSocialPresentation() != Presentation->SocialPresentation
+			|| Item.Agent.GetInheritedProportions() != Presentation->InheritedProportions
+			|| Item.Agent.GetInheritedBody() != Presentation->InheritedBody);
 		const FEcoIdentityFragment& Identity = IdentityFragments[EntityIndex];
 		const FEcoRegionFragment& Region = RegionFragments[EntityIndex];
 		const bool bIdentityChanged = Item.Agent.GetStableAgentId() != Identity.StableAgentId
@@ -180,7 +182,8 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		// Velocity-only changes follow the connection interval; flags/vitals bypass it.
 		const bool bPresentationChanged = Presentation && Item.Agent.SetPresentation(
 			Presentation->Velocity, Presentation->Flags, Presentation->Health, Presentation->Energy, Presentation->Activity, Presentation->FocusYaw,
-			Presentation->BodyScale, Presentation->Maturity, Presentation->CoatTone, Presentation->BodyCondition, Presentation->SocialPresentation);
+			Presentation->BodyScale, Presentation->Maturity, Presentation->CoatTone, Presentation->BodyCondition,
+			Presentation->SocialPresentation, Presentation->InheritedProportions, Presentation->InheritedBody);
 
 		const FReplicatedAgentPositionYawData PreviousTransform = Item.Agent.GetReplicatedPositionYawData();
 		if (bReset)

@@ -89,6 +89,15 @@ bool FEcoJYUAquaticBirthBudget::RunTest(const FString&)
     TestEqual(TEXT("Empty plant food defers the birth"), Request.DiagnosticReason, FName(TEXT("BirthFoodBudget")));
     TestEqual(TEXT("No birth reserved without enough food"), Request.Count, 0);
     TestTrue(TEXT("Close the deferred reservation"), Ecology->CompleteSpawnRequest(Request.RequestId, 0));
+    if (!TestTrue(TEXT("Plant-dependent recovery also requires its food reserve"),
+            Ecology->RequestFaunaRecovery(River.RegionId, Time, Request, 1.))) return false;
+    TestEqual(TEXT("Do not reserve without plant stock"), Request.Count, 0);
+    TestTrue(TEXT("Close the food-budget rejection"), Ecology->CompleteSpawnRequest(Request.RequestId, 0));
+    if (!TestTrue(TEXT("Aquatic recovery reserves a pair without requiring native plants"),
+            Ecology->RequestFaunaRecovery(River.RegionId, Time, Request, 0.))) return false;
+    TestEqual(TEXT("Reserve both founders"), Request.Count, 2);
+    TestTrue(TEXT("Recovery has a dedicated origin"), Request.Origin == EEcoSpawnOrigin::Recovery);
+    TestTrue(TEXT("Close the inspected recovery reservation"), Ecology->CompleteSpawnRequest(Request.RequestId, 0));
     return true;
 }
 

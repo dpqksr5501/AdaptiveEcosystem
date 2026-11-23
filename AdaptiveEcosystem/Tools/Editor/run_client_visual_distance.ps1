@@ -23,7 +23,7 @@ while($true){
     if((Get-Date) -gt $viewDeadline){throw 'Readiness timeout; normal exit timer remains running'}
     Start-Sleep -Seconds 1
 }
-$viewClient=Start-ViewPeer 'UnrealEditor.exe' '127.0.0.1:7796?EcoProtocol=3?Name=ViewRange' 'Client' @('-game')
+$viewClient=Start-ViewPeer 'UnrealEditor.exe' '127.0.0.1:7796?EcoProtocol=5?Name=ViewRange' 'Client' @('-game')
 foreach($viewPeer in @(@{Name='Client';P=$viewClient},@{Name='Server';P=$viewServer})){
     while(-not $viewPeer.P.WaitForExit(1000)){}
     if($viewPeer.P.ExitCode -ne 0){throw "Peer failed: $($viewPeer.Name)"}

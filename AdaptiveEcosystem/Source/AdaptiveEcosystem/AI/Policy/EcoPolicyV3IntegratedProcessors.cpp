@@ -32,6 +32,8 @@
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcologyRegion.h"
 #include "EcoLifeLocomotion.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #if !UE_BUILD_SHIPPING
 #include "Algo/BinarySearch.h"
 #include "Debug/EcoMoveTestSubsystem.h"
@@ -65,11 +67,15 @@ namespace EcoPolicyV3IntegratedProcImpl
 		FEcoV3RegionContext* Ctx = nullptr;
 		const TArray<FEcoIntegratedV3Fragment*>* HerbInts = nullptr;
 		const TArray<FEcoIntegratedV3Fragment*>* WolfInts = nullptr;
+        const TArray<EcoWorldV3::FThreatAgent*>* WolfThreats = nullptr;
+        TArray<EcoRepertoireV3::FVec2, TInlineAllocator<8>> WolfPositions;
         const TArray<FEcoV3DeerRec>* Deer = nullptr;
         const TArray<int32>* Rows = nullptr;
         const TArray<int64>* HerbIds=nullptr;
         const TArray<int64>* WolfKeys=nullptr;
         TArray<uint8> CaptureMask;
+        TArray<double, TInlineAllocator<64>> InitialCoatSight;
+        int64 SightAuditWolf = 0;
         UEcoShelterSubsystem* Shelters = nullptr;
         const UEcoHerdMigrationSubsystem* Journeys=nullptr;
         double Now = 0;
@@ -78,11 +84,12 @@ namespace EcoPolicyV3IntegratedProcImpl
         FEcoV3StaticMeshMetrics* MoveMetrics = nullptr;
         EcoCreatureMovement::FGroundMoveStats* QueryStats() const { return MoveMetrics ? &MoveMetrics->Queries : nullptr; }
         mutable int32 LastCheckedDeer = INDEX_NONE;
+        bool UsesFunctionalBody() const { return Combat && Combat->UsesFunctionalTraits(); }
 
         float BodyRadius(const FEcoIntegratedV3Fragment& Link) const
         {
             return Ctx->Sim.Config.bEcosystemLife && Link.Individual.bInitialized
-                ? float(30 * Link.Individual.BodyScale(Ctx->Sim.T * EcoRepertoireV3::kStepSeconds)) : 30.f;
+                ? float(30 * Link.Individual.BodyWidth(Ctx->Sim.T * EcoRepertoireV3::kStepSeconds, UsesFunctionalBody())) : 30.f;
         }
         // Immutable pre-move positions, rebuilt once per native step. Contact
         // queries visit adjacent buckets, rather than every animal in the world.
@@ -282,6 +289,10 @@ namespace EcoPolicyV3IntegratedProcImpl
         const double Now=W.T*R::kStepSeconds;
         const bool Graze=!Journey&&H.Rep->Behavior==R::kGraze&&Life.Memory.Response==EcoLifeV3::EResponse::Policy
             &&H.Decision->KeepActive!=EcoWorldV3::kKeepPanic&&H.Decision->KeepActive!=EcoWorldV3::kKeepShelter;
+        static const bool bForageApproachTrial = FParse::Param(FCommandLine::Get(), TEXT("EcoIslandNativeForageApproach"));
+        static const FName Grassland(TEXT("Grassland"));
+        const bool bCommitToForage = bForageApproachTrial && A.RegionId == Grassland
+            && H.Body->Energy < .30 * C.MaxEnergy;
         auto Walk=[&](R::FVec2 Direction){
             H.Control->Gait=R::kGaitWalk;H.Control->Velocity=R::Scale(R::Normalize(Direction),C.HerbSpeed*C.GaitSpeed[R::kGaitWalk]);
             H.Control->EatMult=C.GaitEat[R::kGaitWalk];H.Control->DrainMult=C.GaitDrain[R::kGaitWalk];H.Control->bStill=false;
@@ -318,6 +329,13 @@ namespace EcoPolicyV3IntegratedProcImpl
                     Life.ForageCell=-1;Life.NextForageScan=0;Life.ForageOriginX=A.Ctx->OriginCm.X;Life.ForageOriginY=A.Ctx->OriginCm.Y;
                 }
                 const double Range=EcoWorldV3::SeePredNow(W);
+                const auto HasUsableTarget = [&]{
+                    return Life.ForageCell >= 0 && Life.ForageCell < int32(G.Food.size())
+                        && G.Food[Life.ForageCell] >= .012
+                        && R::SizeSquared(R::Sub(CellCenter(Life.ForageCell), H.Body->Pos)) <= Range * Range;
+                };
+                if (bCommitToForage && Life.ForageCell >= 0 && !HasUsableTarget())
+                    Life.NextForageScan = Now;
                 if(Now>=Life.NextForageScan){
                     Life.NextForageScan=Now+1;Life.ForageCell=-1;
                     struct FCandidate{int32 Cell;double Score;};TArray<FCandidate> Candidates;
@@ -335,7 +353,7 @@ namespace EcoPolicyV3IntegratedProcImpl
                     for(int32 J=FMath::Max(0,Y-Radius);J<=FMath::Min(G.Gw-1,Y+Radius);++J)
                         for(int32 I=FMath::Max(0,X-Radius);I<=FMath::Min(G.Gw-1,X+Radius);++I){
                             const int32 Cell=J*G.Gw+I;if(G.Food[Cell]<.02||(!G.Habitats.empty()&&!G.Habitats[Cell].bGroundUsable))continue;
-                            if(bCanGrazeHere&&Cell==LocalCell)continue;
+                            if((bCanGrazeHere||bCommitToForage)&&Cell==LocalCell)continue;
                             const R::FVec2 Q{(I+.5)*G.Cell,(J+.5)*G.Cell},Delta=R::Sub(Q,H.Body->Pos);
                             const double Dist=std::hypot(Delta.X,Delta.Y);if(Dist>Range||Dist<.01)continue;
                             if((Delta.X*H.Body->Head.X+Delta.Y*H.Body->Head.Y)/Dist<W.ObsCfg.ThreatFovCos||G.BlocksSight(H.Body->Pos.X,H.Body->Pos.Y,Q.X,Q.Y))continue;
@@ -363,24 +381,36 @@ namespace EcoPolicyV3IntegratedProcImpl
                         if(A.Sub->UsesTerrain()&&!A.Sub->TraceMove(A.RegionId,P,Target,Z,false,30.f))continue;
                         if(A.Sub->GetWorld()->LineTraceTestByObjectType(P+FVector(0,0,60),FVector(Target.X,Target.Y,Z+30),
                             FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionQueryParams(SCENE_QUERY_STAT(EcoLifeFoodSight),false)))continue;
-                        Life.ForageCell=Cell;break;
+                        Life.ForageCell=Cell;
+                        if (bCommitToForage)
+                        {
+                            // Give a hungry deer time to cross to visible, reachable food before reranking it.
+                            // The existing motion and payment still use the walked path and actual occupied cell.
+                            const double Speed = C.HerbSpeed * C.GaitSpeed[R::kGaitWalk] * Life.SpeedScale(Now)
+                                * (H.Body->bWeak ? W.Config.WildReserve.WeakSpeed : 1.);
+                            const double Distance = std::sqrt(R::SizeSquared(R::Sub(Q, H.Body->Pos)));
+                            Life.NextForageScan = Now + FMath::Clamp(Distance / FMath::Max(.01, Speed), 1., 4.);
+                        }
+                        break;
                     }
                 }
                 bool bWalkToFood=false;
-                if(Life.ForageCell>=0&&(!bCanGrazeHere||Life.ForageCell!=LocalCell)
-                    &&Life.ForageCell<int32(G.Food.size())&&G.Food[Life.ForageCell]>=.012){
+                if(HasUsableTarget() && (!bCanGrazeHere || Life.ForageCell != LocalCell)){
                     const R::FVec2 Q=CellCenter(Life.ForageCell);
-                    if(R::SizeSquared(R::Sub(Q,H.Body->Pos))<=Range*Range){
-                        Walk(R::Sub(Q,H.Body->Pos));
-                        Life.MotionReason=1;
-                        bWalkToFood=true;
+                    Walk(R::Sub(Q,H.Body->Pos));
+                    Life.MotionReason=1;
+                    bWalkToFood=true;
 #if !UE_BUILD_SHIPPING
-                        A.ObserveLocalGoal(Index, TEXT("ForageCell"), Life.ForageCell, Q);
+                    A.ObserveLocalGoal(Index, TEXT("ForageCell"), Life.ForageCell, Q);
 #endif
-                    }
                 }
                 if(bCanGrazeHere&&!bWalkToFood)GrazeHere();
             }
+        }
+        else if (bCommitToForage && Life.ForageCell >= 0)
+        {
+            Life.ForageCell = -1;
+            Life.NextForageScan = Now;
         }
         // Family is a local intent inside the existing Native writer. Never override danger,
         // a journey, hunger, Social reservations or a refuge arrival with attachment behavior.
@@ -453,7 +483,7 @@ namespace EcoPolicyV3IntegratedProcImpl
                     const auto* Context=A.Sub->GetContext(Other.Int->ContextIndex);if(!Context)continue;
                     const R::FVec2 Q{Other.View.Body->Pos.X+(Context->OriginCm.X-A.Ctx->OriginCm.X)/R::kUnitCm,
                         Other.View.Body->Pos.Y+(Context->OriginCm.Y-A.Ctx->OriginCm.Y)/R::kUnitCm};
-                    const double Clearance=.5*(Life.BodyScale(Now)+Other.Int->Individual.BodyScale(Now));
+                    const double Clearance=.5*(Life.BodyWidth(Now,A.UsesFunctionalBody())+Other.Int->Individual.BodyWidth(Now,A.UsesFunctionalBody()));
                     Separation=R::Add(Separation,EcoLifeMotion::Separation(H.Body->Pos,Q,Clearance,uint64(D.Id),uint64(Other.Id)));
                 }
             if(R::SizeSquared(Separation)>1.e-8){
@@ -492,7 +522,7 @@ namespace EcoPolicyV3IntegratedProcImpl
         }
         const bool Hide=H.Rep->Behavior==R::kHide,Sleep=H.Rep->Behavior==R::kSleep;
         if(!Hide&&!Sleep){S.Cover=-1;S.Phase=0;S.SettledSince=-1;return;}
-        const auto& W=A.Ctx->Sim;const double Now=W.T*R::kStepSeconds,Body=.15*Life.BodyScale(Now);
+        const auto& W=A.Ctx->Sim;const double Now=W.T*R::kStepSeconds,Body=.15*Life.BodyWidth(Now,A.UsesFunctionalBody());
         int32 Cover=Hide?H.Rep->HideTarget:-1;
         if(Sleep)for(int32 K=0;K<int32(W.Config.Covers.size());++K){const auto& C=W.Config.Covers[K];
             if(C.Radius>0&&std::hypot(C.X-H.Body->Pos.X,C.Y-H.Body->Pos.Y)<C.Radius){Cover=K;break;}}
@@ -712,9 +742,11 @@ namespace EcoPolicyV3IntegratedProcImpl
                     if (EnergyFraction >= MealStop && !bLowReserve)
                         H.Control->EatMult = 0.;
                 }
-                const double Speed=Life.SpeedScale(SimTime);
+                const bool bRunning = H.Control->Gait == EcoRepertoireV3::kGaitRun;
+                const auto Traits = Life.FunctionalTraits(SimTime, A.UsesFunctionalBody());
+                const double Speed=Life.SpeedScale(SimTime) * (bRunning ? Traits.DriveScale() : 1.);
                 H.Control->Velocity.X*=Speed;H.Control->Velocity.Y*=Speed;
-                H.Control->DrainMult*=Life.Maintenance();
+                H.Control->DrainMult*=Life.Maintenance() * (bRunning ? Traits.ActiveCost() : Traits.RestCost());
             }
         }
         if (bWaitingForRegion)
@@ -738,14 +770,35 @@ namespace EcoPolicyV3IntegratedProcImpl
 #endif
     }
 
+    void LogInitialCoatSight(void* User, int32 Index, double Distance, double Perceived, double NeutralRange, bool bVisible)
+    {
+        const auto& Adapter = *static_cast<FMoveAdapter*>(User);
+        const auto& Life = (*Adapter.HerbInts)[Index]->Individual;
+        UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Coat Sight] Wolf=%lld Deer=%lld At=%.4f Coat=%.9f Distance=%.5f Perceived=%.5f NeutralRange=%.5f Visible=%d"),
+            Adapter.SightAuditWolf, (*Adapter.HerbIds)[Index], Adapter.AuthorityNow, Life.Genome.Coat,
+            Distance, Perceived, NeutralRange, bVisible);
+    }
+
     void EvidenceThreatHook(void* User,int32 Index,EcoWorldV3::FThreatAgent& Threat,EcoThreatV3::FThreatStepInput& Input)
     {
         auto& A=*static_cast<FMoveAdapter*>(User);
         if(!A.Ctx->Sim.Config.bEcosystemLife||!A.WolfInts||!A.WolfInts->IsValidIndex(Index))return;
+        if (A.InitialCoatSight.Num() == Input.NumPrey && Input.NumPrey > 0)
+            Input.InitialCoatSightScale = A.InitialCoatSight.GetData();
         auto& Link=*(*A.WolfInts)[Index];auto& I=Link.Individual.Investigation;
         const double Now=A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds;
         auto& Life=Link.Individual;
+        if (!A.WolfPositions.IsEmpty()) Life.FamilyMode = 0;
         const int64 WolfId = A.WolfKeys && A.WolfKeys->IsValidIndex(Index) ? (*A.WolfKeys)[Index] : 0;
+        static const bool bAuditSnowCoat = FParse::Param(FCommandLine::Get(), TEXT("EcoSnowCoatSightAudit"));
+        static const FName Snowfield(TEXT("Snowfield"));
+        if (bAuditSnowCoat && A.RegionId == Snowfield && WolfId > 0 && A.HerbIds
+            && A.HerbIds->Num() == Input.NumPrey && A.InitialCoatSight.Num() == Input.NumPrey)
+        {
+            A.SightAuditWolf = WolfId;
+            Input.AuditInitialSight = &LogInitialCoatSight;
+            Input.SightAuditUser = &A;
+        }
         if (A.Combat && WolfId > 0)
         {
             FVector Ignored;
@@ -762,13 +815,14 @@ namespace EcoPolicyV3IntegratedProcImpl
                     WolfId, Life.MealCycle.bSeeking, Life.Nutrition);
         }
         const bool bMayFeed = !bAdaptive || Life.MealCycle.bSeeking;
+        const auto Traits = Life.FunctionalTraits(Now, A.UsesFunctionalBody());
         if(!Life.PredatorStep(Now,Threat.State.PosX,Threat.State.PosY,Threat.Last.bRunning,EcoRepertoireV3::kStepSeconds,
-            bMayFeed,bAdaptive?.92:1.)){
+            bMayFeed,bAdaptive?.92:1.,Threat.Last.bRunning ? Traits.ActiveCost() : Traits.RestCost())){
             Threat.bDead=true;I.Cancel(Now);Life.AbandonMeat();Input.bHuntingAllowed=false;return;
         }
         if(Life.BaseSpeed<=0){Life.BaseSpeed=Threat.Spec.BaseSpeed;Life.BaseCatchRadius=Threat.Spec.CatchRadius;}
-        Threat.Spec.BaseSpeed=Life.BaseSpeed*Life.SpeedScale(Now)*(Life.Nutrition<.15?.7:1.);
-        Threat.Spec.CatchRadius=Life.BaseCatchRadius*Life.BodyScale(Now);
+        Threat.Spec.BaseSpeed=Life.BaseSpeed*Life.SpeedScale(Now)*Traits.DriveScale()*(Life.Nutrition<.15?.7:1.);
+        Threat.Spec.CatchRadius=Life.BaseCatchRadius*Life.BodyScale(Now)*Traits.ReachScale();
         Input.bHuntingAllowed=Input.bHuntingAllowed&&(bAdaptive?bMayFeed:Life.Nutrition<.9);
         if(Life.MealRemaining>0&&Now<Life.MealExpires&&(bAdaptive?bMayFeed:(Life.Nutrition<.9||Life.bFeedingMeat))){
             const double X=Life.MealX-Threat.State.PosX,Y=Life.MealY-Threat.State.PosY,D=FMath::Sqrt(X*X+Y*Y);
@@ -828,6 +882,66 @@ namespace EcoPolicyV3IntegratedProcImpl
             return !A.Ctx->Sim.Food.BlocksSight(Threat.State.PosX,Threat.State.PosY,X,Y)
                 &&!A.Sub->GetWorld()->LineTraceTestByObjectType(Start,End,FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionQueryParams(SCENE_QUERY_STAT(EcoHuntSight),false));
         };
+        if (!Input.bResourceApproach && Response == EcoLifeV3::EResponse::Policy && !Threat.State.bAsleep
+            && !Threat.Last.bRunning && WolfId > 0 && !A.WolfPositions.IsEmpty())
+        {
+            // A dependent approaches a visible parent with surplus. A parent that is already
+            // close enough to help waits, leaving pursuit, player combat and self-feeding first.
+            const bool bYoung = Life.Origin == EcoLifeV3::EOrigin::NaturalBirth && Life.AgeFraction(Now) < 1.;
+            constexpr double Reserve = .55;
+            constexpr double SeekParentBelow = .45;
+            if ((bYoung && Life.Nutrition < SeekParentBelow) || (!bYoung && Life.AgeFraction(Now) >= 1. && Life.Nutrition > Reserve))
+            {
+                namespace R = EcoRepertoireV3;
+                const double Maximum = bYoung ? EcoWorldV3::WolfViewNow(A.Ctx->Sim) : 650. / R::kUnitCm;
+                double BestDistance = Maximum;
+                int64 BestId = MAX_int64;
+                R::FVec2 Toward{};
+                for (int32 Other = 0; Other < A.WolfPositions.Num(); ++Other)
+                {
+                    if (Other == Index) continue;
+                    const int64 RelatedId = (*A.WolfKeys)[Other];
+                    const auto& OtherLink = *(*A.WolfInts)[Other];
+                    const auto& OtherLife = OtherLink.Individual;
+                    const auto& OtherThreat = *(*A.WolfThreats)[Other];
+                    if (!OtherLink.bAdopted || !OtherLife.bInitialized || OtherLink.bDead || OtherThreat.bDead) continue;
+                    const bool bFamily = bYoung
+                        ? (RelatedId == Life.ParentA || RelatedId == Life.ParentB) && OtherLife.Nutrition > Reserve
+                        : OtherLife.Origin == EcoLifeV3::EOrigin::NaturalBirth && OtherLife.AgeFraction(Now) < 1.
+                            && (WolfId == OtherLife.ParentA || WolfId == OtherLife.ParentB)
+                            && OtherLife.Nutrition < SeekParentBelow && !OtherThreat.Last.bRunning;
+                    if (!bFamily) continue;
+                    const auto [X, Y] = A.WolfPositions[Other];
+                    const R::FVec2 Delta{X - Threat.State.PosX, Y - Threat.State.PosY};
+                    const double Distance = std::hypot(Delta.X, Delta.Y);
+                    if (Distance > BestDistance || (Distance == BestDistance && RelatedId >= BestId)
+                        || !ClearLine(X, Y, OtherLink.PrevGroundZ)) continue;
+                    const FVector Start = A.Ctx->UnitsToCm(Threat.State.PosX, Threat.State.PosY, Link.GroundZ);
+                    const FVector End = A.Ctx->UnitsToCm(X, Y, OtherLink.PrevGroundZ);
+                    double GroundZ = End.Z;
+                    if (A.Sub->UsesTerrain() && (!A.Sub->TraceMove(A.RegionId, Start, End, GroundZ)
+                        || FMath::Abs(GroundZ - End.Z) > 60.)) continue;
+                    BestId = RelatedId;
+                    BestDistance = Distance;
+                    Toward = R::Normalize(Delta);
+                }
+                if (BestId != MAX_int64)
+                {
+                    Input.bHuntingAllowed = false;
+                    Input.bResourceApproach = true;
+                    Input.bResourceWait = !bYoung || BestDistance <= 250. / R::kUnitCm;
+                    Input.ResourceDirX = Toward.X;
+                    Input.ResourceDirY = Toward.Y;
+                    if (bYoung)
+                    {
+                        Life.FamilyMode = 2;
+                        Life.FamilyObserved = BestId;
+                    }
+                    I.Cancel(Now);
+                    return;
+                }
+            }
+        }
         A.CaptureMask.Init(1,Input.NumPrey);
         for(int32 K=0;K<Input.NumPrey;++K){const auto& P=Input.Prey[K];
             const double DistanceSquared=FMath::Square(P.X-Threat.State.PosX)+FMath::Square(P.Y-Threat.State.PosY);
@@ -910,7 +1024,6 @@ namespace EcoPolicyV3IntegratedProcImpl
     {
         if(!A.Ctx->Sim.Config.bEcosystemLife)return true;
         namespace R=EcoRepertoireV3;const auto& D=(*A.Deer)[(*A.Rows)[Index]];
-        const double Now=A.Ctx->Sim.T*R::kStepSeconds;
         const FIntPoint Center(FMath::FloorToInt((From.X+A.Ctx->OriginCm.X/R::kUnitCm)/2),FMath::FloorToInt((From.Y+A.Ctx->OriginCm.Y/R::kUnitCm)/2));
         int32 Visited=0;
         for(int32 Y=-1;Y<=1;++Y)for(int32 X=-1;X<=1;++X)if(const auto* Bucket=A.BodyBuckets.Find(Center+FIntPoint(X,Y)))
@@ -920,7 +1033,7 @@ namespace EcoPolicyV3IntegratedProcImpl
                 const R::FVec2 Q{Other.View.Body->Pos.X+(Context->OriginCm.X-A.Ctx->OriginCm.X)/R::kUnitCm,
                     Other.View.Body->Pos.Y+(Context->OriginCm.Y-A.Ctx->OriginCm.Y)/R::kUnitCm};
                 // Same 30cm scaled body radius as the terrain movement writer.
-                const double Clearance=30*(D.Int->Individual.BodyScale(Now)+Other.Int->Individual.BodyScale(Now))/R::kUnitCm;
+                const double Clearance=(A.BodyRadius(*D.Int)+A.BodyRadius(*Other.Int))/R::kUnitCm;
                 if(!EcoLifeMotion::AllowsMotion(From,To,Q,Clearance))return false;
             }
         return true;
@@ -1658,6 +1771,10 @@ void UEcoPolicyV3IntegratedStepProcessor::ExecuteSteps(FMassEntityManager& Entit
 			}
 			Adapter.HerbInts = &HerbInts;
 			Adapter.WolfInts = &WolfInts;
+            if (CombatOwner && CombatOwner->GetCoatPalette() && !WolfInts.IsEmpty())
+                for (const auto* Link : HerbInts)
+                    Adapter.InitialCoatSight.Add(CombatOwner->CoatDetectionRange(TEXT("Herbivore"), Ctx.RegionId,
+                        Link->Individual.Genome.Coat));
             Adapter.Deer=&Deer;Adapter.Rows=&DeerByContext[c];
             if(Ctx.Sim.Config.bEcosystemLife)for(int32 Row=0;Row<Deer.Num();++Row){
                 Adapter.FamilyRows.Add(Deer[Row].Id,Row);
@@ -1673,6 +1790,12 @@ void UEcoPolicyV3IntegratedStepProcessor::ExecuteSteps(FMassEntityManager& Entit
 			// 사슴 Social 행동 연결 (조연우 님 22eb1b6). eco.IntegratedV3.SocialControl 1 일 때만 건다 — 기본 0 (사람 결정 10-17 (8))
 			Hooks.HerbControl = &IntegratedControlHook;
             Adapter.HerbIds=&StableViewIds;Adapter.WolfKeys=&WolfIds;
+            if (CombatOwner && CombatOwner->UsesNativeWolfProvisioning())
+            {
+                Adapter.WolfThreats = &ThreatPtrs;
+                for (const auto* Wolf : ThreatPtrs)
+                    Adapter.WolfPositions.Add({Wolf->State.PosX, Wolf->State.PosY});
+            }
             Hooks.ThreatInput=&EvidenceThreatHook;
             Hooks.HerbTravel = &Traveling;
             Hooks.HerbMove = Sub->UsesTerrain() && !Adapter.bStaticMeshContact ? &HerbMoveHook : nullptr;

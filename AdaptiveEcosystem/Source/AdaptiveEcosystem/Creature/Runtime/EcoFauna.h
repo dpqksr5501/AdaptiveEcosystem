@@ -163,6 +163,7 @@ struct FEcoFaunaSpecies
 
     bool IsAquatic() const { return Locomotion == EEcoFaunaLocomotion::Swimming; }
     bool CanSwim() const { return IsAquatic() || Locomotion == EEcoFaunaLocomotion::Amphibious; }
+    double SwimBodyClearance(double BodyScale) const { return FMath::Max(1., .65 * BodyRadius * BodyScale); }
     bool UsesPlantFood() const { return !IsAquatic() && Diet != EEcoFaunaDiet::Carnivore; }
     float PlantPreference(EEcoFaunaPlantGuild Guild) const
     {
@@ -316,6 +317,16 @@ struct FEcoFaunaFragment : public FMassFragment
     double LastForageIntakeAt = -1.;
     float ForageIntake = 0.f;
     float MaintenanceScale = 1.f;
+    float FunctionalEffort = 0.f;
+    double ScaleMaintenance(double ActivityAdjustedRate, bool bHeritable, double Now, bool bFunctional = false) const
+    {
+        // Native calibration is kept separate. Rule fauna use a bounded fraction of the same cost.
+        const double BaseRate = bHeritable && Life.bInitialized
+            ? ActivityAdjustedRate * FMath::Lerp(1., Life.Maintenance(), .25)
+            : ActivityAdjustedRate;
+        const auto Traits = Life.FunctionalTraits(Now, bFunctional);
+        return BaseRate * FMath::Lerp(Traits.RestCost(), Traits.ActiveCost(), double(FunctionalEffort));
+    }
     double PatchBlockedUntil = 0.;
     int32 PatchTarget = INDEX_NONE;
     int32 BlockedPatch = INDEX_NONE;
@@ -366,6 +377,8 @@ struct FEcoFaunaFragment : public FMassFragment
 
 namespace EcoFaunaFeeding
 {
+    constexpr double NestArrivalRadius = 125.;
+
     inline double BreedingReserve(double Energy, double MaxEnergy, double RecentIntake)
     {
         return FMath::Max(0., Energy - MaxEnergy * EcoLifeV3::FIndividual::MinimumParentEnergy) + RecentIntake;

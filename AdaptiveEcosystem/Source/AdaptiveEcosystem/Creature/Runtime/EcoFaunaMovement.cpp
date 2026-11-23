@@ -5,6 +5,7 @@
 #include "Misc/ScopeExit.h"
 
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
+#include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "Creature/Audio/EcoFootstepAudioSet.h"
@@ -35,6 +36,24 @@ using EcoFaunaDecision::HasClearSight;
 
 namespace
 {
+    constexpr float FamilyGuardMinStamina = .30f;
+    constexpr float FamilyGuardContactCost = .15f;
+    constexpr double FamilyGuardWatchSeconds = 2.5;
+
+    bool IsInFamilyGuardLane(const FVector& Guard, const FVector& Hunter, const FVector& Young,
+        const FEcoFaunaSpecies& Species, const EcoLifeV3::FIndividual& Life, double Now, bool bFunctionalTraits)
+    {
+        const FVector Closest = FMath::ClosestPointOnSegment(Guard, Hunter, Young);
+        const double BodyRadius = FMath::Clamp(Species.BodyRadius * Life.BodyWidth(Now, bFunctionalTraits), 1., 120.);
+        return FVector::DotProduct(Guard - Young, Hunter - Young) > 0.
+            && FVector::DistSquared(Guard, Closest) <= FMath::Square(BodyRadius + 35.);
+    }
+
+    double HuntReach(const FEcoFaunaSpecies& Species, const EcoLifeV3::FIndividual& Life, double Now, bool bFunctionalTraits)
+    {
+        return Species.AttackReach * (bFunctionalTraits ? Life.BodyScale(Now) * Life.FunctionalTraits(Now, true).ReachScale() : 1.);
+    }
+
     int64 GroundFoodAuditAgent()
     {
         static const int64 AgentId = [] {
@@ -94,9 +113,10 @@ namespace
     }
 
     bool FindNearbyForage(UWorld& World, const FEcoV3RegionContext* Context, const AEcologyRegion& Region,
-        const FVector& Position, const FEcoFaunaSpecies& Species, float BodyScale, FVector& Out,
+        const FVector& Position, const FEcoFaunaSpecies& Species, float BodyWidth, float BodyHeight, FVector& Out,
         const FEcoFaunaExperience* Experience = nullptr, double Now = 0.,
-        const AEcoCreatureIntegrationSpawner* Owner = nullptr, int64 AgentId = 0)
+        const AEcoCreatureIntegrationSpawner* Owner = nullptr, int64 AgentId = 0,
+        const TFunction<bool(const FVector&)>& AcceptPoint = {})
     {
         if (!Context || !Context->bSpatialFoodRegistered) return false;
         const auto& Grid = Context->Sim.Food;
@@ -107,7 +127,7 @@ namespace
         const float MinStock = Species.bIndividualResponse
             ? FMath::Max(EcoFaunaNutrition::MinimumMeal, .4f * Species.FoodPerMeal)
             : EcoFaunaNutrition::MinimumMeal;
-        const bool bCanFeedHere = Grid.Food[Current] >= MinStock;
+        const bool bCanFeedHere = Grid.Food[Current] >= MinStock && (!AcceptPoint || AcceptPoint(Position));
         const FVector CurrentCenter = Context->UnitsToCm((Current % Grid.Gw + .5) * Grid.Cell,
             (Current / Grid.Gw + .5) * Grid.Cell, Position.Z);
         const double CurrentVisit = Owner && bCanFeedHere ? Owner->RankPlantVisit(AgentId, Region.RegionId,
@@ -148,13 +168,13 @@ namespace
             FVector Ground;
             if (!EcoCreatureMovement::ProjectSpawnPoint(World, Candidates[Index].Position, Ground)
                 || !Region.ContainsPosition(Ground) || !EcoCreatureMovement::IsWadeableGround(World, Ground, 0.f)
-                || !HasClearSight(World, Position, Ground)) continue;
+                || !HasClearSight(World, Position, Ground) || (AcceptPoint && !AcceptPoint(Ground))) continue;
             if (Species.bIndividualResponse)
             {
                 FVector Entrance = Position + (Ground - Position).GetClampedToMaxSize2D(30.);
                 if (!EcoCreatureMovement::ConstrainGroundStep(World, Position, Entrance,
-                        FMath::Clamp(Species.BodyRadius * BodyScale, 1.f, 120.f), Species.MinGroundNormalZ,
-                        Species.SweepHeight * BodyScale, Species.StepHeight)
+                        FMath::Clamp(Species.BodyRadius * BodyWidth, 1.f, 120.f), Species.MinGroundNormalZ,
+                        Species.SweepHeight * BodyHeight, Species.StepHeight)
                     || !EcoCreatureMovement::IsWadeableGround(World, Entrance, Species.WadeDepth)) continue;
             }
             Out = Ground;
@@ -256,7 +276,8 @@ bool AEcoCreatureIntegrationSpawner::CanHuntFauna(const FMassEntityManager& EM, 
     if (Health.HP <= 0.f) return Reject(TEXT("HuntTargetUnavailable"));
     if (EM.GetFragmentDataChecked<FEcoRegionFragment>(Prey).CurrentRegionId != Region.CurrentRegionId)
         return Reject(TEXT("HuntTargetOutsideRegion"));
-    const auto& HunterLife = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Hunter).Life;
+    const auto& HunterFauna = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Hunter);
+    const auto& HunterLife = HunterFauna.Life;
     const auto* TargetProfile = FindFauna(PreyId.SpeciesId);
     if (!TargetProfile || !FitsFaunaPrey(*Rule, Profile, *TargetProfile, HunterLife, Target->Life, Health, Now))
         return Reject(TEXT("HuntTargetSizeOrMaturity"));
@@ -268,19 +289,26 @@ bool AEcoCreatureIntegrationSpawner::CanHuntFauna(const FMassEntityManager& EM, 
     const FVector End = EM.GetFragmentDataChecked<FTransformFragment>(Prey).GetTransform().GetLocation();
     if (bCheckVisibility)
         if (const auto* Shelter = FindFaunaShelter(Region.CurrentRegionId, PreyId.SpeciesId, End, 0.);
-            Shelter && Profile.BodyRadius * HunterLife.BodyScale(Now) > Shelter->EntranceRadius) return Reject(TEXT("HuntTargetInRefuge"));
-    const double Radius = bContact ? Profile.AttackReach
+            Shelter && Profile.BodyRadius * HunterLife.BodyWidth(Now, UsesFunctionalTraits()) > Shelter->EntranceRadius) return Reject(TEXT("HuntTargetInRefuge"));
+    const double BaseRadius = bContact ? HuntReach(Profile, HunterLife, Now, UsesFunctionalTraits())
         : Rule->MaxPursuitStart > 0.f ? FMath::Min(Profile.SightRange, Rule->MaxPursuitStart) : Profile.SightRange;
     const double FovCos = FMath::Cos(FMath::DegreesToRadians(Profile.SightHalfAngle));
     if (bCheckVisibility)
     {
-        if (FVector::DistSquared(Start, End) > FMath::Square(Radius)) return Reject(TEXT("HuntOutOfReach"));
+        if (FVector::DistSquared(Start, End) > FMath::Square(BaseRadius)) return Reject(TEXT("HuntOutOfReach"));
         const FVector SightDirection = bHuntingInWater ? (End - Start).GetSafeNormal() : (End - Start).GetSafeNormal2D();
         if (!bContact && FVector::DotProduct(SightDirection, HunterTransform.GetRotation().GetForwardVector()) < FovCos)
             return Reject(TEXT("HuntOutsideView"));
-        if (!HasClearSight(*GetWorld(), Start, End, bHuntingInWater ? 0.f : Profile.EyeHeight,
-                bHuntingInWater ? 0.f : TargetProfile->EyeHeight))
+        const bool bClearSight = bHuntingInWater && UsesPredatorContinuity()
+            ? EcoFaunaDecision::HasClearWaterHuntSight(*GetWorld(), Start, End)
+            : HasClearSight(*GetWorld(), Start, End, bHuntingInWater ? 0.f : Profile.EyeHeight,
+                bHuntingInWater ? 0.f : TargetProfile->EyeHeight);
+        if (!bClearSight)
             return Reject(TEXT("HuntOccluded"));
+        if (!bContact && !bHuntingInWater && HunterFauna.TargetId != PreyId.StableAgentId
+            && FVector::DistSquared(Start, End) > FMath::Square(BaseRadius * CoatDetectionRange(
+                PreyId.SpeciesId, Region.CurrentRegionId, Target->Life.Genome.Coat)))
+            return Reject(TEXT("HuntCoatContrast"));
     }
     if (TargetProfile->OffspringGuardRange <= 0.f && Rule->GuardRadius > 0.f && Target->Life.AgeFraction(Now) < 1.)
     {
@@ -308,6 +336,7 @@ FMassEntityHandle AEcoCreatureIntegrationSpawner::SelectFaunaGuard(const FMassEn
     const auto* Profile = FindFauna(ChildId.SpeciesId);
     if (!Profile || Profile->OffspringGuardRange <= 0.f) return {};
     const FName Region = EM.GetFragmentDataChecked<FEcoRegionFragment>(Child).CurrentRegionId;
+    if (EM.GetFragmentDataChecked<FEcoRegionFragment>(Hunter).CurrentRegionId != Region) return {};
     const FVector YoungPosition = EM.GetFragmentDataChecked<FTransformFragment>(Child).GetTransform().GetLocation();
     const FVector Danger = EM.GetFragmentDataChecked<FTransformFragment>(Hunter).GetTransform().GetLocation();
     if (FVector::DistSquared(YoungPosition, Danger) > FMath::Square(Profile->OffspringGuardRange)) return {};
@@ -318,7 +347,7 @@ FMassEntityHandle AEcoCreatureIntegrationSpawner::SelectFaunaGuard(const FMassEn
         if (!Guard || !EM.IsEntityValid(*Guard)) continue;
         const auto* Adult = EM.GetFragmentDataPtr<FEcoFaunaFragment>(*Guard);
         const auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(*Guard);
-        if (!Adult || Adult->Life.AgeFraction(Now) < 1. || Adult->bRecovering || Adult->Stamina < .30f
+        if (!Adult || Adult->Life.AgeFraction(Now) < 1. || Adult->bRecovering || Adult->Stamina < FamilyGuardMinStamina
             || Adult->Flight != EEcoFaunaFlightPhase::Grounded || Vitals.HP < .55f * Vitals.MaxHP
             || Vitals.Energy < .25f * Vitals.MaxEnergy
             || EM.GetFragmentDataChecked<FEcoIdentityFragment>(*Guard).SpeciesId != ChildId.SpeciesId
@@ -328,9 +357,7 @@ FMassEntityHandle AEcoCreatureIntegrationSpawner::SelectFaunaGuard(const FMassEn
             || !HasClearSight(*GetWorld(), Position, Danger, Profile->EyeHeight)) continue;
         if (ContactHunterProfile)
         {
-            const FVector ContactPoint = FMath::ClosestPointOnSegment(Position, Danger, YoungPosition);
-            if (FVector::DistSquared(Position, ContactPoint) > FMath::Square(Profile->BodyRadius + 35.f)
-                || FVector::DotProduct(Position - YoungPosition, Danger - YoungPosition) <= 0.
+            if (!IsInFamilyGuardLane(Position, Danger, YoungPosition, *Profile, Adult->Life, Now, UsesFunctionalTraits())
                 || !HasClearSight(*GetWorld(), Position, Danger, Profile->EyeHeight, ContactHunterProfile->EyeHeight)) continue;
         }
         return *Guard;
@@ -395,16 +422,20 @@ void AEcoCreatureIntegrationSpawner::ProcessFaunaPredation(double Now)
             const auto& GuardTransform = EM.GetFragmentDataChecked<FTransformFragment>(Guard).GetTransform();
             const FVector GuardPosition = GuardTransform.GetLocation();
             auto& Adult = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Guard);
-            Adult.Stamina = FMath::Max(0.f, Adult.Stamina - .15f);
-            HunterVitals.HP = FMath::Max(0.f, HunterVitals.HP - PreyProfile->DefenseDamage * float(Adult.Life.BodyScale(Now)));
+            const float StaminaBefore = Adult.Stamina;
+            const float HunterHealthBefore = HunterVitals.HP;
+            const double BodyScale = Adult.Life.BodyScale(Now);
+            Adult.Stamina = FMath::Max(0.f, Adult.Stamina - FamilyGuardContactCost);
+            HunterVitals.HP = FMath::Max(0.f, HunterVitals.HP - PreyProfile->DefenseDamage * float(BodyScale));
             if (HunterVitals.HP <= 0.f)
                 EM.GetFragmentDataChecked<FEcoDeathFragment>(Hunter).Cause = EEcoDeathCause::ExternalDamage;
             Fauna->LastThreatPosition = GuardPosition;
             Fauna->ThreatUntil = Now + 2.;
             Fauna->AttackReady = Now + FMath::Max(4.f, Profile->AttackRecovery);
-            UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][GuardIntercept] Guard=%lld Child=%lld Hunter=%lld Species=%s"),
+            UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][GuardIntercept] Guard=%lld Child=%lld Hunter=%lld Species=%s At=%.3f BodyScale=%.5f Damage=%.3f StaminaBefore=%.4f StaminaAfter=%.4f"),
                 EM.GetFragmentDataChecked<FEcoIdentityFragment>(Guard).StableAgentId, PreyId.StableAgentId,
-                HunterId.StableAgentId, *PreyId.SpeciesId.ToString());
+                HunterId.StableAgentId, *PreyId.SpeciesId.ToString(), Now, BodyScale,
+                HunterHealthBefore - HunterVitals.HP, StaminaBefore, Adult.Stamina);
             continue;
         }
         const FVector ToHunter = (HunterPosition - PreyTransform.GetLocation()).GetSafeNormal2D();
@@ -451,8 +482,27 @@ void AEcoCreatureIntegrationSpawner::ProcessFaunaPredation(double Now)
     }
 }
 
+double AEcoCreatureIntegrationSpawner::FaunaCruiseSpeed(
+    const FEcoFaunaSpecies& Profile, const FEcoFaunaFragment& Fauna, double Now) const
+{
+    const double Speed = UsesHeritableFlightSpeed() && Fauna.Life.bInitialized
+        ? Profile.FlightSpeed * Fauna.Life.SpeedScale(Now) : Profile.FlightSpeed;
+    return Speed * Fauna.Life.FunctionalTraits(Now, UsesFunctionalTraits()).DriveScale();
+}
+
+double AEcoCreatureIntegrationSpawner::FaunaFlightStaminaDrain(
+    const FEcoFaunaSpecies& Profile, const FEcoFaunaFragment& Fauna, double HorizontalSpeed) const
+{
+    const double Baseline = .5 * Profile.SprintDrain;
+    if (!UsesHeritableFlightSpeed() || !Fauna.Life.bInitialized || Fauna.Flight != EEcoFaunaFlightPhase::Cruise)
+        return Baseline;
+
+    const double CruiseEffort = FMath::Clamp(HorizontalSpeed / FMath::Max(1., double(Profile.FlightSpeed)), 0., 1.);
+    return Baseline * FMath::Lerp(1., Fauna.Life.Genome.Speed, CruiseEffort);
+}
+
 bool AEcoCreatureIntegrationSpawner::MoveFaunaFlight(const FEcoFaunaSpecies& Profile, FName RegionId,
-    FEcoFaunaFragment& Fauna, const FVector& Position, double Now, double Delta, FVector& Destination) const
+    FEcoFaunaFragment& Fauna, const FVector& Position, double Now, double Delta, bool bExactLanding, FVector& Destination) const
 {
     UWorld& World = *GetWorld();
     const FCollisionObjectQueryParams Static(ECC_WorldStatic);
@@ -515,13 +565,17 @@ bool AEcoCreatureIntegrationSpawner::MoveFaunaFlight(const FEcoFaunaSpecies& Pro
     }
     if (Fauna.Flight == EEcoFaunaFlightPhase::Takeoff && Now >= Fauna.PhaseUntil)
         Fauna.Flight = EEcoFaunaFlightPhase::Cruise;
-    if (Fauna.Flight == EEcoFaunaFlightPhase::Cruise && FVector::DistSquared2D(Position, Fauna.LandingPoint) < FMath::Square(55.))
+    constexpr double LandingTolerance = 2.;
+    const double ApproachTolerance = bExactLanding ? LandingTolerance : 55.;
+    if (Fauna.Flight == EEcoFaunaFlightPhase::Cruise
+        && FVector::DistSquared2D(Position, Fauna.LandingPoint) < FMath::Square(ApproachTolerance))
     {
         Fauna.Flight = EEcoFaunaFlightPhase::Landing;
-        Fauna.LandingPoint = Ground;
+        // A nest approach must settle at its reserved landing point before checking grounded arrival.
+        if (!bExactLanding) Fauna.LandingPoint = Ground;
     }
     if (Fauna.Flight == EEcoFaunaFlightPhase::Landing
-        && FVector::DistSquared2D(Position, Fauna.LandingPoint) > FMath::Square(2.))
+        && FVector::DistSquared2D(Position, Fauna.LandingPoint) > FMath::Square(LandingTolerance))
     {
         if (MoveTowardLanding()) return true;
         Fauna.LandingPoint = Ground;
@@ -532,7 +586,8 @@ bool AEcoCreatureIntegrationSpawner::MoveFaunaFlight(const FEcoFaunaSpecies& Pro
     Destination = Position;
     if (Fauna.Flight == EEcoFaunaFlightPhase::Cruise && AGL >= .6 * Profile.FlightCruiseHeight)
     {
-        Destination += Direction * FMath::Min(Profile.FlightSpeed * Delta, FVector::Dist2D(Position, Fauna.LandingPoint));
+        Destination += Direction * FMath::Min(FaunaCruiseSpeed(Profile, Fauna, Now) * Delta,
+            FVector::Dist2D(Position, Fauna.LandingPoint));
         FVector NextGround;
         if (!GroundAt(Destination, NextGround) || Position.Z > NextGround.Z + Profile.FlightCeiling)
         {
@@ -753,16 +808,17 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
         }
         FRegionEcologyState Origin;
         if (!Ecology->GetRegionState(Region.CurrentRegionId, Origin)) { CancelTravel(); continue; }
-        const double WaterClearance = bAquatic ? FMath::Max(1., Species->BodyRadius * Fauna->Life.BodyScale(Now) * .65) : 1.;
-        const float BodyScale = Fauna->Life.BodyScale(Now);
-        const float GroundRadius = FMath::Clamp(Species->BodyRadius * BodyScale, 1.f, 120.f);
+        const double WaterClearance = bAquatic ? Species->SwimBodyClearance(Fauna->Life.SwimBody(Now, UsesFunctionalTraits())) : 1.;
+        const float BodyWidth = Fauna->Life.BodyWidth(Now, UsesFunctionalTraits());
+        const float BodyHeight = Fauna->Life.BodyHeight(Now, UsesFunctionalTraits());
+        const float GroundRadius = FMath::Clamp(Species->BodyRadius * BodyWidth, 1.f, 120.f);
         const double HealthFraction = FMath::Clamp(double(Vitals.HP / FMath::Max(1.f, Vitals.MaxHP)), 0., 1.);
         const double WalkCondition = Species->bIndividualResponse
             ? FMath::Lerp(.55, 1., HealthFraction) * FMath::Lerp(.75, 1., double(Fauna->Stamina)) : 1.;
         const auto IsGroundStepUsable = [&](const FVector& From, FVector& To)
         {
             return EcoCreatureMovement::ConstrainGroundStep(*GetWorld(), From, To, GroundRadius,
-                    Species->MinGroundNormalZ, Species->SweepHeight * BodyScale, Species->StepHeight)
+                    Species->MinGroundNormalZ, Species->SweepHeight * BodyHeight, Species->StepHeight)
                 && FMath::Abs(To.Z - From.Z) <= Species->StepHeight
                 && EcoCreatureMovement::IsWadeableGround(*GetWorld(), To, Species->WadeDepth);
         };
@@ -819,7 +875,7 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
             const auto* PlantRegion = Context ? FindRegion(AccessPoint) : nullptr;
             const double PlantStock = bLocalPlants
                 ? (PlantRegion && PlantRegion->RegionId == Area && FindNearbyForage(*GetWorld(), Context, *PlantRegion,
-                    AccessPoint, *Species, BodyScale, PlantSite)
+                    AccessPoint, *Species, BodyWidth, BodyHeight, PlantSite)
                     && FVector::Dist2D(AccessPoint, PlantSite) < GroundReach ? LocalPlantStock(Context, PlantSite) : 0.)
                 : State.FoodAmount;
             const double PlantMeals = Species->UsesPlantFood()
@@ -985,8 +1041,9 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
                     const auto& Survival = EM.GetFragmentDataChecked<FEcoCreatureSurvivalFragment>(Entity).Settings;
                     const double Demand = UsesFaunaPersistence()
                         ? FMath::Max(Fauna->MaintenanceScale, GroundMaintenanceDemand(*Species, Speed)) : Fauna->MaintenanceScale;
-                    EnergyCost = TravelSeconds * (Survival.BaseMetabolism * Demand + Survival.TravelMetabolism);
-                    const double GroundDemand = Survival.BaseMetabolism * Demand;
+                    const double GroundDemand = Fauna->ScaleMaintenance(Survival.BaseMetabolism * Demand,
+                        UsesHeritableFaunaMaintenance(), Time.ServerTimeSeconds, UsesFunctionalTraits());
+                    EnergyCost = TravelSeconds * (GroundDemand + Survival.TravelMetabolism);
                     if (GroundDemand > 0.)
                         GroundReach = Speed * FMath::Max(0., double(Vitals.Energy) - EnergyCost) / GroundDemand;
                 }
@@ -1162,11 +1219,39 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
     if (FootstepAudioSet && !FootstepAudioSet->Profiles.IsEmpty())
         if (auto* Noise = GetWorld()->GetSubsystem<UEcoNoiseSubsystem>()) Noise->GatherRecent(Steps);
     TSet<int64> NestingParents;
+    TMap<int64, FVector> AquaticNurseryGoals;
+    TMap<int64, FVector> BroodLandings;
+    const bool bPredatorContinuity = UsesPredatorContinuity();
     NestingParents.Reserve(FaunaBirths.Num() * 2);
     for (const auto& Birth : FaunaBirths)
     {
         NestingParents.Add(Birth.ParentA);
         NestingParents.Add(Birth.ParentB);
+        if (bPredatorContinuity && !Birth.NestId.IsNone())
+        {
+            const auto* Site = FaunaPerches.FindByPredicate([&](const FEcoFaunaPerch& Candidate)
+            {
+                return Candidate.NestId == Birth.NestId && Candidate.RegionId == Birth.Region && Candidate.SpeciesId == Birth.Species;
+            });
+            if (Site)
+            {
+                BroodLandings.Add(Birth.ParentA, Site->Location + FVector(65., 0., 0.));
+                BroodLandings.Add(Birth.ParentB, Site->Location - FVector(65., 0., 0.));
+            }
+        }
+        if (UsesAquaticNurseryApproach() && !Birth.NurseryId.IsNone())
+        {
+            const auto* Site = FaunaHabitatPatches.FindByPredicate([&](const FEcoFaunaHabitatPatch& Patch)
+            {
+                return Patch.Id == Birth.NurseryId && Patch.RegionId == Birth.Region && Patch.Stage <= FaunaHabitatStage
+                    && Patch.bAquaticNursery && Patch.Consumers.Contains(Birth.Species);
+            });
+            if (Site)
+            {
+                AquaticNurseryGoals.Add(Birth.ParentA, Site->Center);
+                AquaticNurseryGoals.Add(Birth.ParentB, Site->Center);
+            }
+        }
     }
     TMap<int64, FVector> ProvisionLandings;
     if (FaunaPerches.ContainsByPredicate([](const auto& Site) { return !Site.NestId.IsNone(); }))
@@ -1187,35 +1272,66 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     && FVector::DistSquared(Candidate.Location, Young->Home) <= FMath::Square(90.);
             });
             if (!Site) continue;
-            const FVector Landing = Site->Location + (Site->Location - Young->Home).GetSafeNormal2D() * 30.;
-            ProvisionLandings.FindOrAdd(Young->Life.ParentA, Landing);
-            ProvisionLandings.FindOrAdd(Young->Life.ParentB, Landing);
+            const FVector NestSide = (Site->Location - Young->Home).GetSafeNormal2D(UE_SMALL_NUMBER, FVector::ForwardVector);
+            const FVector Landing = Site->Location + NestSide * 30.;
+            // Keep both approaches within feeding range while leaving room for the chick and the other parent.
+            const FVector Spacing = bPredatorContinuity ? FVector::CrossProduct(FVector::UpVector, NestSide) * 52. : FVector::ZeroVector;
+            ProvisionLandings.FindOrAdd(Young->Life.ParentA, Landing + Spacing);
+            ProvisionLandings.FindOrAdd(Young->Life.ParentB, Landing - Spacing);
         }
     }
-    struct FGuardGoal { FVector Position; int64 HunterId; double Urgency; };
+    struct FGuardGoal { FVector Position; int64 HunterId; double Urgency; bool bSprint; };
     TMap<FMassEntityHandle, FGuardGoal> GuardGoals;
+    for (auto It = FamilyGuardWatches.CreateIterator(); It; ++It)
+        if (Now >= It.Value().Until) It.RemoveCurrent();
     for (const auto Hunter : Owned)
     {
         const auto* Attack = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Hunter);
-        if (!Attack || Attack->TargetId <= 0 || EM.GetFragmentDataChecked<FEcoVitalsFragment>(Hunter).HP <= 0.f) continue;
-        const auto* Child = AgentLookup.Find(Attack->TargetId);
+        if (!Attack) continue;
+        const int64 HunterId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Hunter).StableAgentId;
+        if (EM.GetFragmentDataChecked<FEcoVitalsFragment>(Hunter).HP <= 0.f || Attack->bSwimming || Now < Attack->ThreatUntil)
+        {
+            FamilyGuardWatches.Remove(HunterId);
+            continue;
+        }
+        const auto* Watch = FamilyGuardWatches.Find(HunterId);
+        const bool bPursuing = Attack->TargetId > 0;
+        const int64 ChildId = bPursuing ? Attack->TargetId : Watch ? Watch->Child : 0;
+        if (bPursuing && Watch && Watch->Child != ChildId) FamilyGuardWatches.Remove(HunterId);
+        if (ChildId <= 0) continue;
+        const auto* Child = AgentLookup.Find(ChildId);
         if (!Child || !EM.IsEntityValid(*Child) || EM.GetFragmentDataChecked<FEcoVitalsFragment>(*Child).HP <= 0.f) continue;
         const auto Guard = SelectFaunaGuard(EM, *Child, Hunter, Now);
         if (!Guard.IsSet()) continue;
+        const int64 GuardId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Guard).StableAgentId;
+        if (bPursuing)
+            FamilyGuardWatches.Add(HunterId, {ChildId, GuardId, Now + FamilyGuardWatchSeconds});
+        else if (GuardId != Watch->Witness) continue;
         const FVector Young = EM.GetFragmentDataChecked<FTransformFragment>(*Child).GetTransform().GetLocation();
         const FVector Threat = EM.GetFragmentDataChecked<FTransformFragment>(Hunter).GetTransform().GetLocation();
-        const FVector Between = Young + (Threat - Young).GetSafeNormal2D() * FMath::Min(100., FVector::Dist2D(Young, Threat) * .5);
-        const int64 HunterId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Hunter).StableAgentId;
         const double Distance = FVector::DistSquared(Young, Threat);
         const auto* Current = GuardGoals.Find(Guard);
         if (!Current || Distance < Current->Urgency || (Distance == Current->Urgency && HunterId < Current->HunterId))
-            GuardGoals.Add(Guard, {Between, HunterId, Distance});
+        {
+            const FVector GuardPosition = EM.GetFragmentDataChecked<FTransformFragment>(Guard).GetTransform().GetLocation();
+            const auto& Adult = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Guard);
+            const auto* Profile = FindFauna(EM.GetFragmentDataChecked<FEcoIdentityFragment>(Guard).SpeciesId);
+            const bool bInLane = IsInFamilyGuardLane(GuardPosition, Threat, Young, *Profile, Adult.Life, Now, UsesFunctionalTraits());
+            const FVector Between = Young + (Threat - Young).GetSafeNormal2D() * FMath::Min(100., FVector::Dist2D(Young, Threat) * .5);
+            const double Gap = FVector::Dist2D(GuardPosition, Between);
+            const bool bHold = bInLane && Gap <= FMath::Min(18., .8 * Profile->BodyRadius);
+            // Track the moving calf when the screen shifts. Keep enough stamina to take the contact.
+            const double CatchUpGap = 2. * Profile->BodyRadius * Adult.Life.BodyWidth(Now, UsesFunctionalTraits());
+            const bool bSprint = bPursuing && !bHold && (Attack->AttackContact >= Now || Gap > CatchUpGap)
+                && Adult.Stamina > FamilyGuardMinStamina + FamilyGuardContactCost;
+            GuardGoals.Add(Guard, {bHold ? GuardPosition : Between, HunterId, Distance, bSprint});
+        }
     }
     if (FaunaInteractionMode == 2 && bAuthorityWorld)
         for (const auto& Pair : FaunaInterpositions)
             if (const auto* Defender = AgentLookup.Find(Pair.Key); Defender && Now < Pair.Value.Until
                 && EM.IsEntityValid(*Defender) && !GuardGoals.Contains(*Defender))
-                GuardGoals.Add(*Defender, {Pair.Value.Position, Pair.Value.Hunter, 0.});
+                GuardGoals.Add(*Defender, {Pair.Value.Position, Pair.Value.Hunter, 0., true});
     for (const auto Entity : Owned)
     {
         auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
@@ -1291,20 +1407,26 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
         const float ExposedHeat = Heat * (1.f - LocalRelief);
         const double HealthFraction = FMath::Clamp(double(Vitals.HP / FMath::Max(1.f, Vitals.MaxHP)), 0., 1.);
         const double Caution = Species->bIndividualResponse ? Fauna->Life.Genome.Caution : 1.;
+        const auto Traits = Fauna->Life.FunctionalTraits(Now, UsesFunctionalTraits());
+        const double StrikeReach = HuntReach(*Species, Fauna->Life, Now, UsesFunctionalTraits());
+        Fauna->FunctionalEffort = 0.f;
         const double PhysicalCondition = Species->bIndividualResponse
             ? FMath::Lerp(.55, 1., HealthFraction) * FMath::Lerp(.75, 1., double(Fauna->Stamina)) : 1.;
         const bool bAmphibious = Species->Locomotion == EEcoFaunaLocomotion::Amphibious;
+        const bool bCompareShoreFood = bPredatorContinuity && bAmphibious;
         if (Species->IsAquatic() || Fauna->bSwimming)
         {
-            MoveFaunaInWater(EM, Entity, *Species, Delta, Now, PhysicalCondition, Darkness, bAdaptiveMeal);
+            MoveFaunaInWater(EM, Entity, *Species, Delta, Now, PhysicalCondition, Darkness, bAdaptiveMeal, ActivityBlend,
+                AquaticNurseryGoals.Find(Id.StableAgentId));
             continue;
         }
+        const float BodyWidth = Fauna->Life.BodyScale(Now) * Traits.WidthScale();
+        const float BodyHeight = Fauna->Life.BodyScale(Now) * Traits.HeightScale();
         const auto CanMoveOnGround = [&](FVector& Destination)
         {
-            const double BodyScale = Fauna->Life.BodyScale(Now);
-            const float Radius = FMath::Clamp(float(Species->BodyRadius * BodyScale), 1.f, 120.f);
+            const float Radius = FMath::Clamp(Species->BodyRadius * BodyWidth, 1.f, 120.f);
             if (!EcoCreatureMovement::ConstrainGroundStep(*GetWorld(), Position, Destination, Radius, Species->MinGroundNormalZ,
-                    Species->SweepHeight * float(BodyScale), Species->StepHeight)) return false;
+                    Species->SweepHeight * BodyHeight, Species->StepHeight)) return false;
             const auto* DestinationRegion = FindRegion(Destination);
             return DestinationRegion && DestinationRegion->RegionId == Region.CurrentRegionId
                 && FMath::Abs(Destination.Z - Position.Z) <= Species->StepHeight
@@ -1335,14 +1457,18 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
             }
             Fauna->ShorePhase = EEcoFaunaShorePhase::None;
         }
-        if (bAmphibious && Now >= Fauna->PhaseUntil && Now >= Fauna->ThreatUntil && Fauna->TargetId == 0
-            && Vitals.Energy <= Species->MealStart() * Vitals.MaxEnergy && Fauna->Stamina >= .3f)
+        const auto TryShoreFood = [&](double LandScore, bool bAuditChoice)
         {
+            if (!bAmphibious || Now < Fauna->PhaseUntil || Now < Fauna->ThreatUntil || Fauna->TargetId != 0
+                || Vitals.Energy > Species->MealStart() * Vitals.MaxEnergy || Fauna->Stamina < .3f) return false;
             int32 Best = INDEX_NONE;
             int64 SelectedPrey = 0;
             bool bSelectedPatchUsable = false;
-            double Score = 0.;
-            const double Clearance = FMath::Max(1., Species->BodyRadius * Fauna->Life.BodyScale(Now) * .65);
+            double Score = LandScore;
+            const double Clearance = Species->SwimBodyClearance(Fauna->Life.BodyScale(Now) * Traits.SwimClearanceScale());
+            const double LandSpeed = bCompareShoreFood
+                ? Species->WalkSpeed * Fauna->Life.SpeedScale(Now) * PhysicalCondition : Species->WalkSpeed;
+            const double SwimSpeed = LandSpeed * Traits.DriveScale() * FMath::Lerp(.45, 1., double(Species->RoutineActivity(Darkness)));
             FVector Entry = FVector::ZeroVector;
             FVector FoodGoal = FVector::ZeroVector;
             for (int32 Index = 0; Index < FaunaHabitatPatches.Num(); ++Index)
@@ -1366,13 +1492,22 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     && EcoCreatureMovement::HasClearWaterSight(*GetWorld(), Patch.WaterEntryPoint, Patch.Center)
                     && EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId, Patch.Center, Clearance, PatchWater)
                     && Patch.Center.Z > PatchWater.Bottom && Patch.Center.Z < PatchWater.Surface;
-                double Value = bPatchUsable ? RankFaunaFood(EcoFaunaFeeding::Value(FMath::Min(FaunaPatchStock[Index], Patch.EnergyPerMeal),
-                    (Distance + FVector::Dist(Patch.Center, Patch.WaterEntryPoint) * 2.) / Species->WalkSpeed),
+                const double ShoreSeconds = Distance / LandSpeed;
+                const double SwimDistance = 2. * FVector::Dist(Patch.Center, Patch.WaterEntryPoint);
+                const double PatchSeconds = bCompareShoreFood ? ShoreSeconds + SwimDistance / SwimSpeed
+                    : (Distance + SwimDistance) / Species->WalkSpeed;
+                const float Meal = FMath::Min(FaunaPatchStock[Index], Patch.EnergyPerMeal);
+                const float Payable = bCompareShoreFood ? FMath::Min(Meal, Vitals.MaxEnergy - Vitals.Energy) : Meal;
+                double Value = bPatchUsable ? RankFaunaFood(EcoFaunaFeeding::Value(Payable,
+                    PatchSeconds),
                     Id.StableAgentId, Region.CurrentRegionId, Now, EEcoFaunaFoodIntent::HabitatPatch,
                     0, Patch.Id, NAME_None, 0, true) : 0.;
                 FVector Goal = Patch.Center;
                 const int64 Prey = FindFaunaWaterPrey(EM, Entity, *Species, Patch.WaterEntryPoint, Now, false,
-                    2. + Distance / Species->WalkSpeed, Value, Goal);
+                    2. + ShoreSeconds, Value, Goal, bCompareShoreFood ? SwimSpeed : 0.);
+                if (bAuditChoice)
+                    UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Event=ShoreFoodChoice At=%.6f Land=%.6g Water=%.6g Site=%s"),
+                        Id.StableAgentId, Now, LandScore, Value, *Patch.Id.ToString());
                 if (Value <= Score) continue;
                 Score = Value;
                 Best = Index;
@@ -1388,13 +1523,14 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 const FVector Offset = Patch.ShorePoint - Position;
                 if (Offset.SizeSquared2D() > FMath::Square(12.))
                 {
-                    FVector Destination = Position + Offset.GetSafeNormal2D() * FMath::Min(Offset.Size2D(), Species->WalkSpeed * Dt);
+                    FVector Destination = Position + Offset.GetSafeNormal2D() * FMath::Min(Offset.Size2D(), LandSpeed * Dt);
                     if (CanMoveOnGround(Destination))
                     {
                         Transform.SetLocation(Destination);
                         Velocity = (Destination - Position) / Delta;
                         Transform.SetRotation(Velocity.GetSafeNormal2D().ToOrientationQuat());
-                        continue;
+                        if (bCompareShoreFood) Fauna->PatchTarget = INDEX_NONE;
+                        return true;
                     }
                 }
                 else
@@ -1423,24 +1559,27 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                         Fauna->PatchTarget = bSelectedPatchUsable ? Best : INDEX_NONE;
                         Fauna->PatchAccessPoint = 0;
                         Fauna->TargetId = SelectedPrey;
-                        Fauna->CarrionTargetId = 0;
+                        if (!bCompareShoreFood) Fauna->CarrionTargetId = 0;
                         Fauna->ShorePhase = EEcoFaunaShorePhase::Entering;
                         Fauna->bSwimming = true;
                         if (SelectedPrey > 0)
                             RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("WaterPreyAtEntry"), SelectedPrey);
-                        continue;
+                        return true;
                     }
                 }
                 Fauna->BlockedPatch = Best;
                 Fauna->PatchBlockedUntil = Now + 3.;
             }
-        }
+            return false;
+        };
+        if (!bCompareShoreFood && TryShoreFood(0., false)) continue;
         ON_SCOPE_EXIT
         {
+            const float FullSpeed = Fauna->Flight == EEcoFaunaFlightPhase::Grounded ? Species->RunSpeed : Species->FlightSpeed;
+            const float Activity = float(FMath::Clamp(Velocity.Size() / FullSpeed, 0., 1.));
+            Fauna->FunctionalEffort = Activity;
             if (bPersistence && Vitals.HP > 0.f)
             {
-                const float FullSpeed = Fauna->Flight == EEcoFaunaFlightPhase::Grounded ? Species->RunSpeed : Species->FlightSpeed;
-                const float Activity = float(FMath::Clamp(Velocity.Size() / FullSpeed, 0., 1.));
                 const float BaseDemand = Fauna->Flight == EEcoFaunaFlightPhase::Grounded
                     ? GroundMaintenanceDemand(*Species, Velocity.Size())
                     : FMath::Lerp(Species->RestingMaintenanceFraction, 1.f, Activity);
@@ -1466,7 +1605,17 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 Fauna->NextSense = FMath::Max(Fauna->NextSense, AirCue->Until);
                 ApplyFaunaReaction(Id.StableAgentId, Now);
             }
-            if (Species->bCanDiveHunt && Fauna->Flight == EEcoFaunaFlightPhase::Cruise
+            const auto MatchesNestLanding = [&](const FVector* Site)
+            {
+                // Match the live purpose to the saved landing point after its terrain projection.
+                return Site && FVector::DistSquared2D(Fauna->LandingPoint, *Site) <= FMath::Square(.5)
+                    && FMath::Abs(Fauna->LandingPoint.Z - Site->Z) <= 30.;
+            };
+            const bool bCommittedNestLanding = bPredatorContinuity
+                && ((Vitals.Energy > .55f * Vitals.MaxEnergy && MatchesNestLanding(ProvisionLandings.Find(Id.StableAgentId)))
+                    || (Vitals.Energy >= EcoLifeV3::FIndividual::MinimumParentEnergy * Vitals.MaxEnergy
+                        && MatchesNestLanding(BroodLandings.Find(Id.StableAgentId))));
+            if (!bCommittedNestLanding && Species->bCanDiveHunt && Fauna->Flight == EEcoFaunaFlightPhase::Cruise
                 && Vitals.HP > 0.f && Now >= Fauna->NextSense && Now >= Fauna->AttackReady
                 && Now >= Fauna->ThreatUntil && Fauna->Stamina >= .35f
                 && Vitals.Energy < Species->MealStart() * Vitals.MaxEnergy)
@@ -1493,7 +1642,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     }
                     const FVector Target = EM.GetFragmentDataChecked<FTransformFragment>(Prey).GetTransform().GetLocation();
                     const auto* PreyProfile = FindFauna(PreyId.SpeciesId);
-                    if (Position.Z - Target.Z < Species->AttackReach
+                    if (Position.Z - Target.Z < StrikeReach
                         || Position.Z - Target.Z > Species->FlightCruiseHeight) continue;
                     const double Risk = Caution * PreyProfile->DefenseDamage + (1. - Fauna->Stamina) * 5.;
                     const double Score = RankFaunaFood(EcoFaunaFeeding::Value(Species->PredationEnergyPerMeal() * Rule->Preference,
@@ -1508,7 +1657,50 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     Fauna->TargetId = PreyId.StableAgentId;
                     Fauna->LandingPoint = Target;
                 }
-                if (BestScore > 0.)
+                int64 LandingCarcass = 0;
+                FVector CarcassLanding = FVector::ZeroVector;
+                if (bPredatorContinuity && Species->CarrionEnergyPerMeal > 0.f)
+                {
+                    const double Speed = FMath::Max(1., FaunaCruiseSpeed(*Species, *Fauna, Now));
+                    for (const auto& Pair : FaunaCarcasses)
+                    {
+                        const auto& Food = Pair.Value;
+                        if (!Food.IsAvailable(Region.CurrentRegionId, *Species, Now)
+                            || !Food.CanApproach(Id.StableAgentId, Now)
+                            || FVector::DistSquared(Position, Food.Position) > FMath::Square(Species->SightRange)) continue;
+                        FVector Landing;
+                        const double Reach = .8 * Species->CarrionReach();
+                        if (!EcoCreatureMovement::ProjectSpawnPoint(*GetWorld(), Food.Position, Landing)
+                            || FVector::DistSquared(Landing, Food.Position) > FMath::Square(Reach)
+                            || !EcoCreatureMovement::IsWadeableGround(*GetWorld(), Landing, 0.f)
+                            || Landing.Z > Position.Z
+                            || !HasClearSight(*GetWorld(), Position, Food.Position, 0.f, 5.f)) continue;
+                        const auto* SiteRegion = FindRegion(Landing);
+                        if (!SiteRegion || SiteRegion->RegionId != Region.CurrentRegionId) continue;
+                        const double Approach = FVector::Dist2D(Position, Landing) / Speed
+                            + (Position.Z - Landing.Z) / (.65 * Species->FlightSpeed);
+                        if (Now + Approach + 1. >= Food.ExpiresAt) continue;
+                        const double MealEnergy = FMath::Min3(Food.Remaining, Species->CarrionEnergyPerMeal,
+                            Vitals.MaxEnergy - Vitals.Energy);
+                        const double Score = RankFaunaFood(EcoFaunaFeeding::Value(MealEnergy, Approach + 1.),
+                            Id.StableAgentId, Region.CurrentRegionId, Now, EEcoFaunaFoodIntent::Carcass, Pair.Key,
+                            NAME_None, NAME_None, 0, false, EEcoEncounterMedium::Air);
+                        if (Score <= 0. || Score < BestScore
+                            || (Score == BestScore && (LandingCarcass == 0 || Pair.Key >= LandingCarcass))) continue;
+                        BestScore = Score;
+                        LandingCarcass = Pair.Key;
+                        CarcassLanding = Landing;
+                    }
+                }
+                if (LandingCarcass > 0)
+                {
+                    Fauna->TargetId = 0;
+                    Fauna->CarrionTargetId = LandingCarcass;
+                    Fauna->LandingPoint = CarcassLanding;
+                    Fauna->Flight = EEcoFaunaFlightPhase::Landing;
+                    RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("FlightCarrionLanding"), LandingCarcass);
+                }
+                else if (BestScore > 0.)
                 {
                     Fauna->Flight = EEcoFaunaFlightPhase::Dive;
                     Fauna->ChaseBegan = Now;
@@ -1517,13 +1709,14 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
             }
             if (Fauna->Flight == EEcoFaunaFlightPhase::Dive && Vitals.HP > 0.f)
             {
-                if (Fauna->AttackContact >= 0.) continue;
+                const bool bContactPending = Fauna->AttackContact >= 0.;
+                if (bContactPending && !bPredatorContinuity) continue;
                 const auto* Prey = AgentLookup.Find(Fauna->TargetId);
-                if (Prey && Now - Fauna->ChaseBegan < Species->PursuitLimitSeconds
+                if (Prey && (bContactPending || Now - Fauna->ChaseBegan < Species->PursuitLimitSeconds)
                     && CanHuntFauna(EM, Entity, *Prey, *Species, Now, false, true))
                 {
                     const FVector Target = EM.GetFragmentDataChecked<FTransformFragment>(*Prey).GetTransform().GetLocation();
-                    const FVector Contact = Target + FVector(0., 0., Species->AttackReach * .38);
+                    const FVector Contact = Target + FVector(0., 0., StrikeReach * .38);
                     const FVector Destination = Position + (Contact - Position).GetClampedToMaxSize(
                         Species->FlightSpeed * Dt * PhysicalCondition);
                     const auto* NextRegion = FindRegion(Destination);
@@ -1537,14 +1730,19 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                         Velocity = (Destination - Position) / Delta;
                         Transform.SetLocation(Destination);
                         if (!Velocity.IsNearlyZero()) Transform.SetRotation(Velocity.ToOrientationQuat());
-                        Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - Species->SprintDrain * float(Dt));
-                        if (CanHuntFauna(EM, Entity, *Prey, *Species, Now, true, true))
+                        Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - Species->SprintDrain * float(Dt * Traits.ActiveCost()));
+                        if (!bContactPending && CanHuntFauna(EM, Entity, *Prey, *Species, Now, true, true))
                         {
                             Fauna->AttackContact = Now + Species->AttackWindup;
                             RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("DiveContactQueued"), Fauna->TargetId);
                         }
                         continue;
                     }
+                }
+                if (bContactPending)
+                {
+                    Velocity = FVector::ZeroVector;
+                    continue;
                 }
                 if (Prey && EM.IsEntityValid(*Prey) && Now - Fauna->ChaseBegan >= Species->PursuitLimitSeconds
                     && CanHuntFauna(EM, Entity, *Prey, *Species, Now, false, true))
@@ -1562,11 +1760,15 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 Fauna->PhaseUntil = Now;
             }
             FVector Destination;
-            if (MoveFaunaFlight(*Species, Region.CurrentRegionId, *Fauna, Position, Now, Dt, Destination))
+            if (MoveFaunaFlight(*Species, Region.CurrentRegionId, *Fauna, Position, Now, Dt, bCommittedNestLanding, Destination))
             {
                 Velocity = (Destination - Position) / Delta;
                 Transform.SetLocation(Destination);
-                if (Vitals.HP > 0.f) Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - .5f * Species->SprintDrain * float(Dt));
+                if (Vitals.HP > 0.f)
+                {
+                    const double Drain = FaunaFlightStaminaDrain(*Species, *Fauna, Velocity.Size2D()) * Traits.ActiveCost();
+                    Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - float(Drain) * float(Dt));
+                }
                 if (Vitals.HP <= 0.f && Fauna->Flight == EEcoFaunaFlightPhase::Grounded)
                 {
                     Fauna->PhaseUntil = Now;
@@ -1648,6 +1850,13 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                         || (Distance > ThreatNearRangeSq && FVector::DotProduct(
                             Offset.GetSafeNormal2D(), Transform.GetRotation().GetForwardVector()) < ThreatFovCos)) continue;
                     const auto& HunterId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Other);
+                    if (!bWasThreatened && Distance > ThreatNearRangeSq)
+                    {
+                        const auto* NativeHunter = EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Other);
+                        const double Coat = Threat ? Threat->Life.Genome.Coat : NativeHunter ? NativeHunter->Individual.Genome.Coat : 1.;
+                        if (Distance > FMath::Square(VisualThreatRange * CoatDetectionRange(
+                            HunterId.SpeciesId, Region.CurrentRegionId, Coat))) continue;
+                    }
                     const auto* Hunter = FindFauna(HunterId.SpeciesId);
                     if (Hunter && !CanHuntFauna(EM, Other, Entity, *Hunter, Now, false, false)) continue;
                     SeenHunterId = HunterId.StableAgentId;
@@ -1788,9 +1997,43 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 ApplyFaunaReaction(Id.StableAgentId, Now);
                 if (Social->Escape.IsNearlyZero()) continue;
             }
-            const bool bFleeing = !Guard && (bDirectFlee || Social);
+            bool bFleeing = !Guard && (bDirectFlee || Social);
             TOptional<FVector> ShelterMovementGoal;
             bool bHeadingToShelterMouth = false;
+            const bool bCoveredRefugeForage = UsesCoveredRefugeForage();
+            const auto IsCoveredRefuge = [&](const FEcoFaunaHabitatPatch& Patch)
+            {
+                return !Patch.ShelterApproachPoints.IsEmpty() && Patch.Stage <= FaunaHabitatStage
+                    && Patch.RegionId == Region.CurrentRegionId && Patch.ShelteredSpecies == Id.SpeciesId;
+            };
+            struct FRefugeRoute { FVector Goal; double Length; bool bThroughMouth; };
+            const auto ClearRefugeLeg = [&](const FVector& From, const FVector& To)
+            {
+                const float BodyRadius = FMath::Clamp(Species->BodyRadius * BodyWidth, 1.f, 120.f);
+                const FVector Lift(0., 0., FMath::Max(BodyRadius + 1.f, Species->SweepHeight * BodyHeight));
+                return !GetWorld()->SweepTestByChannel(From + Lift, To + Lift, FQuat::Identity, ECC_WorldStatic,
+                    FCollisionShape::MakeSphere(BodyRadius), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaShelterLeg)))
+                    && !EcoCreatureMovement::CrossesExcludedArea(*GetWorld(), From, To);
+            };
+            const auto FindRefugeRoute = [&](const FEcoFaunaHabitatPatch& Patch, const FVector& Origin,
+                double MaxLength) -> TOptional<FRefugeRoute>
+            {
+                const double DirectLength = FVector::Dist(Origin, Patch.Center);
+                if (DirectLength >= MaxLength) return {};
+                if (ClearRefugeLeg(Origin, Patch.Center) && HasClearSight(*GetWorld(), Origin, Patch.Center, Species->EyeHeight, 5.f))
+                    return FRefugeRoute{Patch.Center, DirectLength, false};
+                TOptional<FRefugeRoute> Best;
+                for (const FVector& Mouth : Patch.ShelterApproachPoints)
+                {
+                    const double Length = FVector::Dist(Origin, Mouth) + FVector::Dist(Mouth, Patch.Center);
+                    if (Length >= (Best ? Best->Length : MaxLength)) continue;
+                    if (ClearRefugeLeg(Origin, Mouth) && ClearRefugeLeg(Mouth, Patch.Center)
+                        && HasClearSight(*GetWorld(), Origin, Mouth, Species->EyeHeight, 5.f))
+                        Best = FRefugeRoute{Mouth, Length, true};
+                }
+                return Best;
+            };
+            constexpr double RefugeRange = 650.;
             if (bFleeing)
             {
                 if (bDirectFlee && !bWasThreatened)
@@ -1808,53 +2051,39 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     Id.StableAgentId, Now);
                 Fauna->PatchTarget = Shelter && (bShelterApproach || HasClearSight(*GetWorld(), Position, Shelter->Center, Species->EyeHeight, 5.f))
                     ? int32(Shelter - FaunaHabitatPatches.GetData()) : INDEX_NONE;
-                const float BodyScale = float(Fauna->Life.BodyScale(Now));
-                const float BodyRadius = FMath::Clamp(Species->BodyRadius * BodyScale, 1.f, 120.f);
-                const FVector Lift(0., 0., FMath::Max(BodyRadius + 1.f, Species->SweepHeight * BodyScale));
-                const auto ClearShelterLeg = [&](const FVector& From, const FVector& To)
-                {
-                    return !GetWorld()->SweepTestByChannel(From + Lift, To + Lift, FQuat::Identity, ECC_WorldStatic,
-                        FCollisionShape::MakeSphere(BodyRadius), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaShelterLeg)))
-                        && !EcoCreatureMovement::CrossesExcludedArea(*GetWorld(), From, To);
-                };
                 const auto RefugePreference = [&](const FEcoFaunaHabitatPatch& Patch) {
                     return ExperiencePreference(Id.StableAgentId,
                         {EEcoExperienceActivity::Refuge, Region.CurrentRegionId, Patch.Id}, Now);
                 };
-                constexpr double RefugeRange = 650.;
                 double BestRefugeCost = Shelter && Shelter->ShelterApproachPoints.IsEmpty() && Fauna->PatchTarget != INDEX_NONE
                     ? FVector::Dist(Position, Shelter->Center) / RefugePreference(*Shelter) : RefugeRange;
                 for (int32 Index = 0; Index < FaunaHabitatPatches.Num(); ++Index)
                 {
                     const auto& Patch = FaunaHabitatPatches[Index];
-                    if (Patch.ShelterApproachPoints.IsEmpty() || Patch.Stage > FaunaHabitatStage
-                        || Patch.RegionId != Region.CurrentRegionId || Patch.ShelteredSpecies != Id.SpeciesId) continue;
+                    if (!IsCoveredRefuge(Patch)) continue;
                     const double Preference = RefugePreference(Patch);
                     const double CenterDistance = FVector::Dist(Position, Patch.Center);
                     if (CenterDistance >= RefugeRange || CenterDistance / Preference >= BestRefugeCost) continue;
                     if (Fauna->PatchTarget == Index) Fauna->PatchTarget = INDEX_NONE;
-                    const auto Consider = [&](const FVector& Goal, double Length, bool bMouth)
+                    if (const auto Route = FindRefugeRoute(Patch, Position, FMath::Min(RefugeRange, BestRefugeCost * Preference)))
                     {
-                        const double Cost = Length / Preference;
-                        if (Length >= RefugeRange || Cost >= BestRefugeCost) return;
-                        BestRefugeCost = Cost;
-                        ShelterMovementGoal = Goal;
-                        bHeadingToShelterMouth = bMouth;
+                        BestRefugeCost = Route->Length / Preference;
+                        ShelterMovementGoal = Route->Goal;
+                        bHeadingToShelterMouth = Route->bThroughMouth;
                         Fauna->PatchTarget = Index;
-                    };
-                    if (ClearShelterLeg(Position, Patch.Center)
-                        && HasClearSight(*GetWorld(), Position, Patch.Center, Species->EyeHeight, 5.f))
-                    {
-                        Consider(Patch.Center, FVector::Dist(Position, Patch.Center), false);
-                        continue;
                     }
-                    for (const FVector& Mouth : Patch.ShelterApproachPoints)
-                    {
-                        const double Length = FVector::Dist(Position, Mouth) + FVector::Dist(Mouth, Patch.Center);
-                        if (Length < RefugeRange && Length / Preference < BestRefugeCost
-                            && ClearShelterLeg(Position, Mouth) && ClearShelterLeg(Mouth, Patch.Center)
-                            && HasClearSight(*GetWorld(), Position, Mouth, Species->EyeHeight, 5.f)) Consider(Mouth, Length, true);
-                    }
+                }
+            }
+            else if (bCoveredRefugeForage && !Guard && !bPassageTravel && Fauna->ThreatUntil >= 0.
+                && Now - Fauna->ThreatUntil < 3. && FaunaHabitatPatches.IsValidIndex(Fauna->PatchTarget))
+            {
+                const auto& Patch = FaunaHabitatPatches[Fauna->PatchTarget];
+                // A brief loss of sight does not cancel an already accessible shelter route.
+                if (const auto Route = IsCoveredRefuge(Patch) ? FindRefugeRoute(Patch, Position, RefugeRange) : TOptional<FRefugeRoute>{})
+                {
+                    bFleeing = true;
+                    ShelterMovementGoal = Route->Goal;
+                    bHeadingToShelterMouth = Route->bThroughMouth;
                 }
             }
             const auto TryLaunch = [&](const FVector& Hint, bool bExactLanding = false)
@@ -1926,6 +2155,14 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 && Fauna->AttackContact < 0. && Fauna->Stamina >= .35f)
             {
                 const auto* Landing = ProvisionLandings.Find(Id.StableAgentId);
+                const auto* BroodLanding = BroodLandings.Find(Id.StableAgentId);
+                if (!Landing && BroodLanding && Fauna->CarrionTargetId == 0
+                    && Vitals.Energy >= EcoLifeV3::FIndividual::MinimumParentEnergy * Vitals.MaxEnergy
+                    && FVector::DistSquared(Position, *BroodLanding) > FMath::Square(40.) && TryLaunch(*BroodLanding, true))
+                {
+                    RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("NestBreedingApproach"));
+                    continue;
+                }
                 if (Landing && Vitals.Energy >= .65f * Vitals.MaxEnergy && Fauna->CarrionTargetId == 0
                     && (FVector::DistSquared(Position, *Landing) > FMath::Square(105.) || FMath::Abs(Position.Z - Landing->Z) > 25.))
                 {
@@ -1964,16 +2201,16 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 const FVector Heading = ToTarget.GetSafeNormal2D();
                 const auto& TargetVelocity = EM.GetFragmentDataChecked<FMassVelocityFragment>(Target).Value;
                 const bool bCommittedCharge = bAttackAdvance && Species->bFlankDefendedPrey && PreyProfile->DefenseDamage > 0.f;
-                if (ToTarget.SizeSquared2D() > FMath::Square((bCommittedCharge ? 2.f : 1.25f) * Species->AttackReach)
+                if (ToTarget.SizeSquared2D() > FMath::Square((bCommittedCharge ? 2. : 1.25) * StrikeReach)
                     || !HasClearSight(*GetWorld(), Position, TargetPosition, Species->EyeHeight, PreyProfile->EyeHeight)) return;
 
                 const double Scale = Fauna->Life.SpeedScale(Now);
                 const double ForwardSpeed = FVector::DotProduct(PreviousVelocity, Heading);
                 const double RetreatSpeed = FMath::Max(0., FVector::DotProduct(TargetVelocity, Heading));
                 const double FollowSpeed = FMath::Min(FMath::Max(Species->WalkSpeed * Scale, ForwardSpeed), RetreatSpeed);
-                const double BrakeSpeed = FMath::Max(0., ForwardSpeed - Species->GroundAcceleration * Scale * Dt);
+                const double BrakeSpeed = FMath::Max(0., ForwardSpeed - Species->GroundAcceleration * Scale * Traits.DriveScale() * Dt);
                 const double Speed = bCommittedCharge ? Species->RunSpeed * Scale : FMath::Max(FollowSpeed, BrakeSpeed);
-                const double Gap = (bCommittedCharge ? .4 : .65) * Species->AttackReach;
+                const double Gap = (bCommittedCharge ? .4 : .65) * StrikeReach;
                 const double AdvanceDistance = FMath::Clamp(ToTarget.Size2D() - Gap, 0., Speed * Dt);
                 FVector Destination = Position + Heading * AdvanceDistance;
                 if (AdvanceDistance <= UE_SMALL_NUMBER || !CanMoveOnGround(Destination)) return;
@@ -1983,7 +2220,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 Velocity = (Destination - Position) / Delta;
                 Transform.SetLocation(Destination);
                 const float Demand = float(FMath::Clamp(Speed / (Species->RunSpeed * Scale), 0., 1.));
-                Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - Species->SprintDrain * Demand * float(Dt));
+                Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - Species->SprintDrain * Demand * float(Dt * Traits.ActiveCost()));
                 Transform.SetRotation(Heading.ToOrientationQuat());
             };
             if (!Guard && !bFleeing && Fauna->AttackContact >= 0. && !Fauna->bRecovering)
@@ -2011,7 +2248,9 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 ? .7 * (Species->RunSpeed - Species->WalkSpeed) : 0.);
             const auto CarrionScore = [&](int64 StockId, const FEcoFaunaCarcass& Stock)
             {
-                const double Score = EcoFaunaFeeding::Value(FMath::Min(Stock.Remaining, 3.f * Species->CarrionEnergyPerMeal),
+                const float MealLimit = bCompareShoreFood
+                    ? FMath::Min(Species->CarrionEnergyPerMeal, Vitals.MaxEnergy - Vitals.Energy) : 3.f * Species->CarrionEnergyPerMeal;
+                const double Score = EcoFaunaFeeding::Value(FMath::Min(Stock.Remaining, MealLimit),
                     FVector::Dist(Position, Stock.Position) / CarrionTravelSpeed);
                 return RankFaunaFood(Score, Id.StableAgentId, Region.CurrentRegionId, Now, EEcoFaunaFoodIntent::Carcass, StockId);
             };
@@ -2061,7 +2300,21 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     ? TEXT("StockUnavailable") : TEXT("ExclusiveAccess"));
                 Stock = nullptr;
             }
-            const bool bSearching = !Species->bCanDiveHunt && !bClaim && !bFleeing && !bPassageTravel && !Fauna->bRecovering
+            FVector PlayerGoal = Position;
+            bool bTrackingPlayer = false;
+            if (Id.SpeciesId == TEXT("Leopard") && (bEnableRuleFaunaPlayerAmbush || PlayerCombat.Contains(Id.StableAgentId)))
+            {
+                FRegionEnvironmentState Weather;
+                GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->GetEnvironmentState(Region.CurrentRegionId, Weather);
+                const bool bMayStalkPlayer = Species->Diet == EEcoFaunaDiet::Carnivore
+                    && Species->Locomotion == EEcoFaunaLocomotion::Ground && Species->StalkRange > 0.f
+                    && !Guard && !bFleeing && !bPassageTravel && !Fauna->bRecovering && !Stock && bHungry
+                    && Fauna->Life.AgeFraction(Now) >= 1. && Vitals.HP >= .7f * Vitals.MaxHP
+                    && Fauna->TargetId <= 0 && Fauna->PatchTarget == INDEX_NONE && Fauna->AttackContact < 0.;
+                bTrackingPlayer = GuideRuleFaunaPlayerCombat(Id.StableAgentId, Region.CurrentRegionId, *Species, *Fauna,
+                    Transform, Now, Darkness, Weather.Rainfall, bMayStalkPlayer, PlayerGoal);
+            }
+            const bool bSearching = !bTrackingPlayer && !Species->bCanDiveHunt && !bClaim && !bFleeing && !bPassageTravel && !Fauna->bRecovering
                 && bHungry && !Species->PreyRules.IsEmpty()
                 && Fauna->Life.AgeFraction(Now) >= 1.;
             const bool bLocalPlantMeal = FaunaHabitatStage >= 2 && bFoodScan && Species->UsesPlantFood()
@@ -2080,16 +2333,18 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 double Distance = MaxRange;
                 double BestAccessCost = MaxRange;
                 AccessPoint = INDEX_NONE;
+                const bool bCoveredFood = bCoveredRefugeForage && IsCoveredRefuge(Patch);
                 for (int32 PointIndex = 0; PointIndex <= Patch.ForageAccessPoints.Num(); ++PointIndex)
                 {
                     if (Fauna->BlockedPatch == Index && Fauna->BlockedPatchAccessPoint == PointIndex
                         && Now < Fauna->PatchBlockedUntil) continue;
                     const FVector Point = Patch.ForagePoint(PointIndex);
-                    const double Range = FVector::Dist(Position,Point);
+                    const auto Route = bCoveredFood ? FindRefugeRoute(Patch, Position, MaxRange) : TOptional<FRefugeRoute>{};
+                    const double Range = Route ? Route->Length : FVector::Dist(Position, Point);
                     const double Cost = Range / ExperiencePreference(Id.StableAgentId,
                         {EEcoExperienceActivity::Patch, Region.CurrentRegionId, Patch.Id, FIntVector(PointIndex, 0, 0)}, Now);
                     if (Range > MaxRange || Cost > BestAccessCost || (AccessPoint != INDEX_NONE && Cost == BestAccessCost)
-                        || !HasClearSight(*GetWorld(),Position,Point,Species->EyeHeight,5.f)
+                        || (bCoveredFood ? !Route : !HasClearSight(*GetWorld(), Position, Point, Species->EyeHeight, 5.f))
                         || !EcoCreatureMovement::IsWadeableGround(*GetWorld(),Point,Species->WadeDepth)) continue;
                     AccessPoint = PointIndex;
                     Distance = Range;
@@ -2097,8 +2352,12 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 }
                 if (AccessPoint == INDEX_NONE) return 0.;
                 if (!Patch.IsPlantForage() && bLocalPlantMeal && Patch.ShelteredSpecies != Id.SpeciesId && Distance > 35.) return 0.;
-                const double Value = EcoFaunaFeeding::Value(FMath::Min(FaunaPatchStock[Index], 3.f * Patch.EnergyPerMeal),
-                    Distance / Species->WalkSpeed + 1.) * Species->PlantPreference(Patch.PlantGuild);
+                const float MealLimit = bCompareShoreFood || bCoveredFood
+                    ? FMath::Min(Patch.EnergyPerMeal, Vitals.MaxEnergy - Vitals.Energy) : 3.f * Patch.EnergyPerMeal;
+                const double WalkSpeed = bCompareShoreFood
+                    ? Species->WalkSpeed * Fauna->Life.SpeedScale(Now) * PhysicalCondition : Species->WalkSpeed;
+                const double Value = EcoFaunaFeeding::Value(FMath::Min(FaunaPatchStock[Index], MealLimit),
+                    Distance / WalkSpeed + 1.) * Species->PlantPreference(Patch.PlantGuild);
                 if (Patch.IsPlantForage() && bLocalPlantMeal && Distance > 35.
                     && Value <= EcoFaunaFeeding::Value(Species->FoodPerMeal * EcoFaunaNutrition::PlantEnergyPerUnit, 1.)) return 0.;
                 const double Ranked = RankFaunaFood(Value,
@@ -2129,6 +2388,42 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     {
                         Fauna->PatchTarget = INDEX_NONE;
                         PatchValue = 0.;
+                    }
+                    if (bCoveredRefugeForage && !Stock && bHungry && Species->UsesPlantFood())
+                    {
+                        const auto* CurrentRegion = FindRegion(Position);
+                        const auto* Refuge = FaunaHabitatPatches.FindByPredicate([&](const FEcoFaunaHabitatPatch& Patch)
+                        {
+                            return IsCoveredRefuge(Patch) && Patch.Consumers.Contains(Id.SpeciesId)
+                                && FindRefugeRoute(Patch, Position, RefugeRange).IsSet();
+                        });
+                        FVector PlantPoint;
+                        if (CurrentRegion && CurrentRegion->RegionId == Region.CurrentRegionId && Refuge
+                            && FindNearbyForage(*GetWorld(), Context, *CurrentRegion, Position, *Species,
+                                BodyWidth, BodyHeight, PlantPoint, ChoiceMemory, Now, this, Id.StableAgentId,
+                                [&](const FVector& Point)
+                                {
+                                    return FVector::DistSquared(Position, Point) <= FMath::Square(RefugeRange)
+                                        && (Point.Equals(Position) || ClearRefugeLeg(Position, Point))
+                                        && FindRefugeRoute(*Refuge, Point, RefugeRange).IsSet();
+                                }))
+                        {
+                            const double WalkSpeed = FMath::Max(1., Species->WalkSpeed * Fauna->Life.SpeedScale(Now) * PhysicalCondition);
+                            const double TravelTime = FVector::Dist(Position, PlantPoint) / WalkSpeed;
+                            const double PlantEnergy = FMath::Min(
+                                FMath::Min(LocalPlantStock(Context, PlantPoint), double(Species->FoodPerMeal))
+                                    * EcoFaunaNutrition::PlantEnergyPerUnit, double(Vitals.MaxEnergy - Vitals.Energy));
+                            if (EcoFaunaFeeding::Value(PlantEnergy, TravelTime + 1.) > PatchValue)
+                            {
+                                if (!Fauna->Goal.Equals(PlantPoint, 1.) || Fauna->PatchTarget != INDEX_NONE)
+                                    RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now,
+                                        TEXT("RefugePlantForage"), 0, PlantEnergy);
+                                Fauna->PatchTarget = INDEX_NONE;
+                                PatchValue = 0.;
+                                Fauna->Goal = PlantPoint;
+                                Fauna->NextDecision = Now + FMath::Clamp(TravelTime + 2., 2., 10.);
+                            }
+                        }
                     }
                     if (bAuditGroundFood)
                     {
@@ -2221,7 +2516,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     if (ClosestId > 0)
                     {
                         const double Sociality = Fauna->Life.Genome.Sociability;
-                        const double Spacing = NeighborSpacing * Fauna->Life.BodyScale(Now) / (Sociality * Association);
+                        const double Spacing = NeighborSpacing * BodyWidth / (Sociality * Association);
                         const FVector GroupGoal = Closest + (Position - Closest).GetSafeNormal2D() * Spacing;
                         const double Weight = bConspecific ? .5 * Sociality * Affinity * Association : .25 * Sociality;
                         Fauna->Goal = FMath::Lerp(Fauna->Goal, GroupGoal, FMath::Clamp(Weight, 0., .75));
@@ -2262,7 +2557,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 {
                     const auto* CurrentRegion = FindRegion(Position);
                     if (CurrentRegion && FindNearbyForage(*GetWorld(), Context, *CurrentRegion, Position, *Species,
-                        float(Fauna->Life.BodyScale(Now)), Fauna->Goal, ChoiceMemory, Now, this, Id.StableAgentId))
+                        BodyWidth, BodyHeight, Fauna->Goal, ChoiceMemory, Now, this, Id.StableAgentId))
                     {
                         Fauna->NextDecision = Now + FMath::Clamp(FVector::Dist2D(Position, Fauna->Goal)
                             / FMath::Max(1.f, Species->WalkSpeed * .8f) + 2., 2., 25.);
@@ -2275,6 +2570,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     }
                 }
                 const bool bHuntFlight = Species->bCanDiveHunt && bHungry && !Fauna->bRecovering
+                    && (!bPredatorContinuity || Fauna->Life.AgeFraction(Now) >= 1.)
                     && Now >= Fauna->AttackReady && Now >= Fauna->PhaseUntil;
                 const double FlightChance = bHuntFlight ? FMath::Lerp(.12, .78, double(Activity)) * Fauna->Stamina
                     : FMath::Lerp(.24, .08, double(Darkness)) * Activity;
@@ -2374,8 +2670,13 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                         const double RiskWeight = bAdaptivePreyValue ? FMath::Lerp(.45, 1., double(Vitals.Energy / Vitals.MaxEnergy)) : 1.;
                         const double ExpectedEnergy = Energy * Rule->Preference * Vulnerability
                             * (PreyId.StableAgentId == PreviousTarget ? 1.15 : 1.);
-                        const double CostSeconds = Distance / Species->RunSpeed + Species->AttackWindup + Handling;
-                        const double Risk = 2. + Resistance * .55 * RiskWeight * Caution
+                        const double RunSpeed = bPredatorContinuity
+                            ? Species->RunSpeed * Fauna->Life.SpeedScale(Now) * PhysicalCondition : Species->RunSpeed;
+                        const double CostSeconds = Distance / RunSpeed + Species->AttackWindup + Handling;
+                        const double PursuitCost = bPredatorContinuity ? Fauna->ScaleMaintenance(
+                            2. * Species->Maintenance * CostSeconds, UsesHeritableFaunaMaintenance(), Now, UsesFunctionalTraits())
+                            : 2.;
+                        const double Risk = PursuitCost + Resistance * .55 * RiskWeight * Caution
                             + (1. - Fauna->Stamina) * 5.
                             + (Species->bIndividualResponse ? (1. - HealthFraction) * Resistance * .4 : 0.);
                         const double BaseScore = EcoFaunaFeeding::Value(ExpectedEnergy, CostSeconds, Risk);
@@ -2459,14 +2760,14 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     const FVector Facing = PreyTransform.GetRotation().GetForwardVector().GetSafeNormal2D();
                     const bool bFlank = FaunaHabitatStage >= 3 && Species->bFlankDefendedPrey && PreyProfile
                         && PreyProfile->DefenseDamage > 0.f && PreyVitals.HP >= .35f * PreyVitals.MaxHP
-                        && FromPrey.SizeSquared2D() < FMath::Square(3.f * Species->AttackReach)
+                        && FromPrey.SizeSquared2D() < FMath::Square(3. * StrikeReach)
                         && FVector::DotProduct(FromPrey.GetSafeNormal2D(), Facing) >= (bPursuitFix ? .25 : .15);
                     if (bFlank)
                     {
                         const FVector Side = FVector::CrossProduct(FVector::UpVector, Facing);
                         const double Sign = FVector::DotProduct(FromPrey, Side) < 0. ? -1. : 1.;
-                        const FVector Route = PreyTransform.GetLocation() + Sign * Side * (1.1 * Species->AttackReach)
-                            - Facing * (.45 * Species->AttackReach);
+                        const FVector Route = PreyTransform.GetLocation() + Sign * Side * (1.1 * StrikeReach)
+                            - Facing * (.45 * StrikeReach);
                         if (HasClearSight(*GetWorld(), Position, PreyTransform.GetLocation(), Species->EyeHeight, PreyProfile->EyeHeight)
                             && HasClearSight(*GetWorld(), Position, Route, Species->EyeHeight))
                             FlankGoal = Route;
@@ -2477,7 +2778,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     const double RetreatSpeed = FMath::Max(0., FVector::DotProduct(PreyVelocity, -FromPrey.GetSafeNormal2D()));
                     const double CarrySpeed = FMath::Max(double(Species->WalkSpeed) * Fauna->Life.SpeedScale(Now),
                         FVector::DotProduct(PreviousVelocity, -FromPrey.GetSafeNormal2D()));
-                    const double ContactRange = FMath::Max(0., Species->AttackReach
+                    const double ContactRange = FMath::Max(0., StrikeReach
                         - FMath::Max(0., RetreatSpeed - CarrySpeed) * Windup);
                     if (!bFlank && FromPrey.SizeSquared() <= FMath::Square(ContactRange)
                         && CanHuntFauna(EM, Entity, *Prey, *Species, Now, true))
@@ -2504,6 +2805,21 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     Fauna->PatchTarget = INDEX_NONE;
                 }
                 else { Fauna->TargetId = 0; Fauna->ChaseBegan = -1.; Fauna->LastPreySeenUntil = -1.; }
+            }
+            if (bCompareShoreFood && !bClaim && !Guard && !bFleeing && !bPassageTravel
+                && !Fauna->bRecovering && Fauna->TargetId == 0)
+            {
+                // Compare from the same position after the land scan, including on the steps between scans.
+                int32 AccessPoint = INDEX_NONE;
+                const double LandPatch = Fauna->PatchTarget != INDEX_NONE
+                    ? (bFoodScan ? PatchValue : PatchScore(Fauna->PatchTarget, AccessPoint)) : 0.;
+                const double LandCarrion = Stock ? CarrionScore(Fauna->CarrionTargetId, *Stock) : 0.;
+                if (TryShoreFood(FMath::Max(LandPatch, LandCarrion), bFoodScan && bAuditFaunaHunts))
+                {
+                    if (bFoodScan) Fauna->NextSense = Now + .45;
+                    ReleaseCarrion(TEXT("ShoreFoodScore"));
+                    continue;
+                }
             }
             if (bFoodScan && Now >= Fauna->NextSense) Fauna->NextSense = Now + .45;
             constexpr double CueArrivalDistance = 35.;
@@ -2556,7 +2872,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
             if (Guard)
             {
                 Goal = Guard->Position;
-                bRun = true;
+                bRun = Guard->bSprint;
             }
             else if (bFleeing)
             {
@@ -2574,10 +2890,28 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 Goal = Fauna->Goal;
                 bRun = false;
             }
+            else if (bTrackingPlayer)
+            {
+                Goal = PlayerGoal;
+                bRun = false;
+            }
             else if (FaunaHabitatPatches.IsValidIndex(Fauna->PatchTarget))
             {
                 const auto& Patch = FaunaHabitatPatches[Fauna->PatchTarget];
                 Goal = Patch.ForagePoint(Patch.HasForagePoint(Fauna->PatchAccessPoint) ? Fauna->PatchAccessPoint : 0);
+                if (bCoveredRefugeForage && IsCoveredRefuge(Patch))
+                {
+                    if (const auto Route = FindRefugeRoute(Patch, Position, 1.5 * Species->SightRange))
+                    {
+                        Goal = Route->Goal;
+                        bHeadingToShelterMouth = Route->bThroughMouth;
+                    }
+                    else
+                    {
+                        Fauna->PatchTarget = INDEX_NONE;
+                        Goal = Fauna->Goal;
+                    }
+                }
                 ReleaseCarrion(TEXT("HabitatPatch"));
                 bRun = false;
             }
@@ -2592,7 +2926,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
             {
                 Goal = FlankGoal.Get(Fauna->LastPreyPosition);
                 const double Range = FVector::Dist2D(Position, Goal);
-                Fauna->bStalking = Range <= Species->StalkRange && Range > Species->AttackReach * 2.5;
+                Fauna->bStalking = Range <= Species->StalkRange && Range > StrikeReach * 2.5;
                 if (FaunaHabitatStage >= 3 && Species->bFlankDefendedPrey)
                     if (const auto* Target = AgentLookup.Find(Fauna->TargetId))
                         Fauna->bStalking &= Now >= EM.GetFragmentDataChecked<FEcoFaunaFragment>(*Target).ThreatUntil;
@@ -2675,7 +3009,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
             const double Distance = Offset.Size2D();
             bRun = bRun && !Fauna->bRecovering;
             const double Speed = PhysicalCondition * Fauna->Life.SpeedScale(Now) * (bRun ? Species->RunSpeed : Species->WalkSpeed);
-            const double Accel = Species->GroundAcceleration * Fauna->Life.SpeedScale(Now) * PhysicalCondition;
+            const double Accel = Species->GroundAcceleration * Fauna->Life.SpeedScale(Now) * Traits.DriveScale() * PhysicalCondition;
             const double StopRadius = bPassageTravel ? 2. : FMath::Min(18., .8 * Species->BodyRadius);
             const double StoppingSpeed = FMath::Sqrt(2. * Accel * FMath::Max(0., Distance - StopRadius));
             FVector Desired = Offset.GetSafeNormal2D() * FMath::Min(Speed, StoppingSpeed);
@@ -2685,7 +3019,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 const double DesiredYaw = Desired.Rotation().Yaw;
                 const double Angle = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentYaw, DesiredYaw));
                 const double TurnScale = FMath::Lerp(1., .45, FMath::Clamp(PreviousVelocity.Size2D() / Species->RunSpeed, 0., 1.));
-                const double Yaw = FMath::FixedTurn(CurrentYaw, DesiredYaw, Species->GroundTurnDegreesPerSecond * TurnScale * Dt);
+                const double Yaw = FMath::FixedTurn(CurrentYaw, DesiredYaw, Species->GroundTurnDegreesPerSecond * Traits.TurnScale() * TurnScale * Dt);
                 Desired = FRotator(0., Yaw, 0.).Vector() * Desired.Size2D() * FMath::Lerp(1., .30, Angle / 180.);
             }
             const FVector Motion = FMath::VInterpConstantTo(FVector(PreviousVelocity.X, PreviousVelocity.Y, 0.), Desired, Dt, Accel);
@@ -2743,7 +3077,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 continue;
             }
             Velocity = (Destination - Position) / Delta;
-            if (bRun) Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - Species->SprintDrain * float(Dt));
+            if (bRun) Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - Species->SprintDrain * float(Dt * Traits.ActiveCost()));
             Transform.SetLocation(Destination);
             if (RecordsFaunaExperience() && bFleeing && FaunaHabitatPatches.IsValidIndex(Fauna->PatchTarget))
             {

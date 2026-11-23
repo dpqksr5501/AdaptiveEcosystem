@@ -2,6 +2,7 @@
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Player/EcoCreatureHitProxy.h"
+#include "Creature/Player/EcoPlayerEcologyComponent.h"
 #include "Player/EcoPlayerState.h"
 #include "Player/EcoCombatRelevanceComponent.h"
 #include "Player/EcoEquipmentComponent.h"
@@ -45,10 +46,11 @@ struct FEcoCombatTestAccess
 {
     static void Ready(AEcoCreatureIntegrationSpawner& S, const TArray<FMassEntityHandle>& Entities)
     { S.Owned=Entities; S.bReady=true; S.bEnableEcosystemLife=true; S.bEnablePlayerCombat=true; S.CombatEpoch=7; S.BuildAgentLookup(); }
-    static void Queue(AEcoCreatureIntegrationSpawner& S, APawn& Player, int64 Target, float Damage, int32 Epoch=7, uint32 Avatar=0)
+    static void Queue(AEcoCreatureIntegrationSpawner& S, APawn& Player, int64 Target, float Damage, int32 Epoch=7,
+        uint32 Avatar=0, double Issued=0.)
     {
         AEcoCreatureIntegrationSpawner::FComboDamage R;
-        R.Player=&Player;R.Controller=Player.GetController();R.Target=Target;R.Damage=Damage;R.Epoch=Epoch;R.Avatar=Avatar;
+        R.Player=&Player;R.Controller=Player.GetController();R.Target=Target;R.Damage=Damage;R.Epoch=Epoch;R.Avatar=Avatar;R.Issued=Issued;
         S.ComboDamage.Add(R);
     }
     static void Consume(AEcoCreatureIntegrationSpawner& S, const FEcoServerTimeSnapshot& T) { S.ProcessComboDamage(T); }
@@ -56,6 +58,17 @@ struct FEcoCombatTestAccess
     static void Proxies(AEcoCreatureIntegrationSpawner& S) { S.UpdateHitProxies(); }
     static void Predation(AEcoCreatureIntegrationSpawner& S, double Now) { S.ProcessFaunaPredation(Now); }
     static void MoveFauna(AEcoCreatureIntegrationSpawner& S, double Now) { S.MoveFauna(.05f, Now); }
+    static bool StalkPlayer(AEcoCreatureIntegrationSpawner& S, FMassEntityManager& EM, FMassEntityHandle Entity,
+        const FEcoFaunaSpecies& Profile, double Now, float Dark, float Rain, FVector& Goal)
+    {
+        const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity);
+        return S.GuideRuleFaunaPlayerCombat(Identity.StableAgentId,
+            EM.GetFragmentDataChecked<FEcoRegionFragment>(Entity).CurrentRegionId, Profile,
+            EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entity),
+            EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetTransform(), Now, Dark, Rain, true, Goal);
+    }
+    static void ResolveCombat(AEcoCreatureIntegrationSpawner& S, const FEcoServerTimeSnapshot& Time)
+    { S.ProcessCombatDamage(Time); }
     static void SocialAuthority(AEcoCreatureIntegrationSpawner& S, bool bEnabled) { S.bAuthorityWorld = bEnabled; }
     static void StepSocial(AEcoCreatureIntegrationSpawner& S, FMassEntityManager& EM, double Now) { S.ProcessFaunaSocial(EM, Now); }
     static int64 SocialPeer(const AEcoCreatureIntegrationSpawner& S, int64 Id)
@@ -159,6 +172,48 @@ struct FEcoCombatTestAccess
         const FEcoFaunaFragment& Fauna, const FVector& Position, double Now)
     { S.ObserveInterruptedForage(Eater, Species, Region, Fauna, Position, Now); }
 };
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaHeritableMaintenance, "AdaptiveEcosystem.Fauna.Life.HeritableMaintenanceAtResourceBoundary",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoFaunaHeritableMaintenance::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("TraitMeadow");
+    Region->RegionBounds->SetBoxExtent(FVector(500.));
+    FEcoCombatTestAccess::SetSingleRegion(*Spawner, *Region);
+    FEcoServerTimeSnapshot Time;
+    Time.WorldEpoch = 7;
+    Time.ServerTimeSeconds = 1.;
+    Spawner->FaunaSpecies.AddDefaulted_GetRef().SpeciesId = TEXT("Pig");
+    if (!TestTrue(TEXT("Both rule residents were spawned"), FEcoCombatTestAccess::SpawnFaunaPair(*Spawner, Region->RegionId, Time))) return false;
+    const auto& Residents = FEcoCombatTestAccess::Residents(*Spawner);
+    const auto Smaller = Residents[0];
+    const auto Larger = Residents[1];
+    auto& Manager = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    for (const auto Entity : {Smaller, Larger})
+    {
+        auto& Fauna = Manager.GetFragmentDataChecked<FEcoFaunaFragment>(Entity);
+        Fauna.Life.Genome.Size = Entity == Smaller ? .9 : 1.1;
+        Fauna.Life.Genome.Speed = 1.;
+        Fauna.MaintenanceScale = .5f;
+        Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).Energy = 80.f;
+        Manager.GetFragmentDataChecked<FEcoCreatureSurvivalFragment>(Entity).Settings.BaseMetabolism = 4.f;
+    }
+    const auto Energy = [&](FMassEntityHandle Entity) { return Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).Energy; };
+    TArray<FEcoDeathOutcome> Deaths;
+    Time.ServerTimeSeconds = 2.;
+    if (!TestTrue(TEXT("Baseline survival boundary"), EcoMassSurvival::Advance(Manager, Time, 2., 1, {}, Deaths, true))) return false;
+    TestEqual(TEXT("Activity cost is equal with the rule off"), Energy(Smaller), Energy(Larger));
+    TestEqual(TEXT("Baseline activity cost charged once"), Energy(Smaller), 78.f);
+    Time.ServerTimeSeconds = 3.;
+    if (!TestTrue(TEXT("Heritable survival boundary"), EcoMassSurvival::Advance(Manager, Time, 3., 2, {}, Deaths, true, true))) return false;
+    TestTrue(TEXT("Smaller body has lower maintenance"), FMath::IsNearlyEqual(Energy(Smaller), 76.1355f));
+    TestTrue(TEXT("Larger body has higher maintenance"), FMath::IsNearlyEqual(Energy(Larger), 75.8345f));
+    TestEqual(TEXT("Maintenance created no death receipts"), Deaths.Num(), 0);
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoPigCarrionMeal, "AdaptiveEcosystem.Fauna.Pig.SharedCarrionMeal",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -488,6 +543,7 @@ bool FEcoFoodVisitCycle::RunTest(const FString&)
         auto& Velocity = Manager.GetFragmentDataChecked<FMassVelocityFragment>(Horse).Value;
         H.Life.Born = Bf.Life.Born = -120.;
         H.PatchTarget = Bf.PatchTarget = 0;
+        const int64 HorseId = Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Horse).StableAgentId;
         const auto Feed = [&](double Now)
         {
             return Clock->GetSnapshotAt(Now, Time) && FEcoCombatTestAccess::FeedFauna(*Spawner, Time);
@@ -502,9 +558,23 @@ bool FEcoFoodVisitCycle::RunTest(const FString&)
             BV.Energy = BV.MaxEnergy;
             HV.Energy = .4f * HV.MaxEnergy;
             if (!Feed(At + 1.)) return Outcome;
+            if (At == 5.)
+            {
+                const auto& RegionId = Region->RegionId;
+                const auto* Pending = Spawner->FindFaunaExperience(HorseId);
+                TestTrue(TEXT("The first shortfall still belongs to an open visit"), !Pending || Pending->FoodVisits.IsEmpty());
+                const double FirstRank = FEcoCombatTestAccess::RankPatch(*Spawner, HorseId, RegionId, At + 1.1, TEXT("PastureA"));
+                TestTrue(TEXT("Only applying mode uses a confirmed first shortfall immediately"), Mode == 2 ? FirstRank < 1. : FirstRank == 1.);
+                TestEqual(TEXT("An unvisited patch still has neutral visit evidence"),
+                    FEcoCombatTestAccess::RankPatch(*Spawner, HorseId, RegionId, At + 1.1, TEXT("PastureB")), 1.);
+                const float FedEnergy = HV.Energy;
+                HV.Energy = .1f * HV.MaxEnergy;
+                TestEqual(TEXT("Critical hunger bypasses the visit preference"),
+                    FEcoCombatTestAccess::RankPatch(*Spawner, HorseId, RegionId, At + 1.1, TEXT("PastureA")), 1.);
+                HV.Energy = FedEnergy;
+            }
             FEcoCombatTestAccess::ResolveVisits(*Spawner, Manager, At + 4.);
         }
-        const int64 HorseId = Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Horse).StableAgentId;
         const auto* Memory = Spawner->FindFaunaExperience(HorseId);
         TestEqual(TEXT("Recording is separate from applying the visit"), Memory ? Memory->FoodVisits.Num() : 0, Mode > 0 ? 1 : 0);
         if (Mode > 0)
@@ -1077,6 +1147,299 @@ bool FEcoInterspeciesAerialHunt::RunTest(const FString&)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoAerialWindupContinuity, "AdaptiveEcosystem.Fauna.Experience.AerialWindupContinuity",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoAerialWindupContinuity::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("DiveRidge");
+    Region->RegionBounds->SetBoxExtent(FVector(600.));
+    FEcoCombatTestAccess::SetSingleRegion(*Spawner, *Region);
+    FEcoServerTimeSnapshot Time;
+    Time.ServerTimeSeconds = 1.;
+    const auto Eagle = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, FVector(0., 0., 70.), TEXT("GoldenEagle"));
+    const auto Rabbit = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, FVector(116., 0., 0.), TEXT("Jackrabbit"));
+    auto& Manager = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    if (!TestTrue(TEXT("Both aerial-hunt participants spawned"), Manager.IsEntityValid(Eagle) && Manager.IsEntityValid(Rabbit))
+        || !FEcoCombatTestAccess::RefreshLookup(*Spawner)) return false;
+    auto& Profile = Spawner->FaunaSpecies[0];
+    Profile.Diet = EEcoFaunaDiet::Carnivore;
+    Profile.Locomotion = EEcoFaunaLocomotion::Flight;
+    Profile.AttackReach = 100.f;
+    Profile.AdultMass = 6.f;
+    Profile.PreyRules.AddDefaulted_GetRef().SpeciesId = TEXT("Jackrabbit");
+    Spawner->FaunaSpecies[1].AdultMass = 1.5f;
+    auto& Dive = Manager.GetFragmentDataChecked<FEcoFaunaFragment>(Eagle);
+    Dive.Flight = EEcoFaunaFlightPhase::Dive;
+    Dive.TargetId = Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Rabbit).StableAgentId;
+    Dive.AttackContact = 2.;
+    const auto& Head = Manager.GetFragmentDataChecked<FTransformFragment>(Eagle).GetTransform();
+    const auto& Health = Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Rabbit);
+    const float BeforeHP = Health.HP;
+    FEcoCombatTestAccess::MoveFauna(*Spawner, 1.8);
+    TestEqual(TEXT("The baseline holds the pre-contact position"), Head.GetLocation().X, 0.);
+    Spawner->bEnableEcosystemLife = true;
+    Spawner->bEnablePredatorContinuity = true;
+    FEcoCombatTestAccess::MoveFauna(*Spawner, 1.9);
+    FEcoCombatTestAccess::MoveFauna(*Spawner, 1.95);
+    TestTrue(TEXT("The dive covers real distance during the scheduled windup"), Head.GetLocation().X > 30.);
+    TestEqual(TEXT("Movement leaves the scheduled strike unchanged"), Dive.AttackContact, 2.);
+    TestEqual(TEXT("Movement itself does not cause damage"), Health.HP, BeforeHP);
+    FEcoCombatTestAccess::Predation(*Spawner, 2.);
+    return TestTrue(TEXT("The resource boundary confirms the strike only after physical arrival"), Health.HP < BeforeHP);
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoAerialCarrionLanding, "AdaptiveEcosystem.Fauna.Life.AerialCarrionLanding",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoAerialCarrionLanding::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("FeedingRidge");
+    Region->RegionBounds->SetBoxExtent(FVector(600.));
+    FEcoCombatTestAccess::SetSingleRegion(*Spawner, *Region);
+    auto* Ground = W.World->SpawnActor<AActor>();
+    auto* Box = NewObject<UBoxComponent>(Ground);
+    Ground->SetRootComponent(Box);
+    Ground->AddInstanceComponent(Box);
+    Box->SetBoxExtent(FVector(300., 300., 10.));
+    Box->SetCollisionObjectType(ECC_WorldStatic);
+    Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    Box->SetCollisionResponseToAllChannels(ECR_Block);
+    Box->RegisterComponent();
+    Ground->SetActorLocation(FVector(0., 0., -10.));
+
+    FEcoServerTimeSnapshot Time;
+    const auto Eagle = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, FVector(0., 0., 100.), TEXT("GoldenEagle"));
+    auto& EM = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    if (!TestTrue(TEXT("The eagle spawned"), EM.IsEntityValid(Eagle))) return false;
+    FEcoCombatTestAccess::Ready(*Spawner, {Eagle});
+    Spawner->bEnablePredatorContinuity = true;
+    auto& Profile = Spawner->FaunaSpecies[0];
+    Profile.Diet = EEcoFaunaDiet::Carnivore;
+    Profile.Locomotion = EEcoFaunaLocomotion::Flight;
+    Profile.bCanDiveHunt = true;
+    Profile.FlightCruiseHeight = 100.f;
+    Profile.CarrionEnergyPerMeal = 5.f;
+    auto& Bird = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Eagle);
+    Bird.Flight = EEcoFaunaFlightPhase::Cruise;
+    Bird.LandingPoint = FVector(-120., 0., 0.);
+    EM.GetFragmentDataChecked<FEcoVitalsFragment>(Eagle).Energy = 50.f;
+    auto& Stock = FEcoCombatTestAccess::CarcassStock(*Spawner, 101);
+    Stock.Region = Region->RegionId;
+    Stock.Species = TEXT("Jackrabbit");
+    Stock.Position = FVector(140., 0., 0.);
+    Stock.Remaining = 10.f;
+    Stock.ExpiresAt = 12.;
+    FEcoCombatTestAccess::MoveFauna(*Spawner, 1.);
+    TestEqual(TEXT("A visible, available carcass becomes the landing target"), Bird.CarrionTargetId, int64(101));
+    TestEqual(TEXT("The flight mover descends through its landing phase"), Bird.Flight, EEcoFaunaFlightPhase::Landing);
+    TestEqual(TEXT("An airborne decision leaves the carrion reserve intact"), Stock.Remaining, 10.f);
+    for (int32 Tick = 1; Tick <= 38; ++Tick)
+        FEcoCombatTestAccess::MoveFauna(*Spawner, 1. + .05 * Tick);
+    Time.ServerTimeSeconds = 3.;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)) return false;
+    TestEqual(TEXT("A ground meal debits exactly one portion"), Stock.Remaining, 5.f);
+    return TestEqual(TEXT("The settled eagle consumes from the same reserve"), EM.GetFragmentDataChecked<FEcoVitalsFragment>(Eagle).Energy, 55.f);
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoAmphibiousFoodChoice, "AdaptiveEcosystem.Fauna.Water.CompareShoreFood",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoAmphibiousFoodChoice::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* S = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    S->bEnableEcosystemLife = true;
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("ShoreChoice");
+    Region->RegionBounds->SetBoxExtent(FVector(700.));
+    FEcoCombatTestAccess::SetRulesOnlyRegion(*S, *Region);
+    const auto AddFloor = [&](FVector Center, FVector Extent)
+    {
+        auto* Floor = W.World->SpawnActor<AActor>();
+        auto* Box = NewObject<UBoxComponent>(Floor);
+        Floor->SetRootComponent(Box);
+        Floor->AddInstanceComponent(Box);
+        Box->SetBoxExtent(Extent);
+        Box->SetCollisionObjectType(ECC_WorldStatic);
+        Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Box->SetCollisionResponseToAllChannels(ECR_Block);
+        Box->RegisterComponent();
+        Floor->SetActorLocation(Center);
+    };
+    AddFloor(FVector(-300., 0., -10.), FVector(300., 600., 10.));
+    AddFloor(FVector(300., 0., -65.), FVector(300., 600., 15.));
+    auto* Water = W.World->SpawnActor<AEcoVegetationHabitat>();
+    Water->HabitatId = TEXT("ChoiceBasin");
+    Water->RegionId = Region->RegionId;
+    Water->Bounds->SetBoxExtent(FVector(300., 600., 120.));
+    Water->SetActorLocation(FVector(300., 0., 0.));
+    Water->WaterSurfaceZ = 15.f;
+    Water->bConnectedFreshWater = Water->bSupportsFaunaSwimming = true;
+
+    auto* Clock = W.World->GetSubsystem<UEcoWorldClockSubsystem>();
+    FEcoServerTimeSnapshot Time;
+    if (!Clock->StartClock(1, 60., 60.) || !Clock->GetSnapshotAt(1., Time)) return false;
+    const FName Mink(TEXT("Mink"));
+    const FVector Start(-40., 0., 0.);
+    const auto Entity = FEcoCombatTestAccess::SpawnFaunaAt(*S, Region->RegionId, Time, Start, Mink);
+    auto& EM = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    if (!EM.IsEntityValid(Entity) || !FEcoCombatTestAccess::RefreshLookup(*S)) return false;
+    auto& Profile = S->FaunaSpecies[0];
+    Profile.Locomotion = EEcoFaunaLocomotion::Amphibious;
+    Profile.Diet = EEcoFaunaDiet::Carnivore;
+    Profile.BodyRadius = 5.f;
+    Profile.SightRange = 300.f;
+    S->FaunaHabitatStage = 1;
+    auto& Bank = S->FaunaHabitatPatches.AddDefaulted_GetRef();
+    Bank.Id = TEXT("BankFood");
+    Bank.RegionId = Region->RegionId;
+    Bank.Center = FVector(-72., 0., 0.);
+    Bank.Consumers.Add(Mink);
+    Bank.Capacity = 10.f;
+    Bank.EnergyPerMeal = 5.f;
+    auto& Pool = S->FaunaHabitatPatches.AddDefaulted_GetRef();
+    Pool.Id = TEXT("PoolFood");
+    Pool.RegionId = Region->RegionId;
+    Pool.Center = FVector(75., 0., -10.);
+    Pool.Consumers.Add(Mink);
+    Pool.Capacity = 8.f;
+    Pool.EnergyPerMeal = 1.f;
+    Pool.bSubmerged = Pool.bHasShoreEntry = true;
+    Pool.ShorePoint = FVector(-5., 0., 0.);
+    Pool.WaterEntryPoint = FVector(12., 0., 0.);
+    if (!TestTrue(TEXT("Authored land and water food are both accessible"), FEcoCombatTestAccess::InitializeHabitat(*S))) return false;
+
+    auto& Transform = EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform();
+    auto& Velocity = EM.GetFragmentDataChecked<FMassVelocityFragment>(Entity).Value;
+    auto& Fauna = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entity);
+    auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity);
+    Fauna.Life.Born = -300.;
+    Vitals.Energy = .5f * Vitals.MaxEnergy;
+    const FEcoFaunaFragment Initial = Fauna;
+    auto& Stock = FEcoCombatTestAccess::PatchStock(*S);
+    const auto StepFromBank = [&](bool bCompare)
+    {
+        S->bEnablePredatorContinuity = bCompare;
+        TestEqual(TEXT("The trial uses the requested world rule"), S->UsesPredatorContinuity(), bCompare);
+        Fauna = Initial;
+        Transform.SetLocation(Start);
+        Velocity = FVector::ZeroVector;
+        FEcoCombatTestAccess::MoveFauna(*S, 2.);
+        return Transform.GetLocation().X;
+    };
+
+    TestTrue(TEXT("Existing early shore selection approaches water before scoring the bank"), StepFromBank(false) > Start.X);
+    TestTrue(TEXT("With both sites reachable, the mink approaches the better dry meal"), StepFromBank(true) < Start.X);
+    TestEqual(TEXT("The dry patch remains the feeding target"), Fauna.PatchTarget, 0);
+    TestEqual(TEXT("The choice itself never debits food"), Stock[0], 10.f);
+    Stock[0] = 0.f;
+    TestTrue(TEXT("An empty land patch leaves useful water food eligible"), StepFromBank(true) > Start.X);
+    TestEqual(TEXT("Shore approach does not debit submerged food"), Stock[1], 8.f);
+
+    const FVector FoodPoint = Pool.Center;
+    const auto StepAtPool = [&](bool bContinuity, double ThreatUntil)
+    {
+        S->bEnablePredatorContinuity = bContinuity;
+        Fauna = Initial;
+        Fauna.bSwimming = true;
+        Fauna.Goal = FoodPoint;
+        Fauna.PatchTarget = 1;
+        Fauna.LandingPoint = Pool.ShorePoint;
+        Fauna.SwimEntry = Pool.WaterEntryPoint;
+        Fauna.ThreatUntil = ThreatUntil;
+        Fauna.PhaseUntil = 20.;
+        Fauna.NextSense = Fauna.NextDecision = 10.;
+        Transform.SetLocation(FoodPoint);
+        Velocity = FVector::ZeroVector;
+        FEcoCombatTestAccess::MoveFauna(*S, 3.);
+    };
+    Pool.RegrowthPerSecond = .2f;
+    FEcoCombatTestAccess::UpdateHabitat(*S, 3.);
+    Stock[1] = .1f;
+    StepAtPool(false, -1.);
+    TestTrue(TEXT("The previous rule heads back to shore at an empty food site"), Velocity.X < 0.);
+    StepAtPool(true, 10.);
+    TestTrue(TEXT("A threat still interrupts the visit"), Velocity.X < 0.);
+    StepAtPool(true, -1.);
+    TestTrue(TEXT("The safe swimmer waits beside a briefly depleted site"), Transform.GetLocation().Equals(FoodPoint));
+    TestEqual(TEXT("The pause cannot extend the swimming trip"), Fauna.PhaseUntil, 7.);
+    TestEqual(TEXT("Waiting writes no food stock"), Stock[1], .1f);
+    Time.ServerTimeSeconds = 4.;
+    FEcoCombatTestAccess::UpdateHabitat(*S, Time.ServerTimeSeconds);
+    TestTrue(TEXT("The patch regenerates while the swimmer waits"), Stock[1] > .1f);
+    const float StockBeforeMeal = Stock[1];
+    const float Meal = FMath::Min(Pool.EnergyPerMeal, StockBeforeMeal);
+    const float BeforeMeal = Vitals.Energy;
+    if (!FEcoCombatTestAccess::FeedFauna(*S, Time)) return false;
+    TestEqual(TEXT("A later meal uses the actual available stock"), Vitals.Energy, BeforeMeal + Meal);
+    TestEqual(TEXT("The later meal debits the patch once"), Stock[1], StockBeforeMeal - Meal);
+    Stock[1] = 8.f;
+
+    const FName FishName(TEXT("SmallFish"));
+    const FVector MealPoint = Pool.Center;
+    const int64 HunterId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity).StableAgentId;
+    const double Side = HunterId % 2 == 0 ? 1. : -1.;
+    const FVector FishPoint = MealPoint + FVector(0., Side * 24., 0.);
+    const auto Fish = FEcoCombatTestAccess::SpawnFaunaAt(*S, Region->RegionId, Time, FishPoint, FishName);
+    if (!TestTrue(TEXT("The water prey spawned"), EM.IsEntityValid(Fish))) return false;
+    S->FaunaSpecies[0].SightHalfAngle = 55.f;
+    S->FaunaSpecies[0].AttackReach = 30.f;
+    S->FaunaSpecies[0].AdultMass = 1.f;
+    S->FaunaSpecies[0].PreyRules.AddDefaulted_GetRef().SpeciesId = FishName;
+    auto& PreyProfile = S->FaunaSpecies.Last();
+    PreyProfile.Locomotion = EEcoFaunaLocomotion::Swimming;
+    PreyProfile.BodyRadius = 4.f;
+    PreyProfile.WalkSpeed = 1.f;
+    PreyProfile.AdultMass = .05f;
+    auto& Prey = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Fish);
+    Prey.Goal = FishPoint;
+    Prey.NextDecision = 100.;
+    FEcoCombatTestAccess::Ready(*S, {Entity, Fish});
+    auto& WaterHunter = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entity);
+    WaterHunter = Initial;
+    WaterHunter.bSwimming = true;
+    WaterHunter.PatchTarget = 1;
+    WaterHunter.Goal = MealPoint;
+    WaterHunter.PhaseUntil = 12.;
+    EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform() = FTransform(MealPoint);
+    const auto& FishVitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Fish);
+    const float BeforeHP = FishVitals.HP;
+    FEcoCombatTestAccess::MoveFauna(*S, 3.);
+    TestEqual(TEXT("The mink cannot immediately see prey to its side"), WaterHunter.TargetId, int64(0));
+    for (int32 Tick = 1; Tick <= 35 && WaterHunter.AttackContact < 0.; ++Tick)
+        FEcoCombatTestAccess::MoveFauna(*S, 3. + Tick * .05);
+    if (!TestTrue(TEXT("Turning in place brings prey into the existing view and queues contact"), WaterHunter.AttackContact > 0.)) return false;
+    TestEqual(TEXT("Looking and queuing have not applied damage"), FishVitals.HP, BeforeHP);
+    TestEqual(TEXT("Looking has not debited the feeding patch"), Stock[1], 8.f);
+
+    Pool.Center = MealPoint + FVector(140., 0., 0.);
+    WaterHunter = Initial;
+    WaterHunter.bSwimming = true;
+    WaterHunter.PatchTarget = 1;
+    WaterHunter.SwimEntry = MealPoint;
+    WaterHunter.LandingPoint = Pool.ShorePoint;
+    WaterHunter.Goal = Pool.Center;
+    WaterHunter.PhaseUntil = 13.;
+    EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform() = FTransform(MealPoint);
+    EM.GetFragmentDataChecked<FTransformFragment>(Fish).GetMutableTransform() = FTransform(FishPoint);
+    FEcoCombatTestAccess::MoveFauna(*S, 5.);
+    TestTrue(TEXT("A swimmer entering water checks its vicinity before moving to the more distant patch"),
+        EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetTransform().GetLocation().Equals(MealPoint));
+    TestEqual(TEXT("The entry scan must turn before detecting prey outside the field of view"), WaterHunter.TargetId, int64(0));
+    for (int32 Tick = 1; Tick <= 25 && WaterHunter.AttackContact < 0.; ++Tick)
+        FEcoCombatTestAccess::MoveFauna(*S, 5. + Tick * .05);
+    if (!TestTrue(TEXT("The entry scan queues real contact before the short pause ends"), WaterHunter.AttackContact > 0.)) return false;
+    TestEqual(TEXT("The entry scan does not debit the feeding patch"), Stock[1], 8.f);
+    FEcoCombatTestAccess::Predation(*S, WaterHunter.AttackContact);
+    TestTrue(TEXT("Only the authority contact changes the prey health"), FishVitals.HP < BeforeHP);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoAquaticClockSpeed, "AdaptiveEcosystem.Fauna.Water.DayNightMovement",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FEcoAquaticClockSpeed::RunTest(const FString&)
@@ -1150,6 +1513,35 @@ bool FEcoAquaticClockSpeed::RunTest(const FString&)
         FMath::IsNearlyEqual(NightDistance, DayDistance * ExpectedRatio, 1.e-4));
     AddInfo(FString::Printf(TEXT("Catfish 50ms horizontal movement, day %.6f cm, night %.6f cm"), DayDistance, NightDistance));
 
+    const bool bPreviousPersistence = Spawner->FaunaPersistence.bEnabled;
+    const float PreviousDepthFraction = Catfish.SwimDepthFraction;
+    const FVector PreviousFlow = Water->FaunaWaterCurrent;
+    const FVector RestPoint(0., 0., 50.);
+    Catfish.SwimDepthFraction = .5f;
+    const auto MeasureDemand = [&](bool bPersistence, const FVector& Goal, const FVector& Flow)
+    {
+        Spawner->FaunaPersistence.bEnabled = bPersistence;
+        Water->FaunaWaterCurrent = Flow;
+        Transform.SetLocation(RestPoint);
+        Fish = InitialFish;
+        Fish.NextDecision = 1000.;
+        Fish.Goal = Goal;
+        FEcoCombatTestAccess::MoveFauna(*Spawner, 90.);
+        return Fish.MaintenanceScale;
+    };
+    const float DisabledDemand = MeasureDemand(false, RestPoint, FVector::ZeroVector);
+    TestEqual(TEXT("Water activity leaves maintenance unchanged with persistence disabled"), DisabledDemand, 1.f);
+    const float RestDemand = MeasureDemand(true, RestPoint, FVector::ZeroVector);
+    const float DriftDemand = MeasureDemand(true, RestPoint, FVector(30., 0., 0.));
+    TestTrue(TEXT("Water current produces real movement"), FVector::Dist2D(RestPoint, Transform.GetLocation()) > 1.);
+    TestTrue(TEXT("Drifting carries the same demand as resting"), FMath::IsNearlyEqual(DriftDemand, RestDemand, 1.e-6f));
+    const float SwimmingDemand = MeasureDemand(true, RestPoint + FVector(180., 0., 0.), FVector::ZeroVector);
+    TestTrue(TEXT("Active swimming costs more than resting and no more than full effort"),
+        RestDemand < SwimmingDemand && SwimmingDemand <= 1.f && RestDemand < 1.f);
+    Spawner->FaunaPersistence.bEnabled = bPreviousPersistence;
+    Catfish.SwimDepthFraction = PreviousDepthFraction;
+    Water->FaunaWaterCurrent = PreviousFlow;
+
     auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity);
     const float HungryEnergy = .5f * Vitals.MaxEnergy;
     for (const double StartTime : {30., 90.})
@@ -1176,15 +1568,41 @@ bool FEcoAquaticClockSpeed::RunTest(const FString&)
             FEcoCombatTestAccess::PatchStock(*Spawner)[0], 10.f - Paid);
         AddInfo(FString::Printf(TEXT("Catfish %.0fs paid %.3f from the 220 cm patch"), StartTime, Paid));
     }
-    // Hold the selected patch and hunger fixed while changing one execution condition.
+    // A blocked exploratory goal must yield to the next scheduled food decision.
     auto& Stock = FEcoCombatTestAccess::PatchStock(*Spawner)[0];
+    const FVector Edge(-249.9, 0., Start.Z);
+    const FVector OriginalCenter = Patch.Center;
+    Patch.Center = Edge + FVector(58., 0., 0.);
+    Transform.SetLocation(Edge);
+    Fish = InitialFish;
+    Fish.Goal = Edge - FVector(70., 0., 0.);
+    Fish.NextDecision = 96.25;
+    Vitals.Energy = HungryEnergy;
+    Stock = 10.f;
+    EM.GetFragmentDataChecked<FEcoLifetimeFragment>(Entity).NextFeedTimeSeconds = 99.;
+    FEcoCombatTestAccess::MoveFauna(*Spawner, 96.);
+    TestEqual(TEXT("The outward step hits the dry edge"), Transform.GetLocation(), Edge);
+    for (int32 Tick = 1; Tick <= 60; ++Tick)
+        FEcoCombatTestAccess::MoveFauna(*Spawner, 96. + .05 * Tick);
+    TestEqual(TEXT("Repeated blocked steps cannot starve the next food decision"), Fish.PatchTarget, 0);
+    if (!Clock->GetSnapshotAt(99., Time) || !FEcoCombatTestAccess::FeedFauna(*Spawner, Time)) return false;
+    TestEqual(TEXT("The recovered swimmer consumes food through the normal authority path"), Vitals.Energy, HungryEnergy + 2.f);
+    TestEqual(TEXT("The recovered meal debits the original stock"), Stock, 8.f);
+    Patch.Center = OriginalCenter;
+
+    // Hold the selected patch and hunger fixed while changing one execution condition.
     double AttemptAt = 100.;
     const auto CheckPayment = [&](const TCHAR* Label, const FVector& Position, float Surface,
-        const FVector& Velocity, float InitialStock, float ExpectedPayment)
+        const FVector& Velocity, float InitialStock, float ExpectedPayment, double InheritedSize = 0.)
     {
         Water->WaterSurfaceZ = Surface;
         Transform.SetLocation(Position);
         Fish = InitialFish;
+        if (InheritedSize > 0.)
+        {
+            Fish.Life.Genome.Size = InheritedSize;
+            Fish.Life.Born = AttemptAt - Fish.Life.MaturitySeconds;
+        }
         Fish.PatchTarget = 0;
         Fish.PatchAccessPoint = 0;
         Fish.Life.MealCycle.bSeeking = true;
@@ -1225,7 +1643,145 @@ bool FEcoAquaticClockSpeed::RunTest(const FString&)
     CheckPayment(TEXT("Submerged barrier blocks sight"), Approach, 100.f, FVector::ZeroVector, 10.f, 0.f);
     Barrier->SetActorEnableCollision(false);
     CheckPayment(TEXT("Restored access"), Approach, 100.f, FVector::ZeroVector, 10.f, 2.f);
+
+    // A 5 cm shelf covers the food point, while the fish can wait in deep water within feeding reach.
+    Water->Bounds->SetBoxExtent(FVector(300., 300., 120.));
+    BarrierBox->SetBoxExtent(FVector(6., 8., 5.));
+    Barrier->SetActorLocation(FVector(220., 0., 90.));
+    Barrier->SetActorEnableCollision(true);
+    Patch.Center.Z = 97.5;
+    const FVector ShelfApproach(200., 0., 97.5);
+    CheckPayment(TEXT("A large inherited body cannot debit the stale shallow target"), ShelfApproach, 100.f,
+        FVector::ZeroVector, 10.f, 0.f, 1.1);
+    CheckPayment(TEXT("A small inherited body can feed at the same shallow target"), ShelfApproach, 100.f,
+        FVector::ZeroVector, 10.f, 2.f, .9);
+    CheckPayment(TEXT("Rising water lets the larger body use the same stock"), ShelfApproach, 102.f,
+        FVector::ZeroVector, 10.f, 2.f, 1.1);
+    Patch.Center = OriginalCenter;
+    Water->WaterSurfaceZ = 100.f;
+    Barrier->SetActorEnableCollision(false);
+
+    const FVector SecondAccess = Patch.Center - FVector(90., 0., 0.);
+    const auto Young = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, SecondAccess, TEXT("CommonCarp"));
+    if (!TestTrue(TEXT("The second aquatic consumer spawned"), EM.IsEntityValid(Young))) return false;
+    Spawner->FaunaSpecies.Last().Locomotion = EEcoFaunaLocomotion::Swimming;
+    Patch.Consumers.Add(TEXT("CommonCarp"));
+    Patch.ForageAccessPoints.Add(SecondAccess);
+    if (!FEcoCombatTestAccess::InitializeHabitat(*Spawner)) return false;
+    FEcoCombatTestAccess::Ready(*Spawner, {Entity, Young});
+    const auto PaySharedPortion = [&](const TCHAR* Label, bool bRotate, bool bSecondSwimming, bool bSecondReceives)
+    {
+        Spawner->bEnableAquaticPatchMealRotation = bRotate;
+        FEcoCombatTestAccess::PatchStock(*Spawner)[0] = .8f;
+        for (const auto Candidate : {Entity, Young})
+        {
+            const bool bSecond = Candidate == Young;
+            auto& State = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Candidate);
+            State.PatchTarget = 0;
+            State.PatchAccessPoint = bSecond ? 1 : 0;
+            State.LastMeal = bSecond ? -1. : AttemptAt - 1.;
+            State.bSwimming = bSecond && bSecondSwimming;
+            State.Life.MealCycle.bSeeking = true;
+            EM.GetFragmentDataChecked<FTransformFragment>(Candidate).GetMutableTransform().SetLocation(Patch.ForagePoint(State.PatchAccessPoint));
+            EM.GetFragmentDataChecked<FMassVelocityFragment>(Candidate).Value = FVector::ZeroVector;
+            EM.GetFragmentDataChecked<FEcoLifetimeFragment>(Candidate).NextFeedTimeSeconds = AttemptAt;
+            EM.GetFragmentDataChecked<FEcoVitalsFragment>(Candidate).Energy = HungryEnergy;
+        }
+        if (!Clock->GetSnapshotAt(AttemptAt++, Time) || !FEcoCombatTestAccess::FeedFauna(*Spawner, Time))
+        {
+            AddError(FString::Printf(TEXT("%s: feeding pass failed"), Label));
+            return;
+        }
+        TestEqual(FString::Printf(TEXT("%s: second consumer energy"), Label),
+            EM.GetFragmentDataChecked<FEcoVitalsFragment>(Young).Energy, HungryEnergy + (bSecondReceives ? .8f : 0.f));
+        TestEqual(FString::Printf(TEXT("%s: first consumer energy"), Label),
+            EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).Energy, HungryEnergy + (bSecondReceives ? 0.f : .8f));
+        TestEqual(FString::Printf(TEXT("%s: one debit from shared stock"), Label),
+            FEcoCombatTestAccess::PatchStock(*Spawner)[0], 0.f);
+    };
+    PaySharedPortion(TEXT("The longer-waiting fish eats from a different access point"), true, false, true);
+    Spawner->FaunaSpecies.Last().Locomotion = EEcoFaunaLocomotion::Amphibious;
+    Spawner->FaunaSpecies.Last().Diet = EEcoFaunaDiet::Carnivore;
+    PaySharedPortion(TEXT("Default order preserves the earlier consumer"), false, true, false);
+    PaySharedPortion(TEXT("A swimming amphibian joins the shared feeding order"), true, true, true);
+    PaySharedPortion(TEXT("An amphibian out of swim mode cannot use the submerged stock"), true, false, false);
     return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoLandPlantMealRotation, "AdaptiveEcosystem.Fauna.Life.LandPlantMealRotation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoLandPlantMealRotation::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("LandPlantRotationMeadow");
+    Region->RegionBounds->SetBoxExtent(FVector(500.));
+    FEcoCombatTestAccess::SetRulesOnlyRegion(*Spawner, *Region);
+    auto* Floor = W.World->SpawnActor<AActor>();
+    auto* Box = NewObject<UBoxComponent>(Floor);
+    Floor->SetRootComponent(Box);
+    Floor->AddInstanceComponent(Box);
+    Box->SetBoxExtent(FVector(300., 300., 10.));
+    Box->SetCollisionObjectType(ECC_WorldStatic);
+    Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    Box->SetCollisionResponseToAllChannels(ECR_Block);
+    Box->RegisterComponent();
+    Floor->SetActorLocation(FVector(0., 0., -10.));
+
+    auto* Clock = W.World->GetSubsystem<UEcoWorldClockSubsystem>();
+    FEcoServerTimeSnapshot Time;
+    if (!Clock->StartClock(1, 60., 60.) || !Clock->GetSnapshotAt(1., Time)) return false;
+    const FVector MainPoint(-80., 0., 0.), SidePoint(80., 0., 0.);
+    const auto Horse = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, MainPoint, TEXT("Horse"));
+    const auto Buffalo = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, SidePoint, TEXT("Buffalo"));
+    auto& Manager = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    if (!TestTrue(TEXT("Both contenders spawned"), Manager.IsEntityValid(Horse) && Manager.IsEntityValid(Buffalo))) return false;
+    FEcoCombatTestAccess::Ready(*Spawner, {Horse, Buffalo});
+    Spawner->FaunaHabitatStage = 1;
+    auto& Patch = Spawner->FaunaHabitatPatches.AddDefaulted_GetRef();
+    Patch.Id = TEXT("MeadowGrass");
+    Patch.RegionId = Region->RegionId;
+    Patch.Center = MainPoint;
+    Patch.PlantGuild = EEcoFaunaPlantGuild::Grass;
+    Patch.ForageAccessPoints = {SidePoint};
+    Patch.Consumers = {TEXT("Horse"), TEXT("Buffalo")};
+    Patch.Capacity = 10.f;
+    if (!FEcoCombatTestAccess::InitializeHabitat(*Spawner)) return false;
+
+    constexpr float HungryEnergy = 40.f;
+    constexpr float Portion = .75f;
+    double AttemptAt = 10.;
+    const auto CheckMeal = [&](bool bRotation, const FVector& BuffaloPosition, bool bBuffaloWins)
+    {
+        Spawner->bEnableLandPlantMealRotation = bRotation;
+        auto& Stock = FEcoCombatTestAccess::PatchStock(*Spawner)[0];
+        Stock = Portion;
+        for (const auto Entity : {Horse, Buffalo})
+        {
+            const bool bBuffalo = Entity == Buffalo;
+            auto& State = Manager.GetFragmentDataChecked<FEcoFaunaFragment>(Entity);
+            State.PatchTarget = 0;
+            State.PatchAccessPoint = bBuffalo ? 1 : 0;
+            State.LastMeal = bBuffalo ? -1. : AttemptAt - 1.;
+            Manager.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform().SetLocation(bBuffalo ? BuffaloPosition : MainPoint);
+            Manager.GetFragmentDataChecked<FMassVelocityFragment>(Entity).Value = FVector::ZeroVector;
+            Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).Energy = HungryEnergy;
+            Manager.GetFragmentDataChecked<FEcoLifetimeFragment>(Entity).NextFeedTimeSeconds = AttemptAt;
+        }
+        if (!TestTrue(TEXT("The rules-only feeding pass completes"),
+            Clock->GetSnapshotAt(AttemptAt++, Time) && FEcoCombatTestAccess::FeedFauna(*Spawner, Time))) return false;
+        const auto Winner = bBuffaloWins ? Buffalo : Horse;
+        const auto Other = bBuffaloWins ? Horse : Buffalo;
+        TestEqual(TEXT("Only the eligible first contender receives the portion"),
+            Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Winner).Energy, HungryEnergy + Portion);
+        TestEqual(TEXT("The other contender receives no duplicate payment"),
+            Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Other).Energy, HungryEnergy);
+        TestEqual(TEXT("Both access points use the same stock"), Stock, 0.f);
+        return true;
+    };
+    return CheckMeal(false, SidePoint, false) && CheckMeal(true, SidePoint, true)
+        && CheckMeal(true, SidePoint + FVector(45., 0., 0.), false);
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoSeasonalAquaticPatch, "AdaptiveEcosystem.Fauna.Water.SeasonalFoodStock",
@@ -1422,13 +1978,276 @@ bool FEcoFaunaSocialSpecies::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoSharedNestApproach, "AdaptiveEcosystem.Fauna.Life.SharedNestApproach",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoSharedNestApproach::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    Spawner->bEnableEcosystemLife = true;
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("SharedNestRegion");
+    Region->RegionBounds->SetBoxExtent(FVector(1800., 800., 500.));
+    FEcoCombatTestAccess::SetBreedingRegion(*Spawner, *Region);
+
+    auto* Ground = W.World->SpawnActor<AActor>();
+    auto* Floor = NewObject<UBoxComponent>(Ground);
+    Ground->SetRootComponent(Floor);
+    Ground->AddInstanceComponent(Floor);
+    Floor->SetBoxExtent(FVector(1500., 600., 10.));
+    Floor->SetCollisionObjectType(ECC_WorldStatic);
+    Floor->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    Floor->SetCollisionResponseToAllChannels(ECR_Block);
+    Floor->RegisterComponent();
+    Ground->SetActorLocation(FVector(0., 0., -10.));
+
+    auto& Bird = Spawner->FaunaSpecies.AddDefaulted_GetRef();
+    Bird.SpeciesId = TEXT("GoldenEagle");
+    Bird.Locomotion = EEcoFaunaLocomotion::Flight;
+    Bird.SightRange = 2000.f;
+    Bird.FlightCruiseHeight = 100.f;
+    Bird.NestlingSeconds = 60.f;
+    Bird.Gestation = 10.f;
+    auto& Nest = Spawner->FaunaPerches.AddDefaulted_GetRef();
+    Nest.SpeciesId = Bird.SpeciesId;
+    Nest.RegionId = Region->RegionId;
+    Nest.NestId = TEXT("SharedNest");
+
+    auto* Ecology = W.World->GetSubsystem<UEcologySimulationSubsystem>();
+    FRegionEcologyState State;
+    State.RegionId = Region->RegionId;
+    State.FoodAmount = State.FoodCapacity = 100.;
+    FEcoFoodEventSettings NoFoodEvent;
+    NoFoodEvent.bEnabled = false;
+    FEcoServerTimeSnapshot Time;
+    Time.WorldEpoch = 1;
+    if (!Ecology->RegisterRegionState(State) || !Ecology->RegisterSpawnSchedule(State.RegionId, {})
+        || !Ecology->RegisterSpatialFood(State.RegionId, 100., 100.)
+        || !Ecology->StartResourceSimulation(Time.WorldEpoch, NoFoodEvent, NoFoodEvent, false)
+        || !FEcoCombatTestAccess::SpawnFaunaPair(*Spawner, State.RegionId, Time,
+            {FVector(-650., 0., 0.), FVector(650., 0., 0.)})
+        || !FEcoCombatTestAccess::RefreshResidents(*Spawner))
+    {
+        AddError(TEXT("Shared nest fixture could not be initialized"));
+        return false;
+    }
+    auto& EM = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    const auto& Residents = FEcoCombatTestAccess::Residents(*Spawner);
+    const auto A = Residents[0];
+    const auto B = Residents[1];
+    auto& First = EM.GetFragmentDataChecked<FEcoFaunaFragment>(A).Life;
+    auto& Second = EM.GetFragmentDataChecked<FEcoFaunaFragment>(B).Life;
+    First.Born = Second.Born = -300.;
+    First.Sex = EcoLifeV3::ESex::Female;
+    Second.Sex = EcoLifeV3::ESex::Male;
+    const auto SetLocation = [&](FMassEntityHandle Entity, const FVector& Location) {
+        EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform().SetLocation(Location);
+    };
+    Time.ServerTimeSeconds = 20.;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)
+        || !TestEqual(TEXT("The default rule keeps its direct pairing range"), FEcoCombatTestAccess::PendingFaunaBirths(*Spawner), 0))
+        return false;
+    Spawner->bEnablePredatorContinuity = true;
+    SetLocation(B, FVector(1050., 0., 0.));
+    Time.ServerTimeSeconds = 26.;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)
+        || !TestEqual(TEXT("Each parent must be within approach range of the nest"), FEcoCombatTestAccess::PendingFaunaBirths(*Spawner), 0))
+        return false;
+    SetLocation(B, FVector(650., 0., 0.));
+    Time.ServerTimeSeconds = 32.;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)
+        || !TestEqual(TEXT("Separated parents can reserve the same reachable nest"), FEcoCombatTestAccess::PendingFaunaBirths(*Spawner), 1))
+        return false;
+    Time.ServerTimeSeconds += Bird.Gestation;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)
+        || !TestEqual(TEXT("Reservation alone does not deliver a chick"), Residents.Num(), 2)) return false;
+    for (int32 Tick = 1; Tick <= 120; ++Tick)
+        FEcoCombatTestAccess::MoveFauna(*Spawner, Time.ServerTimeSeconds + .05 * Tick);
+    const auto ReachedNestApproach = [&](FMassEntityHandle Parent, double Offset)
+    {
+        const auto& State = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Parent);
+        const FVector Position = EM.GetFragmentDataChecked<FTransformFragment>(Parent).GetTransform().GetLocation();
+        return State.Flight == EEcoFaunaFlightPhase::Grounded
+            && FVector::DistSquared2D(Position, Nest.Location + FVector(Offset, 0., 0.)) <= FMath::Square(2.1);
+    };
+    if (!TestTrue(TEXT("Both parents stay grounded at their reserved nest approaches"),
+            ReachedNestApproach(A, 65.) && ReachedNestApproach(B, -65.))) return false;
+    Time.ServerTimeSeconds += 6.;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)
+        || !TestEqual(TEXT("Both grounded arrivals permit one hatch"), Residents.Num(), 3)) return false;
+    const auto& Child = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Residents.Last()).Life;
+    TestTrue(TEXT("The hatch records both parents and the next generation"), Child.Generation == 1
+        && Child.ParentA == EM.GetFragmentDataChecked<FEcoIdentityFragment>(A).StableAgentId
+        && Child.ParentB == EM.GetFragmentDataChecked<FEcoIdentityFragment>(B).StableAgentId);
+    SetLocation(A, FVector(-300., 0., 0.));
+    SetLocation(B, FVector(300., 0., 0.));
+    Bird.Diet = EEcoFaunaDiet::Carnivore;
+    Bird.bCanDiveHunt = true;
+    Bird.CarrionEnergyPerMeal = 5.f;
+    constexpr float ParentEnergyFraction = .72f;
+    TestTrue(TEXT("The returning parents are able to provision and hungry enough to scan for food"),
+        ParentEnergyFraction >= .65f && ParentEnergyFraction < Bird.MealStart());
+    for (const auto Parent : {A, B})
+    {
+        auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Parent);
+        Vitals.Energy = ParentEnergyFraction * Vitals.MaxEnergy;
+    }
+    auto& Stock = FEcoCombatTestAccess::CarcassStock(*Spawner, 1001);
+    Stock.Region = Region->RegionId;
+    Stock.Species = TEXT("Jackrabbit");
+    Stock.Position = FVector(-220., 100., 0.);
+    Stock.Remaining = 10.f;
+    const double Takeoff = Time.ServerTimeSeconds + 1.;
+    Stock.ExpiresAt = Takeoff + 20.;
+    FEcoCombatTestAccess::MoveFauna(*Spawner, Takeoff);
+    const auto& FirstApproach = EM.GetFragmentDataChecked<FEcoFaunaFragment>(A);
+    const auto& SecondApproach = EM.GetFragmentDataChecked<FEcoFaunaFragment>(B);
+    TestTrue(TEXT("Both parents can take off toward their provisioning positions"),
+        FirstApproach.Flight == EEcoFaunaFlightPhase::Takeoff && SecondApproach.Flight == EEcoFaunaFlightPhase::Takeoff);
+    TestTrue(TEXT("Each returning parent has its own clear landing space"),
+        FVector::DistSquared(FirstApproach.LandingPoint, SecondApproach.LandingPoint) > FMath::Square(55.));
+    const FVector ChickPosition = EM.GetFragmentDataChecked<FTransformFragment>(Residents.Last()).GetTransform().GetLocation();
+    TestTrue(TEXT("Both landing positions remain within feeding distance of the chick"),
+        FVector::DistSquared(FirstApproach.LandingPoint, ChickPosition) <= FMath::Square(140.)
+        && FVector::DistSquared(SecondApproach.LandingPoint, ChickPosition) <= FMath::Square(140.));
+    const auto BothLanded = [&] {
+        return FirstApproach.Flight == EEcoFaunaFlightPhase::Grounded
+            && SecondApproach.Flight == EEcoFaunaFlightPhase::Grounded;
+    };
+    for (int32 Tick = 1; Tick <= 100 && !BothLanded(); ++Tick)
+    {
+        const bool bFirstFlying = FirstApproach.Flight != EEcoFaunaFlightPhase::Grounded;
+        const bool bSecondFlying = SecondApproach.Flight != EEcoFaunaFlightPhase::Grounded;
+        FEcoCombatTestAccess::MoveFauna(*Spawner, Takeoff + .05 * Tick);
+        if (!TestTrue(TEXT("Active nest approaches stay with the chick instead of diverting to carrion"),
+                (!bFirstFlying || FirstApproach.CarrionTargetId == 0)
+                && (!bSecondFlying || SecondApproach.CarrionTargetId == 0))) return false;
+    }
+    if (!TestTrue(TEXT("Both parents return to the ground"), BothLanded())) return false;
+    const auto Energy = [&](FMassEntityHandle Agent) { return EM.GetFragmentDataChecked<FEcoVitalsFragment>(Agent).Energy; };
+    const float ChickEnergy = Energy(Residents.Last());
+    const float ParentEnergy = Energy(A) + Energy(B);
+    Time.ServerTimeSeconds = Takeoff + 5.;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)) return false;
+    TestEqual(TEXT("The chick receives one real portion"), Energy(Residents.Last()), ChickEnergy + 1.f);
+    TestEqual(TEXT("The parents pay exactly what the chick receives"), Energy(A) + Energy(B), ParentEnergy - 1.f);
+    return TestEqual(TEXT("The unrelated carcass stock stays intact"), Stock.Remaining, 10.f);
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoCoveredRefugeBirth, "AdaptiveEcosystem.Fauna.Life.BirthUnderCoveredRefuge",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoCoveredRefugeBirth::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    Spawner->bEnableEcosystemLife = Spawner->bEnableCoveredRefugeForage = true;
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("CoveredNursery");
+    Region->RegionBounds->SetBoxExtent(FVector(500.));
+    FEcoCombatTestAccess::SetBreedingRegion(*Spawner, *Region);
+    const auto AddBox = [&](FVector Location, FVector Extent)
+    {
+        auto* Actor = W.World->SpawnActor<AActor>();
+        auto* Collision = NewObject<UBoxComponent>(Actor);
+        Actor->SetRootComponent(Collision);
+        Actor->AddInstanceComponent(Collision);
+        Collision->SetBoxExtent(Extent);
+        Collision->SetCollisionObjectType(ECC_WorldStatic);
+        Collision->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Collision->SetCollisionResponseToAllChannels(ECR_Block);
+        Collision->RegisterComponent();
+        Actor->SetActorLocation(Location);
+    };
+    AddBox(FVector(0., 0., -10.), FVector(350., 350., 10.));
+    AddBox(FVector(0., 0., 20.), FVector(80., 55., 5.));
+
+    auto& Rat = Spawner->FaunaSpecies.AddDefaulted_GetRef();
+    Rat.SpeciesId = TEXT("Rat");
+    Rat.BodyRadius = 4.f;
+    Rat.SweepHeight = 6.f;
+    Rat.StepHeight = 8.f;
+    Rat.EyeHeight = 5.f;
+    Rat.Gestation = 4.f;
+    Spawner->FaunaHabitatStage = 1;
+    auto& Patch = Spawner->FaunaHabitatPatches.AddDefaulted_GetRef();
+    Patch.Id = TEXT("CoveredRatRefuge");
+    Patch.RegionId = Region->RegionId;
+    Patch.ShelteredSpecies = Rat.SpeciesId;
+    Patch.ShelterRadius = 60.f;
+    Patch.EntranceRadius = 7.f;
+    Patch.ShelterApproachPoints = {FVector(-100., 0., 0.), FVector(100., 0., 0.)};
+    Patch.Consumers.Add(Rat.SpeciesId);
+    Patch.Capacity = 10.f;
+    Patch.EnergyPerMeal = 1.f;
+
+    auto* Ecology = W.World->GetSubsystem<UEcologySimulationSubsystem>();
+    FRegionEcologyState RegionState;
+    RegionState.RegionId = Region->RegionId;
+    FEcoFoodEventSettings NoFoodEvent;
+    NoFoodEvent.bEnabled = false;
+    FEcoServerTimeSnapshot Time;
+    Time.WorldEpoch = 1;
+    if (!Ecology->RegisterRegionState(RegionState) || !Ecology->RegisterSpawnSchedule(RegionState.RegionId, {})
+        || !Ecology->StartResourceSimulation(Time.WorldEpoch, NoFoodEvent, NoFoodEvent, false)
+        || !FEcoCombatTestAccess::InitializeHabitat(*Spawner)
+        || !FEcoCombatTestAccess::SpawnFaunaPair(*Spawner, RegionState.RegionId, Time, {FVector(-18., 0., 0.), FVector(18., 0., 0.)})
+        || !FEcoCombatTestAccess::RefreshResidents(*Spawner))
+    {
+        AddError(TEXT("Covered rat refuge could not be initialized"));
+        return false;
+    }
+    auto& EM = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    const auto& Residents = FEcoCombatTestAccess::Residents(*Spawner);
+    auto& ParentA = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Residents[0]).Life;
+    auto& ParentB = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Residents[1]).Life;
+    ParentA.Born = ParentB.Born = -300.;
+    ParentA.Sex = EcoLifeV3::ESex::Female;
+    ParentB.Sex = EcoLifeV3::ESex::Male;
+    Time.ServerTimeSeconds = 20.;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)
+        || !TestEqual(TEXT("Nourished parents in the refuge reserve a birth"), FEcoCombatTestAccess::PendingFaunaBirths(*Spawner), 1)) return false;
+    Time.ServerTimeSeconds += Rat.Gestation;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)
+        || !TestEqual(TEXT("The covered floor accepts one birth"), Residents.Num(), 3)) return false;
+    const auto Child = Residents.Last();
+    const auto& Life = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Child).Life;
+    const FVector Position = EM.GetFragmentDataChecked<FTransformFragment>(Child).GetTransform().GetLocation();
+    TestTrue(TEXT("The existing reproduction path assigns the child lineage"), Life.Generation == 1 && Life.ParentA > 0 && Life.ParentB > 0);
+    TestTrue(TEXT("The child is inside the refuge at floor level"), FMath::Abs(Position.Z) < .01 && Patch.Shelters(Rat.SpeciesId, Position));
+
+    // Keep the one portion entirely in the refuge so there is no alternate plant meal in this fixture.
+    Rat.Diet = EEcoFaunaDiet::Carnivore;
+    FEcoCombatTestAccess::PatchStock(*Spawner)[0] = .8f;
+    EM.GetFragmentDataChecked<FTransformFragment>(Child).GetMutableTransform().SetLocation(FVector(0., 12., 0.));
+    const auto Founder = Residents[0];
+    for (const auto Entity : {Founder, Child})
+    {
+        EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).Energy = 40.f;
+        EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entity).PatchTarget = 0;
+    }
+    EM.GetFragmentDataChecked<FEcoFaunaFragment>(Founder).LastMeal = Time.ServerTimeSeconds - 1.;
+    Spawner->bEnableCoveredRefugeMealRotation = true;
+    Time.ServerTimeSeconds += 2.;
+    if (!FEcoCombatTestAccess::FeedFauna(*Spawner, Time)) return false;
+    TestTrue(TEXT("The longer-waiting child receives the portion despite the founder being registered first"),
+        FMath::IsNearlyEqual(EM.GetFragmentDataChecked<FEcoVitalsFragment>(Child).Energy, 40.8f));
+    TestEqual(TEXT("The other contender receives no duplicate energy"), EM.GetFragmentDataChecked<FEcoVitalsFragment>(Founder).Energy, 40.f);
+    TestEqual(TEXT("The shared reserve is debited exactly once"), FEcoCombatTestAccess::PatchStock(*Spawner)[0], 0.f);
+    return true;
+}
+
 IMPLEMENT_COMPLEX_AUTOMATION_TEST(FEcoAquaticNurseryContinuity, "AdaptiveEcosystem.Fauna.Water.NurseryContinuity",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 void FEcoAquaticNurseryContinuity::GetTests(TArray<FString>& Names, TArray<FString>& Commands) const
 {
     Names = Commands = {TEXT("Continuous"), TEXT("ExposedThenRewetted"), TEXT("AnotherSiteBecomesCloser"),
         TEXT("ExperienceChangesChoice"), TEXT("RecordOnlyKeepsChoice"), TEXT("ExperiencedSiteStillNeedsWater"),
-        TEXT("FamiliarPartner"), TEXT("FamiliarPartnerRecordOnly"), TEXT("FamiliarPartnerStillNeedsEligibility")};
+        TEXT("FamiliarPartner"), TEXT("FamiliarPartnerRecordOnly"), TEXT("FamiliarPartnerStillNeedsEligibility"),
+        TEXT("BreedingOpportunity"), TEXT("BreedingOpportunityStillNeedsEligibility"),
+        TEXT("ValidatedApproach"), TEXT("SmallInheritedBodyFitsShelf"), TEXT("LargeInheritedBodyCannotFitShelf"),
+        TEXT("ShelfTooShallowForNewborn")};
 }
 
 bool FEcoAquaticNurseryContinuity::RunTest(const FString& Parameters)
@@ -1461,9 +2280,33 @@ bool FEcoAquaticNurseryContinuity::RunTest(const FString& Parameters)
     Fish.Locomotion = EEcoFaunaLocomotion::Swimming;
     Fish.BodyRadius = 5.f;
     Fish.Gestation = 10.f;
+    const bool bNewbornShelf = Parameters == TEXT("SmallInheritedBodyFitsShelf");
+    const bool bLargeBodyBlocked = Parameters == TEXT("LargeInheritedBodyCannotFitShelf");
+    const bool bShelfTooShallow = Parameters == TEXT("ShelfTooShallowForNewborn");
+    const bool bShelf = bNewbornShelf || bLargeBodyBlocked || bShelfTooShallow;
+    if (bShelf)
+    {
+        // Leave the center and parent approach in deep water. The hatch offsets land on the shelf.
+        const double Depth = bShelfTooShallow ? 4. : 4.9;
+        for (const FVector& Axis : {FVector::ForwardVector, -FVector::ForwardVector,
+                FVector::RightVector, -FVector::RightVector})
+        {
+            const FVector Extent = Axis.X != 0. ? FVector(40., 90., 5.) : FVector(90., 40., 5.);
+            auto* Shelf = NewObject<UBoxComponent>(Ground);
+            Ground->AddInstanceComponent(Shelf);
+            Shelf->SetupAttachment(Box);
+            Shelf->SetBoxExtent(Extent);
+            Shelf->SetRelativeLocation(Axis * 50. + FVector(0., 0., 105. - Depth));
+            Shelf->SetCollisionObjectType(ECC_WorldStatic);
+            Shelf->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+            Shelf->SetCollisionResponseToAllChannels(ECR_Block);
+            Shelf->RegisterComponent();
+        }
+    }
     const bool bMemoryTrial = Parameters == TEXT("ExperienceChangesChoice") || Parameters == TEXT("RecordOnlyKeepsChoice")
         || Parameters == TEXT("ExperiencedSiteStillNeedsWater");
     const bool bPartnerTrial = Parameters.StartsWith(TEXT("FamiliarPartner"));
+    const bool bOpportunityTrial = Parameters.StartsWith(TEXT("BreedingOpportunity"));
     Spawner->FaunaHabitatStage = 1;
     for (const bool bShallow : {true, false})
     {
@@ -1485,8 +2328,9 @@ bool FEcoAquaticNurseryContinuity::RunTest(const FString& Parameters)
     if (!Ecology->RegisterRegionState(State) || !Ecology->RegisterSpawnSchedule(State.RegionId, {})
         || !Ecology->StartResourceSimulation(Time.WorldEpoch, NoFoodEvent, NoFoodEvent, false)
         || !FEcoCombatTestAccess::InitializeHabitat(*Spawner)
-        || !FEcoCombatTestAccess::SpawnFaunaPair(*Spawner, State.RegionId, Time, {FVector(0., -30., 60.), FVector(0., 30., 60.)})
-        || (bPartnerTrial && !FEcoCombatTestAccess::SpawnBreedingCandidate(*Spawner, State.RegionId, Time))
+        || !FEcoCombatTestAccess::SpawnFaunaPair(*Spawner, State.RegionId, Time,
+            {FVector(0., bShelf ? -105. : -30., 60.), FVector(0., bShelf ? 105. : 30., 60.)})
+        || ((bPartnerTrial || bOpportunityTrial) && !FEcoCombatTestAccess::SpawnBreedingCandidate(*Spawner, State.RegionId, Time))
         || !FEcoCombatTestAccess::RefreshResidents(*Spawner))
     {
         AddError(TEXT("Aquatic nursery fixture could not initialize"));
@@ -1495,7 +2339,31 @@ bool FEcoAquaticNurseryContinuity::RunTest(const FString& Parameters)
     auto& EM = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
     const auto& Residents = FEcoCombatTestAccess::Residents(*Spawner);
     for (const auto Parent : Residents)
-        EM.GetFragmentDataChecked<FEcoFaunaFragment>(Parent).RecordForageIntake(FVector::ZeroVector, 19., 5.f, 90.f);
+    {
+        auto& Fauna = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Parent);
+        Fauna.RecordForageIntake(FVector::ZeroVector, 19., 5.f, 90.f);
+        if (bShelf) Fauna.Life.Genome.Size = bLargeBodyBlocked ? 1.1 : .9;
+    }
+    if (bOpportunityTrial)
+    {
+        Spawner->bEnableEcosystemLife = true;
+        Spawner->bEnableFaunaBreedingOpportunity = true;
+        auto& Founder = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Residents[0]).Life;
+        auto& Mate = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Residents[1]).Life;
+        auto& Descendant = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Residents[2]).Life;
+        Founder.Sex = Descendant.Sex = EcoLifeV3::ESex::Female;
+        Mate.Sex = EcoLifeV3::ESex::Male;
+        Founder.Offspring = 2;
+        Descendant.Generation = 1;
+        const bool bRelated = Parameters == TEXT("BreedingOpportunityStillNeedsEligibility");
+        const auto Id = [&](int32 Index) { return EM.GetFragmentDataChecked<FEcoIdentityFragment>(Residents[Index]).StableAgentId; };
+        if (bRelated) Descendant.ParentA = Id(1);
+        Time.ServerTimeSeconds = 20.;
+        TestTrue(TEXT("The authority selects a pair"), FEcoCombatTestAccess::FeedFauna(*Spawner, Time));
+        TestEqual(TEXT("An eligible adult with fewer births gets the nursery reservation"),
+            FEcoCombatTestAccess::ReservedPartner(*Spawner), bRelated ? Id(0) : Id(2));
+        return true;
+    }
     if (bPartnerTrial)
     {
         Spawner->FaunaExperienceMode = Parameters == TEXT("FamiliarPartnerRecordOnly") ? 1 : 2;
@@ -1529,11 +2397,35 @@ bool FEcoAquaticNurseryContinuity::RunTest(const FString& Parameters)
         }
         if (Parameters == TEXT("ExperiencedSiteStillNeedsWater")) Water->WaterSurfaceZ = 67.f;
     }
+    const bool bApproach = Parameters == TEXT("ValidatedApproach");
+    if (bApproach)
+    {
+        Fish.SightRange = 400.f;
+        Spawner->bEnableEcosystemLife = true;
+        Spawner->bEnableAquaticNurseryApproach = true;
+        for (const auto Parent : Residents)
+            EM.GetFragmentDataChecked<FTransformFragment>(Parent).GetMutableTransform().AddToTranslation(FVector(-300., 0., 0.));
+    }
     const FName ExpectedSite = Parameters == TEXT("ExperienceChangesChoice") ? TEXT("DeepNursery") : TEXT("ShallowNursery");
     Time.ServerTimeSeconds = 20.;
     if (!TestTrue(TEXT("The authority processes the spawning step"), FEcoCombatTestAccess::FeedFauna(*Spawner, Time))
         || !TestEqual(TEXT("The expected eligible nursery is reserved"), FEcoCombatTestAccess::ReservedNursery(*Spawner), ExpectedSite))
         return false;
+    if (bApproach)
+    {
+        Time.ServerTimeSeconds = 30.;
+        TestTrue(TEXT("A distant reservation reaches its due time"), FEcoCombatTestAccess::FeedFauna(*Spawner, Time));
+        TestEqual(TEXT("The distant parents cannot hatch yet"), Residents.Num(), 2);
+        if (!TestEqual(TEXT("The pair can still approach the same nursery"), FEcoCombatTestAccess::PendingFaunaBirths(*Spawner), 1)) return false;
+        for (int32 Step = 1; Step <= 120; ++Step)
+            FEcoCombatTestAccess::MoveFauna(*Spawner, 30. + .05 * Step);
+        Time.ServerTimeSeconds = 36.;
+        TestTrue(TEXT("The birth transaction resumes after swimming"), FEcoCombatTestAccess::FeedFauna(*Spawner, Time));
+        if (!TestEqual(TEXT("One child hatches at the reserved site"), Residents.Num(), 3)) return false;
+        const auto& Child = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Residents.Last()).Life;
+        return TestTrue(TEXT("The swimming parents pass both registered identities to the child"),
+            Child.Generation == 1 && Child.ParentA > 0 && Child.ParentB > 0 && Child.ParentA != Child.ParentB);
+    }
     const bool bInterrupted = Parameters == TEXT("ExposedThenRewetted");
     if (bInterrupted) Spawner->FaunaExperienceMode = 2;
     Water->WaterSurfaceZ = bInterrupted ? 50.f : 100.f;
@@ -1560,12 +2452,28 @@ bool FEcoAquaticNurseryContinuity::RunTest(const FString& Parameters)
             EM.GetFragmentDataChecked<FTransformFragment>(Parent).GetMutableTransform().AddToTranslation(FVector(145., 0., 0.));
     }
     Time.ServerTimeSeconds = 30.;
-    TestTrue(TEXT("Both scenarios reach the same hatch-time water level"), FEcoCombatTestAccess::FeedFauna(*Spawner, Time));
-    if (!TestEqual(TEXT("Only continuous inundation yields a hatch"), Residents.Num(), bInterrupted ? 2 : 3)) return false;
-    if (!bInterrupted)
+    TestTrue(TEXT("The authority processes the hatch window"), FEcoCombatTestAccess::FeedFauna(*Spawner, Time));
+    const bool bExpectHatch = !bInterrupted && !bShelfTooShallow && !bLargeBodyBlocked;
+    if (!TestEqual(TEXT("A hatch requires continuous inundation and body clearance"), Residents.Num(), bExpectHatch ? 3 : 2)) return false;
+    if (bExpectHatch)
     {
-        const auto& Position = EM.GetFragmentDataChecked<FTransformFragment>(Residents.Last()).GetTransform().GetLocation();
+        const auto Child = Residents.Last();
+        const FVector Position = EM.GetFragmentDataChecked<FTransformFragment>(Child).GetTransform().GetLocation();
         TestTrue(TEXT("The hatch remains at the originally reserved site"), Position.Size2D() < 85.);
+        if (bNewbornShelf)
+        {
+            const auto& Life = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Child).Life;
+            const double Clearance = Fish.SwimBodyClearance(Life.BodyScale(Time.ServerTimeSeconds));
+            EcoCreatureMovement::FFaunaWaterColumn Column;
+            TestTrue(TEXT("Both parents contribute to the shelf hatch"), Life.Generation == 1 && Life.ParentA > 0
+                && Life.ParentB > 0 && Life.ParentA != Life.ParentB);
+            TestFalse(TEXT("The actual hatch position cannot fit a reference adult"),
+                EcoCreatureMovement::SampleFaunaWater(*W.World, Region->RegionId, Position, Fish.SwimBodyClearance(1.), Column));
+            if (!TestTrue(TEXT("The inherited newborn body fits the same water column"),
+                    EcoCreatureMovement::SampleFaunaWater(*W.World, Region->RegionId, Position, Clearance, Column))) return false;
+            TestTrue(TEXT("The hatch center leaves clearance above the bed and below the surface"),
+                Position.Z >= Column.Bottom + Clearance && Position.Z <= Column.Surface - Clearance);
+        }
     }
     return true;
 }
@@ -1897,6 +2805,66 @@ namespace EcoCombatTest
     };
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRuleFaunaPlayerAmbush, "AdaptiveEcosystem.Combat.RuleFaunaPlayerAmbush",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoRuleFaunaPlayerAmbush::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    EcoCombatTest::FPlayer Player(*W.World);
+    auto* Ecology = NewObject<UEcoPlayerEcologyComponent>(Player.Pawn);
+    Player.Pawn->AddInstanceComponent(Ecology);
+    Ecology->RegisterComponent();
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("AmbushMeadow");
+    Region->RegionBounds->SetBoxExtent(FVector(1000.));
+    FEcoCombatTestAccess::SetSingleRegion(*Spawner, *Region);
+    auto* Clock = W.World->GetSubsystem<UEcoWorldClockSubsystem>();
+    FEcoServerTimeSnapshot Time;
+    if (!Clock->StartClock(7, 60., 60.) || !Clock->GetSnapshotAt(1., Time)) return false;
+    const auto Leopard = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, FVector::ZeroVector, TEXT("Leopard"));
+    if (!Leopard.IsSet()) return false;
+    FEcoCombatTestAccess::Ready(*Spawner, {Leopard});
+    auto& EM = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    auto& Profile = Spawner->FaunaSpecies[0];
+    Profile.StalkRange = 900.f;
+    Profile.SightHalfAngle = 80.f;
+    Profile.AttackReach = 125.f;
+    const auto Guide = [&](double Now, float Dark, float Rain) {
+        FVector Goal = FVector::ZeroVector;
+        return FEcoCombatTestAccess::StalkPlayer(*Spawner, EM, Leopard, Profile, Now, Dark, Rain, Goal);
+    };
+    const auto Resolve = [&](double Now) {
+        Time.ServerTimeSeconds = Now;
+        FEcoCombatTestAccess::ResolveCombat(*Spawner, Time);
+    };
+    Player.Pawn->SetActorLocation(FVector(450., 0., 60.));
+    TestFalse(TEXT("Opt-in is required"), Guide(1., 1.f, 0.f));
+    Spawner->bEnableRuleFaunaPlayerAmbush = true;
+    TestFalse(TEXT("Clear daylight does not start a stalk"), Guide(2., 0.f, 0.f));
+    Player.Pawn->SetActorLocation(FVector(-450., 0., 60.));
+    TestFalse(TEXT("Darkness cannot expose a player behind the predator"), Guide(2.5, 1.f, 0.f));
+    Player.Pawn->SetActorLocation(FVector(450., 0., 60.));
+    TestTrue(TEXT("Heavy rain permits stalking a visible selected player"), Guide(3., 0.f, .8f));
+    TestFalse(TEXT("Clear daylight ends the stalk"), Guide(3.5, 0.f, 0.f));
+    TestTrue(TEXT("Darkness permits stalking a visible selected player"), Guide(4., 1.f, 0.f));
+    Player.Pawn->SetActorLocation(FVector(90., 0., 55.));
+    TestTrue(TEXT("Near contact starts a visible windup"), Guide(4.1, 1.f, 0.f));
+    Resolve(4.2);
+    TestEqual(TEXT("Windup does not apply damage"), Player.State->GetHealth(), 100.f);
+    TestTrue(TEXT("Completed windup queues one contact"), Guide(4.6, 1.f, 0.f));
+    Player.Pawn->SetActorLocation(FVector(450., 0., 60.));
+    Resolve(4.6);
+    TestEqual(TEXT("Moving away before contact protects the avatar"), Player.State->GetHealth(), 100.f);
+    Player.Pawn->SetActorLocation(FVector(90., 0., 55.));
+    TestTrue(TEXT("A later attack can wind up again"), Guide(12., 1.f, 0.f));
+    TestTrue(TEXT("A later attack queues its contact"), Guide(12.5, 1.f, 0.f));
+    Resolve(12.5);
+    Resolve(12.5);
+    TestEqual(TEXT("One valid contact debits health exactly once"), Player.State->GetHealth(), 80.f);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoCombatProxy, "AdaptiveEcosystem.Combat.ProxyIdentityAndQuery", EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoCombatProxy::RunTest(const FString&)
 {
@@ -1993,6 +2961,89 @@ bool FEcoCombatExactTarget::RunTest(const FString&)
     if(Deaths.Num()) TestTrue(TEXT("Death retains target, species and external cause"),Deaths[0].StableAgentId==102&&Deaths[0].SpeciesId==TEXT("Herbivore")&&Deaths[0].Cause==EEcoDeathCause::ExternalDamage);
     T.ServerTimeSeconds=2;EcoMassSurvival::Advance(EM,T,2,2,Survival,Deaths,true);
     TestEqual(TEXT("Next boundary does not kill again"),Deaths.Num(),0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoGroundPlayerDamageWitnesses, "AdaptiveEcosystem.Fauna.Experience.GroundPlayerDamageWitnesses",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoGroundPlayerDamageWitnesses::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    EcoCombatTest::FPlayer Player(*W.World);
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("WitnessMeadow");
+    Region->RegionBounds->SetBoxExtent(FVector(750.));
+    FEcoCombatTestAccess::SetSingleRegion(*Spawner, *Region);
+    const auto SpawnBox = [&](const FVector& Center, const FVector& Extent)
+    {
+        auto* Actor = W.World->SpawnActor<AActor>();
+        auto* Box = NewObject<UBoxComponent>(Actor);
+        Actor->SetRootComponent(Box);
+        Actor->AddInstanceComponent(Box);
+        Box->SetBoxExtent(Extent);
+        Box->SetCollisionObjectType(ECC_WorldStatic);
+        Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+        Box->SetCollisionResponseToAllChannels(ECR_Block);
+        Box->RegisterComponent();
+        Actor->SetActorLocation(Center);
+    };
+    SpawnBox(FVector(0., 0., -10.), FVector(740., 740., 10.));
+    auto* Clock = W.World->GetSubsystem<UEcoWorldClockSubsystem>();
+    FEcoServerTimeSnapshot Time;
+    if (!Clock->StartClock(7, 60., 60.) || !Clock->GetSnapshotAt(1., Time)) return false;
+    const auto Victim = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, FVector(150., 0., 0.), TEXT("Pig"));
+    const auto Visible = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, FVector(0., 100., 0.), TEXT("Horse"));
+    const auto Blocked = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, FVector(0., -150., 0.), TEXT("Rat"));
+    const auto FacingAway = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region->RegionId, Time, FVector(0., 205., 0.), TEXT("Buffalo"));
+    auto& Manager = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    if (!TestTrue(TEXT("The prey and three possible witnesses were spawned"),
+        Manager.IsEntityValid(Victim) && Manager.IsEntityValid(Visible) && Manager.IsEntityValid(Blocked)
+        && Manager.IsEntityValid(FacingAway))) return false;
+    FEcoCombatTestAccess::Ready(*Spawner, {Victim, Visible, Blocked, FacingAway});
+    SpawnBox(FVector(130., -80., 60.), FVector(15., 13., 65.));
+    Player.Pawn->SetActorLocation(FVector(280., 0., 65.));
+    for (const auto Entity : {Visible, Blocked, FacingAway})
+        Manager.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform().SetRotation(
+            Entity == FacingAway ? FRotator(0., 180., 0.).Quaternion() : FQuat::Identity);
+    for (auto& Profile : Spawner->FaunaSpecies)
+    {
+        Profile.ThreatSenseRange = 550.f;
+        Profile.ThreatSightHalfAngle = 65.f;
+        Profile.NightVision = .2f;
+    }
+    Spawner->FaunaExperienceMode = 1;
+    const auto IdOf = [&](FMassEntityHandle Entity)
+    { return Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Entity).StableAgentId; };
+    const auto ThreatOf = [&](FMassEntityHandle Entity) -> const FEcoFaunaFragment&
+    { return Manager.GetFragmentDataChecked<FEcoFaunaFragment>(Entity); };
+    const auto Commit = [&](double At, float Damage, int32 Epoch = 7)
+    {
+        if (!Clock->GetSnapshotAt(At, Time)) return false;
+        FEcoCombatTestAccess::Queue(*Spawner, *Player.Pawn, IdOf(Victim), Damage, Epoch, Player.State->AvatarGeneration, At);
+        FEcoCombatTestAccess::Consume(*Spawner, Time);
+        return true;
+    };
+    if (!Commit(15., 10.)) return false;
+    TestNull(TEXT("Interaction mode off does not record the witnessed hit"), Spawner->FindFaunaExperience(IdOf(Visible)));
+    Spawner->FaunaInteractionMode = 1;
+    if (!Commit(20., 10.)) return false;
+    const auto* Memory = Spawner->FindFaunaExperience(IdOf(Visible));
+    const FEcoEncounterKey Risk{EEcoEncounterKind::Risk, EEcoEncounterMedium::Ground, Region->RegionId,
+        TEXT("Player"), NAME_None, FEcoExperienceKey::PlantCell(FVector(0., 100., 0.))};
+    TestTrue(TEXT("A visible committed hit records the witness's own local risk"), Memory && Memory->FindEncounter(Risk));
+    TestTrue(TEXT("Record-only mode does not create flight"), ThreatOf(Visible).ThreatUntil < 20.);
+    Spawner->FaunaInteractionMode = 2;
+    if (!Commit(25., 10., 6) || !Commit(90., 10.)) return false;
+    TestTrue(TEXT("Rejected damage and darkness do not appoint a witness"), ThreatOf(Visible).ThreatUntil < 25.);
+    if (!Commit(145., 100.)) return false;
+    TestEqual(TEXT("The committed contact killed only its target"),
+        Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Victim).HP, 0.f);
+    TestTrue(TEXT("The visible witness receives a direct flee response"), ThreatOf(Visible).ThreatUntil > 145.);
+    TestEqual(TEXT("Escape uses the visible player's position"), ThreatOf(Visible).LastThreatPosition, Player.Pawn->GetActorLocation());
+    TestNull(TEXT("A wall blocks the attacker from the hidden witness"), Spawner->FindFaunaExperience(IdOf(Blocked)));
+    TestNull(TEXT("A witness facing away learns no attacker position"), Spawner->FindFaunaExperience(IdOf(FacingAway)));
+    TestEqual(TEXT("Only the four valid contacts were committed"), Spawner->GetCombatDiagnostics().DamageCommitted, 4);
     return true;
 }
 
@@ -2372,6 +3423,90 @@ bool FEcoFaunaInjuredRatHunt::RunTest(const FString&)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoBuffaloInheritedGuardTest, "AdaptiveEcosystem.Creature.Fauna.BuffaloInheritedGuardContact",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoBuffaloInheritedGuardTest::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Mass = W.World->GetSubsystem<UMassSpawnerSubsystem>();
+    auto& Manager = Mass->GetEntityManagerChecked();
+    auto* Asset = NewObject<UMassEntityConfigAsset>(W.World);
+    Asset->GetMutableConfig().AddTrait(*NewObject<UEcoFaunaTrait>(Asset));
+    TArray<FMassEntityHandle> Entities;
+    { auto Creation = Mass->SpawnEntities(Asset->GetOrCreateEntityTemplate(*W.World), 3, Entities); }
+    if (!TestEqual(TEXT("Leopard, buffalo calf and caregiver spawned"), Entities.Num(), 3)) return false;
+
+    const double Now = 200.;
+    const FVector Positions[] = {FVector::ZeroVector, FVector(100., 0., 0.), FVector(50., 100., 0.)};
+    Spawner->FaunaSpecies.SetNum(2);
+    auto& Leopard = Spawner->FaunaSpecies[0];
+    Leopard.SpeciesId = TEXT("Leopard");
+    Leopard.Diet = EEcoFaunaDiet::Carnivore;
+    Leopard.AdultMass = 60.f;
+    Leopard.AttackReach = 125.f;
+    auto& Buffalo = Spawner->FaunaSpecies[1];
+    Buffalo.SpeciesId = TEXT("Buffalo");
+    Buffalo.AdultMass = 450.f;
+    Buffalo.BodyRadius = 65.f;
+    Buffalo.DefenseDamage = 32.f;
+    Buffalo.OffspringGuardRange = 650.f;
+    auto& Rule = Leopard.PreyRules.AddDefaulted_GetRef();
+    Rule.SpeciesId = Buffalo.SpeciesId;
+    Rule.MaxPreyMassRatio = 1.8f;
+    Rule.MaxHealthyMaturity = .35f;
+    Rule.MaxInjuredMaturity = .55f;
+
+    for (int32 Index = 0; Index < Entities.Num(); ++Index)
+    {
+        const FMassEntityHandle Entity = Entities[Index];
+        auto& Identity = Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Entity);
+        Identity.StableAgentId = Index + 1;
+        Identity.SpeciesId = Index == 0 ? Leopard.SpeciesId : Buffalo.SpeciesId;
+        Manager.GetFragmentDataChecked<FEcoRegionFragment>(Entity).CurrentRegionId = TEXT("Meadow");
+        Manager.GetFragmentDataChecked<FTransformFragment>(Entity).GetMutableTransform().SetLocation(Positions[Index]);
+        auto& Life = Manager.GetFragmentDataChecked<FEcoFaunaFragment>(Entity).Life;
+        Life.Born = -100.;
+        Life.MaturitySeconds = Index == 0 ? 170. : 220.;
+    }
+    FEcoCombatTestAccess::Ready(*Spawner, Entities);
+    auto& Hunter = Manager.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[0]);
+    auto& Calf = Manager.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[1]);
+    auto& Caregiver = Manager.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[2]);
+    Calf.Life.Born = Now - 6.;
+    Calf.Life.ParentA = Calf.Life.Caregiver = 3;
+    auto& HunterHP = Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Entities[0]).HP;
+    auto& CalfHP = Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Entities[1]).HP;
+    for (const double ParentSize : {.90, 1.10})
+    {
+        EcoLifeV3::FGenome Parent;
+        Parent.Size = ParentSize;
+        Caregiver.Life.Genome = EcoLifeV3::Inherit(Parent, Parent, 22);
+        Caregiver.Life.Generation = 1;
+        Caregiver.Stamina = 1.f;
+        HunterHP = CalfHP = 100.f;
+        Calf.ThreatUntil = Hunter.ThreatUntil = 0.;
+        Hunter.AttackContact = Now;
+        Hunter.AttackReady = 0.;
+        Hunter.TargetId = 2;
+        FEcoCombatTestAccess::Predation(*Spawner, Now);
+        if (ParentSize < 1.)
+        {
+            TestEqual(TEXT("The smaller caregiver leaves the attack lane open"), CalfHP, 55.f);
+            TestEqual(TEXT("Missing an interception spends no stamina"), Caregiver.Stamina, 1.f);
+            TestEqual(TEXT("The leopard takes no counterattack on that trajectory"), HunterHP, 100.f);
+        }
+        else
+        {
+            TestEqual(TEXT("The larger caregiver blocks the same trajectory"), CalfHP, 100.f);
+            TestEqual(TEXT("The actual interception spends stamina"), Caregiver.Stamina, .85f);
+            TestEqual(TEXT("The leopard receives the current caregiver's scaled damage"),
+                HunterHP, 100.f - 32.f * float(Caregiver.Life.BodyScale(Now)));
+        }
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaCounterTest, "AdaptiveEcosystem.Creature.Fauna.ContestedContact",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FEcoFaunaCounterTest::RunTest(const FString&)
@@ -2431,10 +3566,20 @@ bool FEcoFaunaCounterTest::RunTest(const FString&)
     FEcoCombatTestAccess::MoveFauna(*S, 11.95);
     TestEqual(TEXT("Movement selects the caregiver for the threatened juvenile"),
         EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[2]).GuardThreatId, int64(1));
+    TestEqual(TEXT("A caregiver in the lane preserves its stamina until contact"),
+        EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[2]).Stamina, 1.f);
+    Hunt.TargetId = 0;
+    Hunt.AttackContact = -1.;
+    FEcoCombatTestAccess::MoveFauna(*S, 11.975);
+    TestEqual(TEXT("A visible predator dropping the target does not immediately erase the caregiver's warning"),
+        EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[2]).GuardThreatId, int64(1));
     Hunt.AttackContact = 12.; Hunt.TargetId = 2;
     FEcoCombatTestAccess::Predation(*S, 12.);
     TestEqual(TEXT("Caregiver already in the attack lane intercepts"), HunterHP, 64.f);
     TestEqual(TEXT("The intercepted attack does not wound the young"), PreyHP, 55.f);
+    FEcoCombatTestAccess::MoveFauna(*S, 14.5);
+    TestEqual(TEXT("The caregiver stops guarding after the unrefreshed warning expires"),
+        EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[2]).GuardThreatId, int64(0));
     EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[2]).Stamina = .1f;
     S->FaunaSpecies[1].bAllowSecondParentGuard = true;
     Hunt.AttackContact = 18.; Hunt.TargetId = 2;

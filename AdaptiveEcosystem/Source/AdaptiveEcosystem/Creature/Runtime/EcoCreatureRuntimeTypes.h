@@ -59,6 +59,8 @@ struct FEcoCreaturePresentationFragment : public FMassFragment
     uint8 Maturity = 255; // normalized age; separate from inherited size
 	uint8 BodyScale = 128; // scale = byte / 128; authority computes from genome + age
 	uint8 BodyCondition = 128; // rendered horizontal proportions only; byte / 128
+	uint16 InheritedProportions = 0x8080; // low byte longitudinal, high byte transverse; neutral 128
+	uint32 InheritedBody = 0x80808080u; // signed spatial growth modes, biased around 128
 	uint16 SocialPresentation = 0; // cosmetic role and yaw, independent of threat focus
 	int16 FocusYaw = 0;
 };

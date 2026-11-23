@@ -1,6 +1,9 @@
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Representation/EcoCreatureAnimationProfile.h"
 #include "Creature/Representation/EcoCreatureAnimInstance.h"
+#include "Creature/Representation/EcoCreatureShapeComponent.h"
+#include "Creature/Representation/EcoCreatureCoatPalette.h"
+#include "AI/Policy/EcoBodyDevelopment.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -50,6 +53,9 @@ bool FEcoCreatureVisualState::IsValid() const
 {
 	return StableAgentId > 0 && !SpeciesId.IsNone() && Sequence > 0 && FMath::IsFinite(WorldTime) && WorldTime >= 0.0
         &&FMath::IsFinite(BodyScale)&&BodyScale>=.65f&&BodyScale<=1.15f&&Appearance<=3
+        &&FMath::IsFinite(InheritedLength)&&InheritedLength>=.89f&&InheritedLength<=1.11f
+        &&FMath::IsFinite(InheritedWidth)&&InheritedWidth>=.89f&&InheritedWidth<=1.11f
+        && EcoLifeV3::FBodyDevelopment::Unpack(InheritedBody).IsValid()
         &&FMath::IsFinite(BodyCondition)&&BodyCondition>=.875f&&BodyCondition<=1.125f
         &&SocialSignal<=2&&FMath::IsFinite(SocialYaw)
         &&FMath::IsFinite(Maturity)&&Maturity>=0&&Maturity<=1&&FMath::IsFinite(CoatTone)&&CoatTone>=0&&CoatTone<=1
@@ -69,11 +75,11 @@ AEcoCreatureRepresentationActor::AEcoCreatureRepresentationActor()
 	HealthBar = CreateDefaultSubobject<UEcoHealthBarComponent>(TEXT("HealthBar"));
 	HealthBar->SetupAttachment(RootComponent);
 	Footsteps = CreateDefaultSubobject<UEcoFootstepAudioComponent>(TEXT("Footsteps"));
-	CreatureMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CreatureMesh"));
+	CreatureMesh = CreateDefaultSubobject<UEcoCreatureShapeComponent>(TEXT("CreatureMesh"));
 	CreatureMesh->SetupAttachment(RootComponent);
 	CreatureMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	CreatureMesh->SetGenerateOverlapEvents(false);
-    ImmatureMesh=CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("ImmatureMesh"));
+    ImmatureMesh=CreateDefaultSubobject<UEcoCreatureShapeComponent>(TEXT("ImmatureMesh"));
     ImmatureMesh->SetupAttachment(RootComponent);ImmatureMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     ImmatureMesh->SetGenerateOverlapEvents(false);ImmatureMesh->SetVisibility(false);ImmatureMesh->bCastDynamicShadow=true;
 	CreatureMesh->SetAnimInstanceClass(UEcoCreatureAnimInstance::StaticClass());
@@ -220,6 +226,8 @@ void AEcoCreatureRepresentationActor::RefreshAppearance()
     if (!BaseCreatureMeshScale.IsSet()) BaseCreatureMeshScale = CreatureMesh->GetRelativeScale3D();
     if (!BasePlaceholderScale.IsSet()) BasePlaceholderScale = PlaceholderBody->GetRelativeScale3D();
     AppliedAppearance=255;ApplyAppearance(VisualState.Appearance);
+    ApplyBodyDevelopment();
+    ApplyCoatMaterials();
 	CreatureMesh->SetRelativeRotation(MeshRotation);
     ImmatureMesh->SetRelativeRotation(MeshRotation);
     if (!MeshOffset.IsNearlyZero())
@@ -250,6 +258,49 @@ void AEcoCreatureRepresentationActor::ApplyAppearance(uint8 Variant)
             for(int32 I=0;I<Young.GrowthMaterials.Num();++I)ImmatureMesh->SetMaterial(I,Young.GrowthMaterials[I]);
         }
     }
+    ApplyCoatMaterials();
+}
+
+void AEcoCreatureRepresentationActor::SetCoatPalette(UEcoCreatureCoatPalette* Palette)
+{
+    if (CoatPalette == Palette) return;
+    CoatPalette = Palette;
+    ApplyCoatMaterials();
+}
+
+void AEcoCreatureRepresentationActor::ApplyCoatMaterials()
+{
+    if (!CoatPalette || !CoatPalette->Species.Contains(VisualSpeciesId)) return;
+    for (USkeletalMeshComponent* Mesh : {CreatureMesh.Get(), ImmatureMesh.Get()})
+        for (int32 Slot = 0; Slot < Mesh->GetNumMaterials(); ++Slot)
+            if (const auto* Material = CoatPalette->Materials.Find(Mesh->GetMaterial(Slot)))
+                Mesh->SetMaterial(Slot, Material->Get());
+    ApplyCoatTint(VisualState.CoatTone);
+}
+
+void AEcoCreatureRepresentationActor::ApplyCoatTint(float Tone)
+{
+    const auto* Surface = CoatPalette ? CoatPalette->Species.Find(VisualSpeciesId) : nullptr;
+    if (!Surface) return;
+    const FLinearColor Tint = Surface->Tint(Tone);
+    for (USkeletalMeshComponent* Mesh : {CreatureMesh.Get(), ImmatureMesh.Get()})
+        Mesh->SetCustomPrimitiveDataVector4(8, FVector4(Tint.R, Tint.G, Tint.B, 1.));
+}
+
+int32 AEcoCreatureRepresentationActor::ShowCoatComparison(float Tone)
+{
+#if WITH_EDITOR
+    if (CoatPalette && GetWorld() && GetWorld()->WorldType == EWorldType::PIE)
+    {
+        ApplyCoatTint(Tone);
+        int32 Count = 0;
+        for (const auto& Material : CoatPalette->Materials)
+            for (int32 Index = 0; Index < CreatureMesh->GetNumMaterials(); ++Index)
+                if (CreatureMesh->GetMaterial(Index) == Material.Value.Get()) ++Count;
+        return Count;
+    }
+#endif
+    return 0;
 }
 
 bool AEcoCreatureRepresentationActor::BindIdentity(int64 AgentId, FName SpeciesId)
@@ -271,6 +322,25 @@ bool AEcoCreatureRepresentationActor::BindIdentity(int64 AgentId, FName SpeciesI
     // A pooled visual must not inherit death/IK state from its previous logical identity.
     if(auto* Animation=CreatureMesh->GetAnimInstance())Animation->InitializeAnimation();
 	return true;
+}
+
+void AEcoCreatureRepresentationActor::ApplyBodyDevelopment()
+{
+    const FVector LocalUp = MeshRotation.Quaternion().UnrotateVector(FVector::UpVector);
+    const FQuat MeshToBody = FRotationMatrix::MakeFromXZ(MeshForwardAxis.GetSafeNormal(), LocalUp).ToQuat().Inverse();
+    if (auto* Mesh = Cast<UEcoCreatureShapeComponent>(CreatureMesh))
+        Mesh->SetBodyDevelopment(VisualState.InheritedBody, MeshToBody, AnimationProfile);
+    if (auto* Mesh = Cast<UEcoCreatureShapeComponent>(ImmatureMesh))
+        Mesh->SetBodyDevelopment(VisualState.InheritedBody, MeshToBody,
+            AppearanceVariants.IsValidIndex(2) ? AppearanceVariants[2].Profile.Get() : AnimationProfile.Get());
+}
+
+int32 AEcoCreatureRepresentationActor::GetDisplacedJointCount() const
+{
+    const auto* Main = Cast<UEcoCreatureShapeComponent>(CreatureMesh);
+    const auto* Immature = Cast<UEcoCreatureShapeComponent>(ImmatureMesh);
+    return FMath::Max(Main && Main->IsVisible() ? Main->GetDisplacedJointCount() : 0,
+                      Immature && Immature->IsVisible() ? Immature->GetDisplacedJointCount() : 0);
 }
 
 void AEcoCreatureRepresentationActor::ClearBinding()
@@ -418,7 +488,9 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
     SetActorScale3D(FVector(State.BodyScale));
 	VisualState = State;
     ApplyAppearance(State.Appearance);
-    const FVector ConditionScale(State.BodyCondition, State.BodyCondition, 1.);
+    ApplyBodyDevelopment();
+    ApplyCoatTint(State.CoatTone);
+    const FVector ConditionScale(State.BodyCondition * State.InheritedLength, State.BodyCondition * State.InheritedWidth, 1.);
     const FVector MeshScale = AppearanceVariants.IsValidIndex(AppliedAppearance)
         ? AppearanceVariants[AppliedAppearance].MeshScale : BaseCreatureMeshScale.Get(FVector::OneVector);
     if(bContinuousGrowthAppearance&&State.Appearance>0){
@@ -428,7 +500,7 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
         const float Adult=State.Appearance==1?T*T*(3-2*T):1.f;
         CreatureMesh->SetVisibility(Adult>0);CreatureMesh->SetCustomPrimitiveDataFloat(3,Adult);CreatureMesh->SetCustomPrimitiveDataFloat(4,0);
         ImmatureMesh->SetVisibility(Adult<1);ImmatureMesh->SetCustomPrimitiveDataFloat(3,Adult);ImmatureMesh->SetCustomPrimitiveDataFloat(4,1);
-        const float Tone=.85f+.3f*State.CoatTone;
+        const float Tone=CoatPalette ? 1.f : .85f+.3f*State.CoatTone;
         CreatureMesh->SetCustomPrimitiveDataFloat(5,Tone);ImmatureMesh->SetCustomPrimitiveDataFloat(5,Tone);
         // Nutrition/health alter condition without rewriting genes, growing bones or giving speed.
         const float Condition=FMath::Clamp(.75f*State.NormalizedEnergy+.25f*State.NormalizedHealth,0.f,1.f);

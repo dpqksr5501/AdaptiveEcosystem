@@ -15,6 +15,9 @@ struct FEcoCreatureVisualState
 	GENERATED_BODY()
     UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float BodyScale=1;
     UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float BodyCondition=1;
+    UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float InheritedLength=1;
+    UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float InheritedWidth=1;
+    uint32 InheritedBody = 0x80808080u;
     UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") uint8 SocialSignal = 0; // 1 offer, 2 reply
     UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float SocialYaw = 0.f;
     UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bFaunaAlarm = false;

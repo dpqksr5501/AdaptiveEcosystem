@@ -174,7 +174,7 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
         if(bEnableEcosystemLife)if(auto* Native=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entities[I])){
             auto& Life=Native->Individual;Life.bInitialized=true;
             const auto* N=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
-            Life.Genome=EcoLifeV3::Founder(N?N->GetSettings().Seed:101,Id.StableAgentId);
+            Life.Genome=EcoLifeV3::Founder(N?N->GetSettings().Seed:101,Id.StableAgentId, CoatPalette != nullptr);
             Life.Origin=bReady?EcoLifeV3::EOrigin::Recovery:EcoLifeV3::EOrigin::Initial;
             Life.Born=Time.ServerTimeSeconds-180;
             const auto* Habitat=NaturalHabitatProfile.Get();

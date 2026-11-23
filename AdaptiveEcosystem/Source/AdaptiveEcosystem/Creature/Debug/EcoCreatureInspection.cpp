@@ -214,6 +214,7 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetStringField(TEXT("sense"),UEnum::GetValueAsString(EEcoSenseSource((View->Flags>>4)&3)));
                 Data->SetNumberField(TEXT("energy_fraction"),View->Energy/255.0);
                 Data->SetNumberField(TEXT("body_scale"),View->BodyScale/128.);
+                Data->SetNumberField(TEXT("visual_maturity"),View->Maturity/255.);
                 Data->SetNumberField(TEXT("body_condition"), View->BodyCondition / 128.);
                 Data->SetNumberField(TEXT("social_signal"), uint8(EcoFaunaSocial::Signal(View->SocialPresentation)));
                 Data->SetNumberField(TEXT("social_yaw"), EcoFaunaSocial::Yaw(View->SocialPresentation));
@@ -333,6 +334,7 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                             J->SetNumberField(TEXT("hunt_y"),Life.Memory.HuntY);
                             J->SetNumberField(TEXT("hunt_pressure"),Life.Memory.HuntPressure);
                             J->SetNumberField(TEXT("local_forage_cell"),Life.ForageCell);
+                            J->SetNumberField(TEXT("forage_scan_wait"), FMath::Max(0., Life.NextForageScan - W.T * EcoRepertoireV3::kStepSeconds));
                             J->SetNumberField(TEXT("motion_reason"),Life.MotionReason);
                             J->SetNumberField(TEXT("world_rules_version"),EcoLifeV3::kWorldRulesVersion);
                             J->SetNumberField(TEXT("contact_blocked_steps"),double(Life.ContactBlockedSteps));
@@ -843,9 +845,10 @@ void AEcoCreatureInspectorHUD::DrawHUD()
     if (PanelActor)
     {
         const auto& S = PanelActor->VisualState;
-        Text = FString::Printf(TEXT("%s #%lld  Region: %s\nActivity: %s\nSense: %s  Focus yaw: %.0f\nHealth: %.0f%%  Energy: %.0f%%  Speed: %.0f cm/s\n%s"),
+        Text = FString::Printf(TEXT("%s #%lld  Region: %s\nActivity: %s\nSense: %s  Focus yaw: %.0f\nHealth: %.0f%%  Energy: %.0f%%  Speed: %.0f cm/s\nSize vs. adult reference: %.1f%%  Maturity: %.1f%%\n%s"),
             *S.SpeciesId.ToString(),PanelAgentId,*S.RegionId.ToString(),*UEnum::GetValueAsString(S.Activity),*UEnum::GetValueAsString(S.SenseSource),
-            S.FocusYawDegrees,S.NormalizedHealth*100,S.NormalizedEnergy*100,S.Velocity.Size2D(),bRecording?TEXT("Recording 1 Hz JSONL"):TEXT("Read-only presentation"));
+            S.FocusYawDegrees,S.NormalizedHealth*100,S.NormalizedEnergy*100,S.Velocity.Size2D(),S.BodyScale*100,S.Maturity*100,
+            bRecording?TEXT("Recording 1 Hz JSONL"):TEXT("Read-only presentation"));
     }
     else
     {
@@ -873,6 +876,6 @@ void AEcoCreatureInspectorHUD::DrawHUD()
             }
         }
     }
-    DrawText(InspectionDetail,FLinearColor(.7f,.85f,.7f),25,155,nullptr,.8f);
+    DrawText(InspectionDetail,FLinearColor(.7f,.85f,.7f),25,174,nullptr,.8f);
 
 }

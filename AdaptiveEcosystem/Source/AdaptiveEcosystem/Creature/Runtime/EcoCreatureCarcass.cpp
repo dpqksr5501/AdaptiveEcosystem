@@ -12,6 +12,15 @@
 #include "Engine/World.h"
 #include "MassMovementFragments.h"
 #include "World/EcoWorldClockSubsystem.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
+
+namespace
+{
+    constexpr double WolfCarrionSearchCm = 1600.;
+    constexpr double WolfCarrionContactCm = 115.;
+    constexpr double WolfCarrionFeedSpeedCmPerSecond = 35.;
+}
 
 double AEcoCreatureIntegrationSpawner::CommitNativeCarcass(const FEcoDeathOutcome& Death)
 {
@@ -65,7 +74,7 @@ bool AEcoCreatureIntegrationSpawner::SelectWolfCarrion(int64 WolfId, FName Regio
         const auto& Stock = Pair.Value;
         const double Distance = FVector::Dist(Stock.Position, Position);
         if (Stock.Region != Region || Stock.Species == TEXT("Wolf") || !Stock.CanApproach(WolfId, Now)
-            || Distance > 1600.) continue;
+            || Distance > WolfCarrionSearchCm) continue;
         const double TravelSeconds = FMath::Max(0., Distance - 95.) / ApproachSpeedCmPerSecond;
         // Bites are separated by a one-second resource interval.
         const double FeedingSeconds = Stock.ExpiresAt - Now - TravelSeconds;
@@ -109,8 +118,8 @@ void AEcoCreatureIntegrationSpawner::FeedWolvesFromCarrion(double Now)
         const auto* Context = Native->GetContext(Link->ContextIndex);
         if (!Context || Context->RegionId != Stock->Region) continue;
         const FVector Position = Context->UnitsToCm(Wolf->Agent.State.PosX, Wolf->Agent.State.PosY, Link->GroundZ);
-        if (FVector::DistSquared(Position, Stock->Position) > FMath::Square(115.)
-            || EM.GetFragmentDataChecked<FMassVelocityFragment>(*Handle).Value.SizeSquared2D() > FMath::Square(35.)
+        if (FVector::DistSquared(Position, Stock->Position) > FMath::Square(WolfCarrionContactCm)
+            || EM.GetFragmentDataChecked<FMassVelocityFragment>(*Handle).Value.SizeSquared2D() > FMath::Square(WolfCarrionFeedSpeedCmPerSecond)
             || GetWorld()->LineTraceTestByObjectType(Position + FVector(0, 0, 55), Stock->Position + FVector(0, 0, 20),
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfCarrionContact)))) continue;
         const bool bAdaptive = UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal);
@@ -133,6 +142,169 @@ void AEcoCreatureIntegrationSpawner::FeedWolvesFromCarrion(double Now)
         UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Scavenge] Eater=%lld Species=Wolf Carcass=%lld Amount=%.3f Remaining=%.3f"),
             WolfId, StockId, Meal, Stock->Remaining);
     }
+}
+
+void AEcoCreatureIntegrationSpawner::FeedNativeWolfYoung(double Now)
+{
+    if (!bAuthorityWorld) return;
+    auto* World = GetWorld();
+    auto& Manager = World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    const auto* Native = World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+    if (!Native) return;
+
+    constexpr double AdultReserve = .55;
+    constexpr double YoungCeiling = .65;
+    constexpr double Portion = .01; // One energy unit on the Native 100-unit scale.
+    constexpr double LocalRangeCm = 650.; // Same local transfer range as ground rule fauna.
+    static const FName WolfSpecies(TEXT("Wolf"));
+    TArray<int64, TInlineAllocator<16>> Dependents;
+    for (const auto& [Id, Entity] : AgentLookup)
+    {
+        const auto* Link = Manager.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entity);
+        if (Link && Link->Individual.Origin == EcoLifeV3::EOrigin::NaturalBirth && Link->Individual.AgeFraction(Now) < 1.
+            && Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Entity).SpeciesId == WolfSpecies)
+            Dependents.Add(Id);
+    }
+    Dependents.Sort();
+
+    for (int64 ChildId : Dependents)
+    {
+        const auto Child = AgentLookup.FindChecked(ChildId);
+        auto& ChildLink = Manager.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Child);
+        auto& ChildLife = ChildLink.Individual;
+        const auto* ChildWolf = Manager.GetFragmentDataPtr<FEcoThreatStateFragment>(Child);
+        auto& ChildVitals = Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Child);
+        auto& ChildLifetime = Manager.GetFragmentDataChecked<FEcoLifetimeFragment>(Child);
+        if (!ChildWolf || !ChildLink.bAdopted || ChildLink.bDead || ChildWolf->Agent.bDead || ChildWolf->Agent.State.bAsleep
+            || ChildWolf->Agent.Last.bRunning || ChildVitals.HP <= 0.f || Now < ChildLifetime.NextFeedTimeSeconds
+            || ChildLife.MealRemaining > 0. || ChildLife.Nutrition >= YoungCeiling
+            || ChildLife.Memory.Response != EcoLifeV3::EResponse::Policy) continue;
+        const auto* Context = Native->GetContext(ChildLink.ContextIndex);
+        if (!Context || Context->RegionId != Manager.GetFragmentDataChecked<FEcoRegionFragment>(Child).CurrentRegionId) continue;
+        const auto& ChildState = ChildWolf->Agent.State;
+        const FVector ChildPosition = Context->UnitsToCm(ChildState.PosX, ChildState.PosY, ChildLink.GroundZ);
+
+        for (int64 ParentId : {ChildLife.ParentA, ChildLife.ParentB})
+        {
+            const auto* Parent = AgentLookup.Find(ParentId);
+            if (!Parent || *Parent == Child || Manager.GetFragmentDataChecked<FEcoIdentityFragment>(*Parent).SpeciesId != WolfSpecies
+                || Manager.GetFragmentDataChecked<FEcoRegionFragment>(*Parent).CurrentRegionId != Context->RegionId) continue;
+            auto* ParentLink = Manager.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(*Parent);
+            const auto* ParentWolf = Manager.GetFragmentDataPtr<FEcoThreatStateFragment>(*Parent);
+            auto& ParentVitals = Manager.GetFragmentDataChecked<FEcoVitalsFragment>(*Parent);
+            if (!ParentLink || !ParentWolf || !ParentLink->bAdopted || ParentLink->bDead || ParentWolf->Agent.bDead
+                || ParentWolf->Agent.State.bAsleep || ParentWolf->Agent.Last.bRunning || ParentVitals.HP <= 0.f
+                || ParentLink->ContextIndex != ChildLink.ContextIndex || ParentLink->Individual.AgeFraction(Now) < 1.
+                || ParentLink->Individual.Memory.Response != EcoLifeV3::EResponse::Policy) continue;
+
+            auto& ParentNutrition = ParentLink->Individual.Nutrition;
+            const double Amount = FMath::Min3(Portion, ParentNutrition - AdultReserve, YoungCeiling - ChildLife.Nutrition);
+            if (Amount <= UE_SMALL_NUMBER) continue;
+            const auto& ParentState = ParentWolf->Agent.State;
+            const FVector ParentPosition = Context->UnitsToCm(ParentState.PosX, ParentState.PosY, ParentLink->GroundZ);
+            const double Distance = FVector::Dist(ChildPosition, ParentPosition);
+            double GroundZ = ParentPosition.Z;
+            if (Distance > LocalRangeCm || (Native->UsesTerrain() && (!Native->TraceMove(Context->RegionId, ChildPosition, ParentPosition, GroundZ)
+                    || FMath::Abs(GroundZ - ParentPosition.Z) > 60.))
+                || World->LineTraceTestByObjectType(ChildPosition + FVector(0, 0, 55), ParentPosition + FVector(0, 0, 55),
+                    FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoNativeWolfParentMeal)))) continue;
+
+            const double AdultBefore = ParentNutrition;
+            const double YoungBefore = ChildLife.Nutrition;
+            ParentNutrition -= Amount;
+            ChildLife.Nutrition += Amount;
+            ParentVitals.Energy = float(ParentNutrition) * ParentVitals.MaxEnergy;
+            ChildVitals.Energy = float(ChildLife.Nutrition) * ChildVitals.MaxEnergy;
+            ChildLifetime.NextFeedTimeSeconds = Now + 1.;
+            RecordGameplayReason(ChildId, Context->RegionId, Now, TEXT("ParentProvisioned"), ParentId, Amount * 100.);
+            RecordFaunaExperience(ChildId, {EEcoExperienceActivity::Provision, Context->RegionId, WolfSpecies}, Now);
+            RecordFaunaAssociation(ChildId, ParentId, Now, true);
+            RecordFaunaAssociation(ParentId, ChildId, Now, true);
+            if (bAuditTraitOutcomes)
+                UE_LOG(LogTemp, Log, TEXT("[EcoLife][WolfProvision] Parent=%lld Child=%lld Region=%s At=%.6f Amount=%.9f ParentBefore=%.9f ParentAfter=%.9f ChildBefore=%.9f ChildAfter=%.9f DistanceCm=%.3f"),
+                    ParentId, ChildId, *Context->RegionId.ToString(), Now, Amount, AdultBefore, ParentNutrition, YoungBefore, ChildLife.Nutrition, Distance);
+            break;
+        }
+    }
+}
+
+FString AEcoCreatureIntegrationSpawner::CaptureNativeWolfForage(FName Region) const
+{
+    auto* World = GetWorld();
+    if (!World || !bAuthorityWorld || !IsInGameThread()) return {};
+    const auto* Native = World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+    const auto* Clock = World->GetSubsystem<UEcoWorldClockSubsystem>();
+    auto* Spawner = World->GetSubsystem<UMassSpawnerSubsystem>();
+    if (!Native || !Clock || !Spawner) return {};
+    const auto& Manager = Spawner->GetEntityManagerChecked();
+    if (Manager.IsProcessing()) return {};
+
+    const double Now = Clock->GetServerTime().ServerTimeSeconds;
+    const auto Result = MakeShared<FJsonObject>();
+    Result->SetNumberField(TEXT("at"), Now);
+    Result->SetStringField(TEXT("region"), Region.ToString());
+    Result->SetBoolField(TEXT("provisioning_enabled"), UsesNativeWolfProvisioning());
+    TArray<TSharedPtr<FJsonValue>> Wolves;
+    for (const auto& [Id, Entity] : AgentLookup)
+    {
+        if (!Manager.IsEntityValid(Entity)) continue;
+        const auto* Wolf = Manager.GetFragmentDataPtr<FEcoThreatStateFragment>(Entity);
+        const auto* Link = Manager.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entity);
+        if (!Wolf || !Link || Link->bDead || Wolf->Agent.bDead || !Link->bAdopted || !Link->Individual.bInitialized) continue;
+        const auto* Context = Native->GetContext(Link->ContextIndex);
+        if (!Context || Context->RegionId != Region || Manager.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).HP <= 0.) continue;
+
+        const auto& Life = Link->Individual;
+        const auto& Threat = Wolf->Agent;
+        const FVector Position = Context->UnitsToCm(Threat.State.PosX, Threat.State.PosY, Link->GroundZ);
+        const double Speed = Manager.GetFragmentDataChecked<FMassVelocityFragment>(Entity).Value.Size2D();
+        const double SimTime = Context->Sim.T * EcoRepertoireV3::kStepSeconds;
+        const auto Row = MakeShared<FJsonObject>();
+        Row->SetStringField(TEXT("id"), LexToString(Id));
+        Row->SetNumberField(TEXT("generation"), Life.Generation);
+        Row->SetNumberField(TEXT("maturity"), Life.AgeFraction(SimTime));
+        Row->SetNumberField(TEXT("nutrition"), Life.Nutrition);
+        Row->SetNumberField(TEXT("reserved_meat_consumed"), Life.MeatConsumed);
+        Row->SetNumberField(TEXT("reserved_meat_remaining"), Life.MealRemaining);
+        Row->SetBoolField(TEXT("asleep"), Threat.State.bAsleep);
+        Row->SetBoolField(TEXT("hunting"), Threat.Last.bHunting);
+        Row->SetBoolField(TEXT("has_prey_target"), Threat.Last.bHasTarget);
+        Row->SetStringField(TEXT("parent_target"), LexToString(Life.FamilyMode == 2 ? Life.FamilyObserved : 0));
+        Row->SetNumberField(TEXT("speed_cm_s"), Speed);
+        int32 Open = 0, InRange = 0, Visible = 0;
+        double Nearest = TNumericLimits<double>::Max();
+        const int64 Target = WolfCarrionTargets.FindRef(Id);
+        for (const auto& [CarcassId, Stock] : FaunaCarcasses)
+        {
+            if (Stock.Region != Region || Stock.Species == TEXT("Wolf") || !Stock.CanApproach(Id, Now)) continue;
+            ++Open;
+            const double Distance = FVector::Dist(Position, Stock.Position);
+            Nearest = FMath::Min(Nearest, Distance);
+            if (Distance <= WolfCarrionSearchCm)
+            {
+                ++InRange;
+                if (!World->LineTraceTestByObjectType(Position + FVector(0, 0, 55), Stock.Position + FVector(0, 0, 20),
+                    FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfCarrionSurvey)))) ++Visible;
+            }
+            if (Target == CarcassId)
+            {
+                Row->SetNumberField(TEXT("target_distance_cm"), Distance);
+                Row->SetNumberField(TEXT("target_stock"), Stock.Remaining);
+                Row->SetBoolField(TEXT("target_in_contact"), Distance <= WolfCarrionContactCm);
+                Row->SetBoolField(TEXT("target_bite_speed"), Speed <= WolfCarrionFeedSpeedCmPerSecond);
+            }
+        }
+        Row->SetStringField(TEXT("carrion_target"), LexToString(Target));
+        Row->SetNumberField(TEXT("open_stock"), Open);
+        Row->SetNumberField(TEXT("open_stock_in_range"), InRange);
+        Row->SetNumberField(TEXT("clear_sight_in_range"), Visible);
+        if (Open > 0) Row->SetNumberField(TEXT("nearest_open_stock_cm"), Nearest);
+        Wolves.Add(MakeShared<FJsonValueObject>(Row));
+    }
+    Result->SetArrayField(TEXT("wolves"), MoveTemp(Wolves));
+    FString Json;
+    FJsonSerializer::Serialize(Result, TJsonWriterFactory<>::Create(&Json));
+    return Json;
 }
 
 void AEcoCreatureIntegrationSpawner::CommitFaunaCarcass(const FEcoDeathOutcome& Death, float NativeReserved)

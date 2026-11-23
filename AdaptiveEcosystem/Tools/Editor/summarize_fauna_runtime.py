@@ -150,11 +150,12 @@ def summarize(report_path, log_path, fixed_fps=None, *, audit_carcasses=False):
                         agent = fields.get("Agent", fields.get("Eater"))
                         if agent:
                             source = fields["Patch"] if meal == "PatchMeal" else meal
+                            source_id = fields.get("Patch", fields.get("Carcass", fields.get("Parent")))
                             remaining = float(fields["Remaining"]) if meal == "PatchMeal" else None
                             logged_food_sources[(species, agent)].append((source, remaining))
                             if amount > 0:
                                 logged_food_receipts[(species, agent)].append({
-                                    "kind": meal, "source_id": fields.get("Patch", fields.get("Carcass")),
+                                    "kind": meal, "source_id": source_id,
                                     "authority_seconds": float(fields["At"]) if "At" in fields else None,
                                     "amount": amount,
                                     "remaining": float(fields["Remaining"]) if "Remaining" in fields else None,
@@ -165,7 +166,7 @@ def summarize(report_path, log_path, fixed_fps=None, *, audit_carcasses=False):
                                 previous = first_timed_meal.get(key)
                                 if previous is None or at < previous["authority_seconds"]:
                                     first_timed_meal[key] = {"authority_seconds": at, "meal": meal,
-                                                             "source": fields.get("Patch", fields.get("Carcass")),
+                                                             "source": source_id,
                                                              "amount": amount}
                             elif amount > 0:
                                 untimed_meal_agents[species].add(agent)
@@ -240,7 +241,7 @@ def summarize(report_path, log_path, fixed_fps=None, *, audit_carcasses=False):
         expanded["sampled_nursery_fry"] = summarize_nursery_fry(island["nursery_fry"])
     if island:
         expanded["feeding_by_birth_cohort"] = summarize_birth_cohorts(
-            island, natural_births, deaths_by_id, first_timed_meal, untimed_meal_agents)
+            island, natural_births, deaths_by_id, first_timed_meal, untimed_meal_agents, logged_food_receipts)
         if phase_activity := summarize_phase_activity(island["samples"]):
             expanded["sampled_activity_by_clock_phase"] = phase_activity
         if island.get("patch_budget"):
@@ -599,9 +600,11 @@ def summarize_phase_activity(samples):
     return regions
 
 
-def summarize_birth_cohorts(report, births, deaths, first_timed_meal, untimed_meal_agents):
+def summarize_birth_cohorts(report, births, deaths, first_timed_meal, untimed_meal_agents, logged_food_receipts):
     samples = report["samples"]
     first, last = samples[0], samples[-1]
+    start_seconds = first.get("completed_clock", {}).get("authority_seconds", first["time"])
+    end_seconds = last.get("completed_clock", {}).get("authority_seconds", last["time"])
     initial = defaultdict(set)
     final_alive = set()
     observed_ids = set()
@@ -648,12 +651,31 @@ def summarize_birth_cohorts(report, births, deaths, first_timed_meal, untimed_me
             untimed = agents & untimed_meal_agents.get(species, set())
             sampled = {agent for agent in agents if payments[agent]}
             native = agents & native_intake.keys()
+            independent = set()
+            provisioned = set()
+            timed_energy_by_source = Counter()
+            for agent in agents:
+                for receipt in logged_food_receipts.get((species, agent), ()):
+                    when = receipt["authority_seconds"]
+                    if when is None or not start_seconds <= when <= end_seconds:
+                        continue
+                    if receipt["kind"] == "ParentMeal":
+                        provisioned.add(agent)
+                    else:
+                        independent.add(agent)
+                    timed_energy_by_source[receipt["kind"]] += receipt["amount"]
             cohorts[name] = {
                 "count": len(agents), "observed_alive": len(agents & observed_alive),
                 "alive_in_final_sample": len(agents & final_alive),
                 "logged_death_causes": Counter(deaths[agent] for agent in agents if agent in deaths),
                 "with_recorded_payment": sum(bool(payments[agent]) for agent in agents),
                 "with_recorded_payment_by_reason": source_counts,
+                "timed_receipt_outcomes": {
+                    "independent_eaters": len(independent),
+                    "provisioned_offspring": len(provisioned),
+                    "independent_eaters_alive_in_final_sample": len(independent & final_alive),
+                    "energy_by_source": {kind: round(amount, 3) for kind, amount in sorted(timed_energy_by_source.items())},
+                },
                 "feeding_evidence": {
                     "first_timed_log_by_id": {
                         agent: first_timed_meal[(species, agent)] for agent in sorted(timed, key=int)

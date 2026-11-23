@@ -5,7 +5,7 @@
 namespace EcoSessionPolicy
 {
     // Increment whenever our advertised/session handshake or client payload contract becomes incompatible.
-    inline constexpr int32 ProtocolVersion = 3; // Mass presentation includes the social signal.
+    inline constexpr int32 ProtocolVersion = 5; // Mass presentation includes local body development.
     inline constexpr int32 DefaultRemoteClients = 10;
     inline constexpr int32 DefaultTotalPlayers = DefaultRemoteClients + 1;
 

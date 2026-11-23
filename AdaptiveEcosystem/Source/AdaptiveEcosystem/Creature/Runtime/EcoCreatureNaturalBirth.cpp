@@ -70,7 +70,20 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         auto* C=Native->FindContext(P.Region);if(!C)return false;
         const auto BA=NativePosition(A),BB=NativePosition(B);
         const auto& Link=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(A);
-        if((BA.X-BB.X)*(BA.X-BB.X)+(BA.Y-BB.Y)*(BA.Y-BB.Y)>225)continue;
+        const double SeparationSquared = FMath::Square(BA.X - BB.X) + FMath::Square(BA.Y - BB.Y);
+        if (SeparationSquared > 225.)
+        {
+            const bool bAllowDelivery = P.bPredator && UsesNativeWolfBirthAfterSeparation();
+            const double DistanceCm = EcoRepertoireV3::UnitsToCm(FMath::Sqrt(SeparationSquared));
+            if (bAuditFaunaBirths && P.bPredator)
+                UE_LOG(LogTemp, Log, TEXT("[EcoLife][BirthPairSeparated] Region=%s Parents=%lld,%lld At=%.3f DistanceCm=%.3f Allow=%d"),
+                    *P.Region.ToString(), P.ParentA, P.ParentB, Now, DistanceCm, bAllowDelivery);
+            if (!bAllowDelivery)
+            {
+                if (P.bPredator) RecordGameplayReason(P.ParentA, P.Region, Now, TEXT("BirthPairSeparated"), P.ParentB, DistanceCm);
+                continue;
+            }
+        }
         const FVector Center=C->UnitsToCm(BA.X,BA.Y,Link.GroundZ);
         TArray<FVector> Positions;
         for(int32 K=0;K<8;++K){
@@ -88,7 +101,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
             continue;
         }
         // Copy before spawning: entity creation may move/reallocate fragment storage.
-        const auto Genome=EcoLifeV3::Inherit(LA.Genome,LB.Genome,uint64(P.ParentA)^EcoLifeV3::Mix(P.ParentB)^uint64(LA.Offspring));
+        const auto Genome=EcoLifeV3::Inherit(LA.Genome,LB.Genome,uint64(P.ParentA)^EcoLifeV3::Mix(P.ParentB)^uint64(LA.Offspring), CoatPalette != nullptr);
         const bool NaturalPopulation=LA.bNaturalPopulation&&!P.bPredator;
         const double Maturity=LA.MaturitySeconds;
         const int64 Mother=LA.Sex==EcoLifeV3::ESex::Female?P.ParentA:P.ParentB;
@@ -133,6 +146,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
             else{auto& Body=EM.GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(E).Body;Body.Energy-=.2;Energy=Body.Energy;}
             auto& Vitals=EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);Vitals.Energy=float(Energy)*Vitals.MaxEnergy;
         }
+        RecordTraitOutcome(EM, Child, Time, TEXT("birth"));
         UE_LOG(LogTemp,Log,TEXT("[EcoLife][NaturalBirth] Child=%lld Parents=%lld,%lld Generation=%u Region=%s Speed=%.5f Size=%.5f Predator=%d"),
             EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId,P.ParentA,P.ParentB,Generation,*P.Region.ToString(),Genome.Speed,Genome.Size,P.bPredator);
     }
@@ -161,6 +175,20 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
                 ||(LA.ParentB&&(LA.ParentB==LB.ParentA||LA.ParentB==LB.ParentB)))continue;
             const auto PA=NativePosition(A),PB=NativePosition(B);
             if((PA.X-PB.X)*(PA.X-PB.X)+(PA.Y-PB.Y)*(PA.Y-PB.Y)>100)continue;
+            if (Predator && UsesNativeWolfBirthAfterSeparation())
+            {
+                const auto* Context = Native->FindContext(G.RegionId);
+                const auto& LinkA = EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(A);
+                const auto& LinkB = EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(B);
+                if (!Context || LinkA.ContextIndex != Context->Index || LinkB.ContextIndex != Context->Index) continue;
+                const FVector Start = Context->UnitsToCm(PA.X, PA.Y, LinkA.GroundZ);
+                const FVector End = Context->UnitsToCm(PB.X, PB.Y, LinkB.GroundZ);
+                double GroundZ = End.Z;
+                // The pair must be able to meet when the delayed birth is reserved.
+                if ((Native->UsesTerrain() && (!Native->TraceMove(G.RegionId, Start, End, GroundZ) || FMath::Abs(GroundZ - End.Z) > 60.))
+                    || GetWorld()->LineTraceTestByObjectType(Start + FVector(0, 0, 55), End + FVector(0, 0, 55),
+                        FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfBirthPair)))) continue;
+            }
             PendingBirths.Add({Candidates[I],Partner,G.RegionId,Now+30,Predator});Found=true;
             UE_LOG(LogTemp, Log, TEXT("[EcoLife][BirthQueued] Region=%s Predator=%d Parents=%lld,%lld Due=%.2f"),
                 *G.RegionId.ToString(), Predator, Candidates[I], Partner, Now+30.);

@@ -107,7 +107,7 @@ foreach($entry in @(@{Name='ClientA';At=$ClientAAt},@{Name='ClientB';At=$ClientB
     $taskLifetime=if($entry.Name -eq 'ClientB'){$LateClientDuration}elseif($WatchFaunaAlarms){$Duration-$ClientAAt+4}elseif($AllIslandSocial){$Duration-$ClientAAt-8}elseif($GrassTravelCheck){$TravelDuration+4}elseif($OverlapClients){$ClientBAt-$ClientAAt+40}else{30}
     $taskProbe=$taskLifetime-4
     $taskTravelArgument=if($GrassTravelCheck -and $entry.Name -eq 'ClientA'){'-VegetationGrassTravelCheck'}else{'-VegetationGrassTravelDisabled'}
-    $taskAddress="127.0.0.1:7777?EcoProtocol=3?Name=Vegetation$($entry.Name)"
+    $taskAddress="127.0.0.1:7777?EcoProtocol=5?Name=Vegetation$($entry.Name)"
     $taskClient=Start-VegetationProcess "$taskEngine/UnrealEditor.exe" @($taskProject,$taskAddress,'-game','-nosteam','-d3d11','-unattended','-nop4','-windowed',
         '-ResX=960','-ResY=540','-NoSound',"-EcoIntegrationExitAfter=$taskLifetime","-VegetationClientDuration=$taskProbe","-VegetationClientName=$($entry.Name)",
         "-VegetationMap=$taskMapName","-VegetationAuditFolder=$AuditFolder",

@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include "EcoBodyDevelopment.h"
 #include "EcoMovementTracesV3.h"
 #include "EcoNaturalHabitat.h"
 
@@ -35,6 +36,45 @@ namespace EcoLifeV3
         ESex Sex(std::uint64_t Seed,std::uint64_t Id) const
         { return Unit(Seed^Mix(Id+911))<FemaleFraction?ESex::Female:ESex::Male; }
     };
+    struct FFunctionalTraits
+    {
+        static constexpr double Minimum = .82;
+        static constexpr double Maximum = 1.18;
+        double Propulsion = 1.;
+        double Endurance = 1.;
+        double Form = 1.;
+        FBodyDevelopment Development;
+
+        bool IsValid() const
+        {
+            const auto Valid = [](double Value) { return std::isfinite(Value) && Value >= Minimum && Value <= Maximum; };
+            return Valid(Propulsion) && Valid(Endurance) && Valid(Form) && Development.IsValid();
+        }
+        double DriveScale() const { return Propulsion + .40 * Development.Aft + .20 * Development.Rise - .25 * Development.Span; }
+        double AddedMass() const { return .16 * (Development.Fore + Development.Aft) + .36 * Development.Span + .30 * Development.Rise; }
+        double RestCost() const { return 1. + .35 * (Endurance - 1.) + .25 * (Form - 1.) + AddedMass(); }
+        double ActiveCost() const { return (1. + .45 * (DriveScale() - 1.) + .25 * (Form - 1.) + AddedMass()) / Endurance; }
+        double TurnScale() const { return 1. - .65 * (Form - 1.) - .30 * (Development.Fore + Development.Aft) + .25 * Development.Span; }
+        double ReachScale() const { return 1. + .65 * (Form - 1.) + .80 * Development.Fore + .15 * Development.Rise; }
+        double WholeBodyWidthScale() const { return 1. + .5 * (Form - 1.); }
+        double WidthScale() const { return WholeBodyWidthScale() * (1. + Development.Span + .10 * (Development.Fore + Development.Aft)); }
+        double HeightScale() const { return 1. + Development.Rise + .075 * (Development.Fore + Development.Aft); }
+        double SwimClearanceScale() const { return WidthScale() + .45 * (HeightScale() - 1.); }
+        double LengthScale() const { return 1. + .5 * (Propulsion - 1.); }
+    };
+
+    inline std::uint8_t QuantizeTraitScale(double Scale)
+    {
+        return static_cast<std::uint8_t>(std::clamp(std::lround(128. * Scale), 0L, 255L));
+    }
+
+    inline FFunctionalTraits FoundFunctionalTraits(std::uint64_t Seed, std::uint64_t Id)
+    {
+        const auto BodyAxis = [Seed, Id](std::uint64_t Offset) { return .18 * (Unit(Seed ^ Mix(Id + Offset)) - .5); };
+        return { .9 + .2 * Unit(Seed ^ Mix(Id + 257)), .9 + .2 * Unit(Seed ^ Mix(Id + 307)),
+                 .9 + .2 * Unit(Seed ^ Mix(Id + 347)), {BodyAxis(389), BodyAxis(431), BodyAxis(463), BodyAxis(509)} };
+    }
+
     struct FGenome
     {
         // Bounded correlated tradeoff: faster/larger bodies require more food.
@@ -42,24 +82,47 @@ namespace EcoLifeV3
         // Caution is inherited context only; the learning owner decides its policy use.
         // Sociability only adjusts local spacing within an already selected graze action.
         double Caution=1,Sociability=1,Coat=1;
+        FFunctionalTraits Functional;
         bool IsValid() const { return std::isfinite(Speed)&&Speed>=.9&&Speed<=1.1&&std::isfinite(Size)&&Size>=.9&&Size<=1.1
             &&std::isfinite(Caution)&&Caution>=.85&&Caution<=1.15&&std::isfinite(Sociability)&&Sociability>=.85&&Sociability<=1.15
-            &&std::isfinite(Coat)&&Coat>=.85&&Coat<=1.15; }
+            &&std::isfinite(Coat)&&Coat>=.85&&Coat<=1.15&&Functional.IsValid(); }
     };
-    inline FGenome Founder(std::uint64_t Seed,std::uint64_t Id)
-    { return {.95+.1*Unit(Seed^Id),.95+.1*Unit(Seed+Id+17)}; }
+    inline FGenome Founder(std::uint64_t Seed,std::uint64_t Id, bool bDiverseCoat = false)
+    { return {.95+.1*Unit(Seed^Id),.95+.1*Unit(Seed+Id+17),1.,1.,bDiverseCoat ? .9+.2*Unit(Seed^Mix(Id+113)) : 1.,FoundFunctionalTraits(Seed,Id)}; }
     inline FGenome NaturalFounder(std::uint64_t Seed,std::uint64_t Id,double Variation)
     {
         const double V=std::clamp(Variation,0.,.1);
         return {1+2*V*(Unit(Seed^Id)-.5),1+2*V*(Unit(Seed+Id+17)-.5),
-            .85+.30*Unit(Seed^Mix(Id+41)),.85+.30*Unit(Seed^Mix(Id+79)),.9+.2*Unit(Seed^Mix(Id+113))};
+            .85+.30*Unit(Seed^Mix(Id+41)),.85+.30*Unit(Seed^Mix(Id+79)),.9+.2*Unit(Seed^Mix(Id+113)),FoundFunctionalTraits(Seed,Id)};
     }
-    inline FGenome Inherit(const FGenome& A,const FGenome& B,std::uint64_t Seed)
-    { return {std::clamp((A.Speed+B.Speed)*.5+(Unit(Seed)-.5)*.04,.9,1.1),
+    inline FGenome Inherit(const FGenome& A,const FGenome& B,std::uint64_t Seed, bool bDiverseCoat = false)
+    {
+        const auto InheritAxis = [](double First, double Second, std::uint64_t AxisSeed)
+        {
+            return std::clamp(.5 * (First + Second) + .06 * (Unit(AxisSeed) - .5),
+                              FFunctionalTraits::Minimum, FFunctionalTraits::Maximum);
+        };
+        const auto InheritShape = [](double First, double Second, std::uint64_t AxisSeed)
+        {
+            // A parent contributes a larger share at each locus, preserving variation between lineages.
+            const double Share = Unit(AxisSeed) < .5 ? .25 : .75;
+            return std::clamp(Share * First + (1. - Share) * Second + .04 * (Unit(AxisSeed + 1) - .5),
+                              -FBodyDevelopment::Limit, FBodyDevelopment::Limit);
+        };
+        const auto& FirstShape = A.Functional.Development;
+        const auto& SecondShape = B.Functional.Development;
+        return {std::clamp((A.Speed+B.Speed)*.5+(Unit(Seed)-.5)*.04,.9,1.1),
         std::clamp((A.Size+B.Size)*.5+(Unit(Seed+31)-.5)*.04,.9,1.1),
         std::clamp((A.Caution+B.Caution)*.5+(Unit(Seed+61)-.5)*.04,.85,1.15),
         std::clamp((A.Sociability+B.Sociability)*.5+(Unit(Seed+97)-.5)*.04,.85,1.15),
-        std::clamp((A.Coat+B.Coat)*.5+(Unit(Seed+131)-.5)*.03,.85,1.15)}; }
+        bDiverseCoat ? 1. + InheritShape(A.Coat - 1., B.Coat - 1., Seed + 131)
+                     : std::clamp((A.Coat+B.Coat)*.5+(Unit(Seed+131)-.5)*.03,.85,1.15),
+        {InheritAxis(A.Functional.Propulsion, B.Functional.Propulsion, Seed + 257),
+         InheritAxis(A.Functional.Endurance, B.Functional.Endurance, Seed + 307),
+         InheritAxis(A.Functional.Form, B.Functional.Form, Seed + 347),
+         {InheritShape(FirstShape.Fore, SecondShape.Fore, Seed + 389), InheritShape(FirstShape.Aft, SecondShape.Aft, Seed + 431),
+          InheritShape(FirstShape.Span, SecondShape.Span, Seed + 463), InheritShape(FirstShape.Rise, SecondShape.Rise, Seed + 509)}}};
+    }
     /** Recognized local harm only. Aggregate has no target location or rebroadcast path. */
     struct FRegionalDanger
     {
@@ -224,6 +287,17 @@ namespace EcoLifeV3
         }
         double BodyScale(double Now) const { return Genome.Size*Growth(Now); }
         double SpeedScale(double Now) const { return Genome.Speed*(.8+.2*Growth(Now)); }
+        FFunctionalTraits FunctionalTraits(double Now, bool Enabled) const
+        {
+            if (!Enabled || !bInitialized) return {};
+            const double Expression = .6 + .4 * AgeFraction(Now);
+            const auto& Traits = Genome.Functional;
+            return {1. + Expression * (Traits.Propulsion - 1.), 1. + Expression * (Traits.Endurance - 1.),
+                    1. + Expression * (Traits.Form - 1.), Traits.Development.AtGrowth(Expression)};
+        }
+        double BodyWidth(double Now, bool Enabled) const { return BodyScale(Now) * FunctionalTraits(Now, Enabled).WidthScale(); }
+        double BodyHeight(double Now, bool Enabled) const { return BodyScale(Now) * FunctionalTraits(Now, Enabled).HeightScale(); }
+        double SwimBody(double Now, bool Enabled) const { return BodyScale(Now) * FunctionalTraits(Now, Enabled).SwimClearanceScale(); }
         double Maintenance() const { return Genome.Size*Genome.Size*Genome.Size*(1+std::max(0.,Genome.Speed-1)*2); }
         static constexpr double MinimumParentEnergy = .7;
         bool CanParent(double Now,double Energy,bool Resident,double Health=1) const
@@ -239,11 +313,11 @@ namespace EcoLifeV3
         static constexpr double PredatorSatiation=.98;
         double RoomForReservedMeat(double Full=1.) const
         { return std::max(0.,std::min(PredatorSatiation,Full)-Nutrition); }
-        bool PredatorStep(double Now,double X,double Y,bool Running,double Dt,bool bMayFeed=true,double Full=1.)
+        bool PredatorStep(double Now,double X,double Y,bool Running,double Dt,bool bMayFeed=true,double Full=1.,double TraitCost=1.)
         {
             if(!std::isfinite(Dt)||Dt<=0||Dt>.25)return Nutrition>0;
             LastMeatIntake=0;
-            Nutrition=std::max(0.,Nutrition-.00225*Maintenance()*(Running?2:1)*Dt);
+            Nutrition=std::max(0.,Nutrition-.00225*Maintenance()*(Running?2:1)*TraitCost*Dt);
             if(MealRemaining>0&&Now>=MealExpires){MeatWasted+=MealRemaining;MealRemaining=0;bFeedingMeat=false;}
             if(Nutrition<.9)bFeedingMeat=true;
             if(bMayFeed&&bFeedingMeat&&MealRemaining>0&&(MealX-X)*(MealX-X)+(MealY-Y)*(MealY-Y)<=6.25){

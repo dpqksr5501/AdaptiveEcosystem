@@ -2,7 +2,7 @@
 
 2026-11-22 · `codex/social-shelter-handoff`의 `dc8a1443` 기반 작업 트리 · 대상은 `/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`
 
-실행 결과는 당시 로컬 작업 트리에서 얻었다. 눈밭 대조를 재현하려면 유전색 구현·팔레트·눈밭 계측을 포함한 작업 트리와 동일한 저장 섬이 필요하다. 아래의 `Saved/` 경로는 그 환경에서 생성되는 로컬 산출물이다.
+실행 결과는 당시 로컬 작업 트리에서 얻었다. 눈밭 대조를 재현할 때는 이 브랜치의 유전색 구현·팔레트·눈밭 계측과 같은 커밋의 저장 섬을 사용한다. 아래의 `Saved/` 경로는 실행할 때 생성되는 로컬 산출물이다.
 
 ## 2026-11-23 뼈대에 분포하는 체형 변화
 
@@ -1310,7 +1310,7 @@ foreach ($seed in 20000, 20017) {
 python -B ./AdaptiveEcosystem/Tools/Editor/check_snow_coat_selection.py ./AdaptiveEcosystem/Saved/FaunaAudit 20000 20017
 ```
 
-이전 실행의 직접 UBT 결과는 `Saved/Logs/EcoSnowCoatAuditUBT.log`에 있다. [실행기](../../Tools/Editor/run_jyu_island_audit.ps1) · 눈밭 비교 도구 (`Tools/Editor/check_snow_coat_selection.py`)
+이전 실행의 직접 UBT 결과는 `Saved/Logs/EcoSnowCoatAuditUBT.log`에 있다. [실행기](../../Tools/Editor/run_jyu_island_audit.ps1) · [눈밭 비교 도구](../../Tools/Editor/check_snow_coat_selection.py) · [부모와 출생 검증](../../Tools/Editor/check_island_trait_cohorts.py)
 
 ## 재현과 판정
 

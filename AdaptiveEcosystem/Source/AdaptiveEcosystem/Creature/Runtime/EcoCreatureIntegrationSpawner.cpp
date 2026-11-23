@@ -76,6 +76,14 @@ void AEcoCreatureIntegrationSpawner::BeginPlay()
         }
     int32 LifeOverride=-1;
     if(FParse::Value(FCommandLine::Get(),TEXT("EcoEcosystemLife="),LifeOverride)&&(LifeOverride==0||LifeOverride==1))bEnableEcosystemLife=LifeOverride!=0;
+    bEnableFunctionalTraits = UWorld::RemovePIEPrefix(GetWorld()->GetOutermost()->GetName())
+        == TEXT("/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed");
+#if WITH_DEV_AUTOMATION_TESTS
+    int32 FunctionalTraitsOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFunctionalTraits="), FunctionalTraitsOverride)
+        && (FunctionalTraitsOverride == 0 || FunctionalTraitsOverride == 1))
+        bEnableFunctionalTraits = FunctionalTraitsOverride == 1;
+#endif
 	PostTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &AEcoCreatureIntegrationSpawner::OnWorldPostActorTick);
 	StartedAt = GetWorld()->GetTimeSeconds();
 #if WITH_DEV_AUTOMATION_TESTS
@@ -104,6 +112,35 @@ void AEcoCreatureIntegrationSpawner::BeginPlay()
     bFaunaFollowWounded = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaFollowWounded"));
     bAuditFaunaHunts = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaHuntAudit"));
     bAuditFaunaBirths = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaBirthAudit"));
+    bAuditTraitOutcomes = FParse::Param(FCommandLine::Get(), TEXT("EcoTraitAudit"));
+    int32 HeritableFlightOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoHeritableFlight="), HeritableFlightOverride)
+        && (HeritableFlightOverride == 0 || HeritableFlightOverride == 1))
+        bEnableHeritableFlightSpeed = HeritableFlightOverride != 0;
+    int32 MaintenanceOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoHeritableMaintenance="), MaintenanceOverride)
+        && (MaintenanceOverride == 0 || MaintenanceOverride == 1))
+        bEnableHeritableFaunaMaintenance = MaintenanceOverride != 0;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoAquaticNurseryApproach")))
+        bEnableAquaticNurseryApproach = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaBreedingOpportunity")))
+        bEnableFaunaBreedingOpportunity = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoRuleFaunaPlayerAmbush")))
+        bEnableRuleFaunaPlayerAmbush = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoPredatorContinuity")))
+        bEnablePredatorContinuity = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoNativeWolfProvisioning")))
+        bEnableNativeWolfProvisioning = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoNativeWolfBirthAfterSeparation")))
+        bEnableNativeWolfBirthAfterSeparation = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoCoveredRefugeForage")))
+        bEnableCoveredRefugeForage = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoCoveredRefugeMealRotation")))
+        bEnableCoveredRefugeMealRotation = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoAquaticPatchMealRotation")))
+        bEnableAquaticPatchMealRotation = true;
+    if (FParse::Param(FCommandLine::Get(), TEXT("EcoLandPlantMealRotation")))
+        bEnableLandPlantMealRotation = true;
     int32 PersistenceOverride = INDEX_NONE;
     if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaPersistence="), PersistenceOverride)
         && (PersistenceOverride == 0 || PersistenceOverride == 1)) FaunaPersistence.bEnabled = PersistenceOverride != 0;
@@ -356,4 +393,23 @@ void AEcoCreatureIntegrationSpawner::EndPlay(const EEndPlayReason::Type Reason)
     ActiveFoodVisits.Reset();
 	PendingEncounterThreats.Reset();
 	Owned.Reset(); SpeciesTotals.Reset(); Super::EndPlay(Reason);
+}
+bool AEcoCreatureIntegrationSpawner::UsesCoatSelection() const
+{
+    static const int32 Selection = [] {
+        int32 Mode = 1;
+        FParse::Value(FCommandLine::Get(), TEXT("EcoCoatSelection="), Mode);
+        return Mode;
+    }();
+    return CoatPalette && Selection != 0;
+}
+
+double AEcoCreatureIntegrationSpawner::CoatDetectionRange(FName Species, FName Region, double Coat) const
+{
+    if (!UsesCoatSelection()) return 1.;
+    const FEcoCoatSurface* Surface = CoatPalette->Species.Find(Species);
+    const float* Background = CoatPalette->RegionLuminance.Find(Region);
+    if (!Surface || !Background) return 1.;
+    const float Luminance = Surface->Luminance(UEcoCreatureCoatPalette::PackTone(Coat) / 255.f);
+    return UEcoCreatureCoatPalette::DetectionRangeScale(Luminance, *Background);
 }

@@ -126,6 +126,7 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 				Actor = GetWorld()->SpawnActor<AEcoCreatureRepresentationActor>(Class, Input.Position, FRotator::ZeroRotator, Params);
 			}
 			if (!Actor || !Actor->BindIdentity(Input.Id, Input.Species)) { if (Actor) Actor->Destroy(); continue; }
+            Actor->SetCoatPalette(CoatPalette);
 			auto& Binding = Visuals.FindOrAdd(Input.Id); Binding.Actor = Actor; Binding.Sequence = 0; ++Adds;
 			Existing = &Binding;
 		}
@@ -144,6 +145,9 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		State.FocusYawDegrees = float(Input.Visual.FocusYaw)/182.0389f;
         State.BodyScale=Input.Visual.BodyScale/128.f;State.Maturity=Input.Visual.Maturity/255.f;State.CoatTone=Input.Visual.CoatTone/255.f;
         State.BodyCondition=Input.Visual.BodyCondition/128.f;
+        State.InheritedLength=float(Input.Visual.InheritedProportions & 255u)/128.f;
+        State.InheritedWidth=float(Input.Visual.InheritedProportions >> 8)/128.f;
+        State.InheritedBody = Input.Visual.InheritedBody;
         State.SocialSignal=uint8(EcoFaunaSocial::Signal(Input.Visual.SocialPresentation));
         State.SocialYaw=float(EcoFaunaSocial::Yaw(Input.Visual.SocialPresentation));
         State.bFaunaAlarm = (Input.Visual.SocialPresentation & EcoFaunaSocial::AlarmPulse) != 0;

@@ -24,8 +24,8 @@ while($true){
  if((Get-Date) -gt $rifleDeadline){throw 'Readiness timeout; native exit timer left running'}
  Start-Sleep -Seconds 1
 }
-$rifleA=Start-RiflePeer 'UnrealEditor.exe' '127.0.0.1:7793?EcoProtocol=3?Name=RifleA' 'A' @('-game','-RifleNetworkClient=A')
-$rifleB=Start-RiflePeer 'UnrealEditor.exe' '127.0.0.1:7793?EcoProtocol=3?Name=RifleB' 'B' @('-game','-RifleNetworkClient=B')
+$rifleA=Start-RiflePeer 'UnrealEditor.exe' '127.0.0.1:7793?EcoProtocol=5?Name=RifleA' 'A' @('-game','-RifleNetworkClient=A')
+$rifleB=Start-RiflePeer 'UnrealEditor.exe' '127.0.0.1:7793?EcoProtocol=5?Name=RifleB' 'B' @('-game','-RifleNetworkClient=B')
 $rifleFailures=[System.Collections.Generic.List[string]]::new()
 foreach($riflePeer in @(@{Name='A';P=$rifleA},@{Name='B';P=$rifleB},@{Name='Server';P=$rifleServer})){
  while(-not $riflePeer.P.WaitForExit(1000)){}

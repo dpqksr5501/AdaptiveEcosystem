@@ -14,7 +14,8 @@
 #include "Engine/World.h"
 
 bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, double ObservedTime,
-	int64 StepId, const FEcoSurvivalSettings& Settings, TArray<FEcoDeathOutcome>& OutDeaths, bool bIntegratedCreatures)
+	int64 StepId, const FEcoSurvivalSettings& Settings, TArray<FEcoDeathOutcome>& OutDeaths,
+	bool bIntegratedCreatures, bool bHeritableFaunaMaintenance, bool bFunctionalTraits)
 {
 	OutDeaths.Reset();
 	if (!IsInGameThread() || Manager.IsProcessing() || !Settings.IsValid() || StepId <= 0 || Time.WorldEpoch <= 0
@@ -87,8 +88,10 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 			if (Profile.bEnabled && V.HP > 0)
 			{
 				const double Dt = Time.ServerTimeSeconds - R.LastTime;
-				const double ActivityScale = Fauna.IsEmpty() ? 1. : Fauna[I].MaintenanceScale;
-				const double Rate = Profile.BaseMetabolism * ActivityScale
+				const double Maintenance = Fauna.IsEmpty() ? Profile.BaseMetabolism : Fauna[I].ScaleMaintenance(
+					Profile.BaseMetabolism * double(Fauna[I].MaintenanceScale), bHeritableFaunaMaintenance,
+					Time.ServerTimeSeconds, bFunctionalTraits);
+				const double Rate = Maintenance
 					+ (Travel[I].State == EEcoResidenceState::Traveling ? Profile.TravelMetabolism : 0.0);
 				const double StartEnergy = FMath::Clamp<double>(V.Energy, 0, V.MaxEnergy);
 				const double ZeroAfter = StartEnergy <= 0 ? 0.0 : Rate > 0 ? StartEnergy / Rate : Dt;
