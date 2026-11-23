@@ -2,6 +2,26 @@
 
 2026-11-05~06 작업. 사용자 요청에 따라 추가 이주 실행 검증을 중지하고 현재 확인 범위를 정리했다. 작업 기준 `jwj-1024`, 시작 HEAD `92e6df20a7ee10d9299551a60ba32d4ab1e8c4ae`. 커밋·push는 하지 않았다. 기존 사용자 변경과 이번 변경이 함께 있는 작업 폴더다.
 
+## 2026-11-22 소유 섬 플레이어 연결
+
+`/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`를 열고 Play한다. 맵은 팀의 `BP_EcoGameMode_Common`과 기존 무기·플레이어 체력 경로, 코디네이터의 `Enable Player Combat`을 사용한다. 왼쪽 Ctrl은 은밀 이동, 왼쪽 Shift는 달리기다. 마우스 오른쪽 버튼으로 조준하고 왼쪽 버튼으로 발사한다. 기본 프로젝트 시작 맵은 `/Game/JWJ/Integration_JwJ`다.
+
+기존 Grassland 시작점에서 입력 없이 대기하자 늑대에게 피해를 받은 뒤 부활한 자리에서 다시 공격받았다. 소유 섬의 `PlayerStart`를 PIE에서 확인한 초지 남쪽 진입 지면에 옮겼다. 새 위치는 Unreal 좌표 `(94000, 54000, -4170.78) cm`이며 지면보다 120cm 높다. 지형 배치로 첫 접근 거리를 확보했고, 늑대의 감지·공격과 사체 거래는 기존 권위 경로를 사용한다.
+
+저장 맵 설정을 쓰는 사냥 시험은 PowerShell에서 실행한다. `SavedPlayerCombat` 검사가 게임모드와 코디네이터 설정을 확인하고, 기존 조준·발사 입력으로 선택된 개체의 권위 사망과 공유 사체 생성까지 추적한다. 시험 중에는 플레이어 위치와 조준을 제어한다. [재현 실행기](../../Tools/Editor/run_jyu_island_audit.ps1) · [섬 PIE 검증 코드](../../Tools/Editor/audit_jyu_island_fauna.py)
+
+```powershell
+& ./AdaptiveEcosystem/Tools/Editor/run_jyu_island_audit.ps1 -Label IslandPlayerRifle -Mode Full -Headless -Seed 20000 -Scenario @('-EcoIslandSavedPlayerCombat','-EcoIslandCombatCarrion=Rifle')
+```
+
+렌더링을 끈 PIE에서 시드 20000·20017은 각각 초기 120개체, 첫 30게임초 무입력 체력 100, 이어서 초지 방향 10.54m 이동을 기록했다. 사냥 시험은 시드 20000에서 늑대 49번에 실제 피해 30·30·30·10을 확정했다. 지역 사망이 한 번 반영됐고 공용 사체 재고 100이 생겼다. 이 사체는 소비 없이 만료됐다. 플레이어 시작점과 사냥은 각각 `Saved/IslandPlayerIntegration/Startup_{20000,20017}.json`과 `Saved/FaunaAudit/Island_20000_IslandPlayerRifle/IslandFaunaPIE.json`에 있다.
+
+같은 시드 20000의 강변 약 11m 구간에서 은밀 이동은 발소리 강도 0.12와 청각 회피 기록 0건, 달리기는 0.54~1.00과 29건이었다. 반응 종은 쥐·산토끼·여우·표범이다. 29건은 귀로 감지한 사건에 대한 회피 기록 수다. 같은 개체가 여러 번 포함될 수 있다. 원본은 `Saved/FaunaAudit/Island_20000_IslandPlayer{Sneak,Run}/IslandFaunaPIE.json`과 대응 권위 로그다. 새 멀티플레이·장시간 생태 균형과 물리 입력은 이 PIE 범위에 포함되지 않는다.
+
+2026-11-23 소유 섬 후속 검증에서는 `EcoProtocol=5`로 두 명이 같은 표적을 사냥한 뒤 새 전용 서버에 복원했다. 기존 사망과 재고가 유지됐고, 새 클라이언트가 받은 살아 있는 늑대의 털색은 서버와 일치했다. [전용 서버 검증과 재현 명령](MMORPG_ECOSYSTEM_TRAIT_EVIDENCE_20261122.md#전용-서버-사냥-직후-체크포인트-복원)
+
+아래 JWJ 사냥·장시간 비교는 2026-11-05~06 기록이다.
+
 ## 적용 위치와 구현
 
 별도 맵을 만들지 않고 기존 **`/Game/JWJ/1102_Integration_JWJ`**에 적용했다. 기존 `JWJ_WildlifeTest` 지역에 인접한 `JWJ_HuntingMeadow`와 양방향 지면 이주 경로, 두 지역의 식생/토양 입력을 추가했다. 기존 지역의 초기 개체 설정은 보존했다. destination SpawnGroup 저작값은 사슴 8·늑대 1이지만, 현재 Native 설정의 개체 수 override에 의해 **실제 실행은 각 지역 사슴 12·늑대 4**로 시작했다. 저작값과 실행 개체 수를 혼동하지 않는다. 수원은 임의 생성하지 않았다.

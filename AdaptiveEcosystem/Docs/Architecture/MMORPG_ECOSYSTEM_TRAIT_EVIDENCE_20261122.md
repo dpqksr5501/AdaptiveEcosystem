@@ -559,6 +559,8 @@ UE 5.8 직접 Editor 빌드와 `GroundPlayerDamageWitnesses` 자동화를 확인
 
 재현에는 `-SavedIsland -SharedTarget -CheckpointRoundTrip`과 새 `-EvidenceTag`를 사용한다. 최초 저장 뒤 새 서버의 기본 두뇌 적용 시점을 맞추기 위해 성공한 저장 파일을 재사용해 복원 단계만 다시 실행했다. 저장과 복원 양쪽에서 같은 에디터 바이너리를 사용했다. 원본 증거는 `Saved/RifleValidation/IslandHuntCheckpointStocks/{Server,A,B,Late,SharedLedger,Checkpoint}.json`, 복원 증거는 `Saved/RifleValidation/IslandHuntRestoreAuthority/{RestoredServer,RestoredClient,RestoredCheckpoint,RestoredLedger}.json`에 있다. [전용 서버 실행기](../../Tools/Editor/run_jwj_rifle_network.ps1) · [체크포인트 수지 검사](../../Tools/Editor/check_island_checkpoint_receipts.py)
 
+2026-11-23에 유전색이 적용된 저장 섬과 `EcoProtocol=5`에서 같은 명령으로 저장과 복원을 처음부터 다시 실행했다. 두 플레이어가 늑대 `49`에게 피해 40과 60을 가했고, 사망과 사체 생성은 각각 한 번 기록됐다. 복원한 포맷 24 체크포인트에서 생존 개체 119마리의 유전값과 표현값, 먹이점 재고 3곳, Native 지역 재고 4곳이 일치했다. late join과 새 서버의 클라이언트에서 늑대 `50`의 털색 값은 권위 표본과 같은 약 `0.55686`이었다. 복원 뒤 사체 지급은 0, 만료 잔량은 100이었다. 검증기는 권위 보고서에서 기능 형질과 위장 모드를 읽어 체크포인트의 모듈·규칙 식별값을 확인한다. 집계는 `Saved/RifleValidation/PublishRifleCoat1123/{SharedLedger,RestoredLedger,RestoredClient}.json`에 있다.
+
 ### 현재 실행기별 30게임분 개체군
 
 저장 섬을 시드 `20000`, `20017`에서 각각 1,800게임초까지 실행했다. 추가 먹이터나 플레이어 사냥 없이 기존 자원과 배치를 사용했다. 유전 순항·유지 비용, 산란장 접근, 포식자 연속 이동의 개발 옵션을 모두 켰다. 두 실행은 16종 120마리에서 시작했다. 아래 성체 스케일은 별도 단기 멀티플레이에서 같은 종의 두 극단 개체를 샘플링한 값이다.
