@@ -7,6 +7,7 @@ bool UEcoCreatureAnimationProfile::IsValidProfile() const
         ||MorphScale.ContainsNaN()||MorphScale.GetMin()<.7||MorphScale.GetMax()>1.3
         || !FMath::IsFinite(MaxFootCorrectionCm) || MaxFootCorrectionCm<0 || MaxFootCorrectionCm>50
         || !FMath::IsFinite(FootClearanceCm) || FootClearanceCm<0 || FootClearanceCm>20
+        || !FMath::IsFinite(MaxPlantCorrectionCm) || MaxPlantCorrectionCm < 0.f || MaxPlantCorrectionCm > 15.f
         || (bEnableGroundIK && ((FootBones.Num()!=2 && FootBones.Num()!=4)
             || IKEndBones.Num()!=FootBones.Num() || ContactHeights.Num()!=FootBones.Num()))) return false;
     if(!MorphBone.IsNone()&&Locomotion->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(MorphBone)==INDEX_NONE)return false;

@@ -44,6 +44,16 @@ bool AEcoCreatureIntegrationSpawner::BuildAgentLookup()
 		if (Id <= 0 || AgentLookup.Contains(Id)) return false;
 		AgentLookup.Add(Id, E);
 	}
+    for (auto It = FaunaExperience.CreateIterator(); It; ++It)
+    {
+        const auto* Entity = AgentLookup.Find(It.Key());
+        if (!Entity) It.RemoveCurrent();
+        else if (EM.GetFragmentDataChecked<FEcoVitalsFragment>(*Entity).HP <= 0.f)
+        {
+            It.Value().RetainBodyCondition();
+            if (!It.Value().HasData()) It.RemoveCurrent();
+        }
+    }
 	return true;
 }
 
@@ -172,6 +182,13 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	CommittedDeaths += Deaths.Num();
 	for (const auto& Death : Deaths)
 	{
+        if (Death.PredatorStableAgentId > 0)
+        {
+            RecordFaunaExperience(Death.PredatorStableAgentId,
+                {EEcoExperienceActivity::Hunt, Death.RegionId, Death.SpeciesId}, Time.ServerTimeSeconds);
+            if (Death.Cause == EEcoDeathCause::Predation)
+                RecordHuntEncounter(EM, Death.PredatorStableAgentId, Death.SpeciesId, Death.RegionId, Time.ServerTimeSeconds, 1.);
+        }
         ++SpeciesTotals.FindOrAdd(Death.RegionId).FindOrAdd(Death.SpeciesId).Deaths;
         if (const auto* Kill = PendingHuntingDeaths.Find(Death.StableAgentId))
         {
@@ -312,6 +329,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 		const auto* Entity = AgentLookup.Find(Arrival.StableAgentId);
 		if (!Entity || !EM.IsEntityValid(*Entity)) return false;
 		const FName Species = EM.GetFragmentDataChecked<FEcoIdentityFragment>(*Entity).SpeciesId;
+        RecordFaunaExperience(Arrival.StableAgentId, {EEcoExperienceActivity::Passage, Arrival.OriginRegionId,
+            Arrival.DestinationRegionId}, Time.ServerTimeSeconds);
 		++SpeciesTotals.FindOrAdd(Arrival.OriginRegionId).FindOrAdd(Species).Outgoing;
 		++SpeciesTotals.FindOrAdd(Arrival.DestinationRegionId).FindOrAdd(Species).Incoming;
 	}
@@ -328,6 +347,18 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	}
 	if (!BuildAgentLookup() || !ReconcilePopulation() || !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return false;
     if(!ProcessNaturalBirths(Time)||!ProcessFauna(Time)||!ProcessPopulationRecovery(Time)||(bEnableEcosystemLife&&!ReconcilePopulation()))return false;
+    if (RecordsFaunaExperience())
+        for (const auto Entity : Owned)
+        {
+            const auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity);
+            if (Vitals.HP > 0.f && Vitals.MaxEnergy > 0.f)
+            {
+                const int64 Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity).StableAgentId;
+                FaunaExperience.FindOrAdd(Id).LongTerm.SampleCondition(Time.ServerTimeSeconds, Vitals.Energy / Vitals.MaxEnergy);
+            }
+        }
+    ResolveEncounterEvidence(EM, Time.ServerTimeSeconds);
+    ProcessFaunaSocial(EM, Time.ServerTimeSeconds);
     PublishForageVisuals();
 	CompletedTime = Time;
 	PublishSummary();
@@ -339,6 +370,8 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 	TRACE_CPUPROFILER_EVENT_SCOPE(EcoCreature_PresentationSnapshot);
 	auto& EM = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
     const bool bEmitFootsteps = FootstepAudioSet && FootstepAudioSet->IsValidConfiguration();
+    const double PresentationTime = FaunaInteractionMode == 2
+        ? GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds : 0.;
 	for (const auto E : Owned)
 	{
 		const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
@@ -346,6 +379,11 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 		auto& Present = EM.GetFragmentDataChecked<FEcoCreaturePresentationFragment>(E);
         const uint8 PreviousActivity = Present.Activity;
         Present.BodyScale=128;Present.Maturity=255;Present.CoatTone=128;
+        Present.BodyCondition = 128;
+        Present.SocialPresentation = 0;
+        if (FaunaExperienceMode == 2)
+            if (const auto* Memory = FindFaunaExperience(EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId))
+                Present.BodyCondition = Memory->LongTerm.BodyConditionByte();
         if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized)
             {
             const double AgeNow=V.HP<=0&&Life.DeathTime>=0?Life.DeathTime:GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
@@ -509,6 +547,21 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 		if (const auto* Cue = EM.GetFragmentDataPtr<FEcoCreatureCueFragment>(E)) {
             Present.Flags |= uint8(Cue->Memory.Source)<<4;
             Present.FocusYaw = Cue->FocusYaw;
+        }
+        if (FaunaExperienceMode == 2 && V.HP > 0 && !(Present.Flags & 0x36)
+            && EcoFaunaSocial::IsActivityCompatible(EEcoSpeciesActivity(Present.Activity)))
+        {
+            const auto Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId;
+            Present.SocialPresentation = FaunaSocialPresentation.FindRef(Id);
+        }
+        if (FaunaInteractionMode == 2 && V.HP > 0.f)
+        {
+            const auto Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId;
+            const auto* Signal = FaunaHuntSignals.Find(Id);
+            if (Signal && Signal->Medium != EEcoEncounterMedium::Water && PresentationTime - Signal->At < 1.
+                && Signal->Region == EM.GetFragmentDataChecked<FEcoRegionFragment>(E).CurrentRegionId
+                && EncounterMedium(EM, E) != EEcoEncounterMedium::Water)
+                Present.SocialPresentation |= EcoFaunaSocial::AlarmPulse;
         }
         if (V.HP <= 0.f && !FaunaSpecies.IsEmpty() && Life.DeathTime >= 0.)
         {

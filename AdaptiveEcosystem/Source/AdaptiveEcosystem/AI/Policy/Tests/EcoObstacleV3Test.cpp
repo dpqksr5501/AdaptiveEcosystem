@@ -233,7 +233,7 @@ bool FEcoObstacleV3LevelScanTest::RunTest(const FString& Parameters)
 	const FVector Origin(0.0, 0.0, 0.0);
 	SpawnBox(W.World, FVector(2000.0, 5000.0, 100.0), FVector(1.0, 1.0, 2.0), true);    // 원판: 반지름 50 cm = 0.25 단위, (10, 25)
 	SpawnBox(W.World, FVector(5000.0, 3000.0, 100.0), FVector(1.0, 1.0, 2.0), false);   // 충돌 없음
-	SpawnBox(W.World, FVector(6000.0, 3000.0, 100.0), FVector(0.3, 0.3, 2.0), true);    // 작음 (반지름 15 cm)
+	SpawnBox(W.World, FVector(6000.0, 3000.0, 100.0), FVector(0.08, 0.08, 2.0), true);  // 작음 (반지름 4 cm)
 	SpawnBox(W.World, FVector(7000.0, 3000.0, 10.0), FVector(2.0, 2.0, 0.2), true);     // 낮음 (높이 20 cm)
 	SpawnBox(W.World, FVector(3000.0, 3000.0, 100.0), FVector(1.0, 1.0, 2.0), true);    // 은신처 원 안 (중심 (15, 15), 반경 6)
 	SpawnBox(W.World, FVector(-500.0, 3000.0, 100.0), FVector(1.0, 1.0, 2.0), true);    // 무대 밖

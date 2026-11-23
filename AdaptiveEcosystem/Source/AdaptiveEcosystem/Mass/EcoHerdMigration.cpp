@@ -310,6 +310,8 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 // Context rebase preserves actual world position, identity, energy, reserve and herd.
                 A.Body->Body.Pos=A.Body->Body.PrevPos=Local;A.Body->Body.Detour={};
                 A.Link->ContextIndex=Target->Index;A.Link->PrevGroundZ=A.Link->GroundZ;
+                A.Link->StaticMeshMovement={};
+                Native->CancelStaticMeshTangent(A.Id);
                 A.Link->bRefreshObservation=true;
                 A.Region->CurrentRegionId=P.Destination;A.Region->CurrentRegionIndex=Target->RegionRuntimeIndex;
                 RegisterResident(P.Destination,A.Id);

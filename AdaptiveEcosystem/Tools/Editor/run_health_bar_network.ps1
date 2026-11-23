@@ -22,8 +22,8 @@ while($true){
     Start-Sleep -Seconds 1
 }
 $healthClientOptions=if($RenderedClients){@('-d3d11','-windowed','-ResX=1280','-ResY=720','-HealthBarRender')}else{@('-NullRHI')}
-$healthA=Start-HealthPeer 'UnrealEditor.exe' '127.0.0.1:7795?EcoProtocol=1?Name=HealthA' 'A' (@('-game','-HealthBarClient=A')+$healthClientOptions)
-$healthB=Start-HealthPeer 'UnrealEditor.exe' '127.0.0.1:7795?EcoProtocol=1?Name=HealthB' 'B' (@('-game','-HealthBarClient=B')+$healthClientOptions)
+$healthA=Start-HealthPeer 'UnrealEditor.exe' '127.0.0.1:7795?EcoProtocol=3?Name=HealthA' 'A' (@('-game','-HealthBarClient=A')+$healthClientOptions)
+$healthB=Start-HealthPeer 'UnrealEditor.exe' '127.0.0.1:7795?EcoProtocol=3?Name=HealthB' 'B' (@('-game','-HealthBarClient=B')+$healthClientOptions)
 $healthFailures=[System.Collections.Generic.List[string]]::new()
 foreach($healthPeer in @(@{Name='A';P=$healthA},@{Name='B';P=$healthB},@{Name='Server';P=$healthServer})){
     while(-not $healthPeer.P.WaitForExit(1000)){}

@@ -52,7 +52,6 @@ bool UEcoDebugCommandSubsystem::RegisterCommand(const FString& Name, const FStri
 	}
 	Handlers.Add(Key, MoveTemp(Handler));
 	++Shared->Owners;
-	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Debug] Registered %s in %s"), *Name, *GetWorld()->GetName());
 	return true;
 }
 

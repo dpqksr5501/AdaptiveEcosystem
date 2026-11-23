@@ -245,6 +245,57 @@ def save_eagle_perch():
     u.log("ECO_ISLAND_EAGLE_PERCH_SAVED")
 
 
+def apply_food_visit_layout(world, runtime):
+    """Share the existing rat population between the riparian habitat and the dry upland."""
+    if world.get_path_name().split(".")[0] != TARGET:
+        raise RuntimeError("Expected the owned island")
+    groups = [row.copy() for row in get(runtime, "groups")]
+    regions = {str(get(row, "region_id")): row for row in groups}
+    bank, upland = (regions[region] for region in ("Riverbank", "Highland"))
+    bank_rows = [row.copy() for row in get(bank, "fauna")]
+    upland_rows = [row.copy() for row in get(upland, "fauna")]
+    rats, = (row for row in bank_rows if str(get(row, "species_id")) == "Rat")
+    eagles, = (row for row in upland_rows if str(get(row, "species_id")) == "GoldenEagle")
+    existing = next((row for row in upland_rows if str(get(row, "species_id")) == "Rat"), None)
+    source = list(get(rats, "spawn_points"))
+    sites = list(get(existing, "spawn_points")) if existing is not None else []
+    if existing is None:
+        descriptors = wp.get_actor_descs()
+        prefix = TARGET.replace("/Game/", "/Game/__ExternalActors__/", 1) + "/"
+        if not descriptors or any(not str(get(row, "actor_package")).startswith(prefix) for row in descriptors):
+            raise RuntimeError("Expected actor packages from the owned island")
+        wp.load_actors([get(row, "guid") for row in descriptors])
+        eagle_profile, = (row for row in get(runtime, "fauna_species") if str(get(row, "species_id")) == "GoldenEagle")
+        if "Rat" not in {str(get(row, "species_id")) for row in get(eagle_profile, "prey_rules")} or len(source) < 4:
+            raise RuntimeError("The upland move needs an existing predator-prey relation and a viable riverbank group")
+        # Two previously surveyed dry sites on the open slope by the first eagle's perch.
+        # Only founder placement changes. They use the existing ground and food rules after spawning.
+        anchor = get(eagles, "spawn_points")[0]
+        for x, y in ((-540., -310.), (700., -530.)):
+            hint = anchor + v(x, y, 0)
+            point = u.EcoCreatureAnimationBuilder.project_placement_point(world, hint)
+            if point is None or not dry_ground(world, point, 85., 20.):
+                raise RuntimeError(f"The proposed upland rat site lacks a dry ground footprint at {hint}, projected {point}")
+            sites.append(point)
+        upland_rats = rats.copy()
+        put(upland_rats, spawn_points=sites)
+        source = source[:-len(sites)]
+        put(rats, spawn_points=source)
+        put(bank, fauna=bank_rows)
+        put(upland, fauna=[*upland_rows, upland_rats])
+    runtime.modify()
+    put(runtime, groups=groups, fauna_food_visit_mode=2)
+    return {"riverbank_rats": len(source), "highland_rat_sites_cm": [list(point.to_tuple()) for point in sites]}
+
+
+def save_food_visit_layout():
+    world = editor.get_editor_world()
+    report = apply_food_visit_layout(world, common["runtime"]())
+    if not levels.save_current_level():
+        raise RuntimeError("Unable to save the owned island food layout")
+    u.log(f"ECO_ISLAND_FOOD_VISITS_SAVED {report}")
+
+
 def save_forage_soil():
     world = editor.get_editor_world()
     if world.get_path_name().split(".")[0] != TARGET:
@@ -613,6 +664,7 @@ def author():
         footstep_audio_set=donor["footstep_audio_set"], fauna_habitat_stage=1, global_population_limit=160,
         v3_use_authored_shelters=True)
     add_eagle_perch(runtime)
+    apply_food_visit_layout(world, runtime)
     if not levels.save_current_level():
         raise RuntimeError("Unable to save island")
     result = {"map": TARGET, "river": river_region, "water_samples": samples, "forage": len(stock) - len(samples), "foliage": scenery,
@@ -647,6 +699,8 @@ if __name__ == "__main__":
             save_mink_high_bank()
         elif "-EcoIslandSaveEaglePerch" in u.SystemLibrary.get_command_line().split():
             save_eagle_perch()
+        elif "-EcoIslandSaveFoodVisitLayout" in u.SystemLibrary.get_command_line().split():
+            save_food_visit_layout()
         elif "-EcoIslandSaveForageSoil" in u.SystemLibrary.get_command_line().split():
             save_forage_soil()
         elif "-EcoIslandSaveLocalForageSoil" in u.SystemLibrary.get_command_line().split():

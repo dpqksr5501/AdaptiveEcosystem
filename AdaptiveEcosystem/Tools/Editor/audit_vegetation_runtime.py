@@ -50,6 +50,17 @@ map_paths = {
 if map_name not in map_paths or not re.fullmatch(r'[A-Za-z0-9_]+',folder):raise RuntimeError('Approved map/output folder required')
 jwj = map_name == '1102_Integration_JWJ'
 island = map_name == 'LV_JYU_IslandEcosystemRefreshed'
+all_island_social = '-vegetationallislandsocial' in cmd.lower().split()
+late_join_social = '-vegetationlatejoinsocial' in cmd.lower().split()
+watch_fauna_alarms = '-vegetationwatchfaunaalarms' in cmd.lower().split()
+if all_island_social or late_join_social:
+    import runpy
+    social_tools = runpy.run_path(str(Path(__file__).with_name('observe_island_social.py')))
+    observe_social = social_tools['position_observers']
+if all_island_social:
+    opening = arg('VegetationSocialOpening', 'GoldenEagle+Mink').split('+')
+    if len(opening) != 2 or any(kind not in social_tools['RANGES'] for kind in opening):
+        raise RuntimeError('Two authored island species are required for the opening views')
 expected_field_count = 4 if jwj or island else 3
 jwj_camera_check = '-vegetationjwjcameracheck' in cmd.lower().split()
 if jwj_camera_check and not (jwj and pie and authored and duration >= 52):
@@ -57,6 +68,7 @@ if jwj_camera_check and not (jwj and pie and authored and duration >= 52):
 out = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())) / folder
 out.mkdir(parents=True, exist_ok=True)
 state = dict(start=None, next=0, rows=[], error=None, phase=None, camera=None, shots=0, focus=None, hidden=False, last={}, transfers=[],world=None,csv=False,child_visuals=[],observer_targets=[])
+if all_island_social: state['social_opening'] = dict(zip(('ClientA', 'ClientB'), opening))
 state['feeding'] = dict(synchronous_samples=0, source_cells=0, intake_samples=0, rendered=[], changes=[], pending={})
 state['depletion'] = dict(synchronous_samples=0, positive={}, depleted={}, recovered={}, verified={})
 deadline = time.monotonic() + duration + 180
@@ -202,8 +214,15 @@ def finish(result):
             result = 'FAILED'; state['error'] = 'S1 layout readiness/authority world trace budget failed'
     report = dict(result=result, error=state['error'], map=map_name, fixture=fixture, patch_layout=patch_layout,
                   duration_wall_seconds=duration, grass_profile=grass_profile, samples=state['rows'], screenshots=state['shots'], region_transfers=state['transfers'],child_visuals=state['child_visuals'],observer_targets=state['observer_targets'],overlap_expected='-vegetationoverlapexpected' in cmd.lower())
+    if watch_fauna_alarms:
+        state['fauna_alarm_finished'] = True
+        report['fauna_alarm_transitions'] = state.get('fauna_alarm_transitions', [])
     (out / (name + '_Runtime.json')).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     unreal.log('VEGETATION_AUDIT_FINISHED ' + json.dumps(dict(result=result, error=state['error'], samples=len(state['rows']))))
+    if all_island_social:
+        state['social_finished'] = True
+        if all((out / f'{peer}_Client.json').exists() for peer in ('ClientA', 'ClientB')):
+            unreal.SystemLibrary.quit_editor()
     if pie:
         levels.editor_request_end_play()
         for source, vegetation, food_grass in state.get('authored_settings', []):
@@ -246,11 +265,47 @@ def tick(dt):
         if time.monotonic() > deadline: raise RuntimeError('Initialization/observation deadline')
         game = world()
         if not game: return
+        now = time.monotonic()
+        if all_island_social and 'social_preroll' not in state:
+            if not unreal.EcoCreatureInspectionLibrary.get_authority_agent_ids(game):
+                return  # Let the saved World Partition island finish its startup first.
+            unreal.GameplayStatics.set_global_time_dilation(game, .001)
+            state['social_preroll'] = now
+            state['start'] = now
+            unreal.log('ISLAND_SOCIAL_PREROLL_STARTED')
+        if all_island_social and not state.get('social_released'):
+            ready = all((out / f'{peer}_SocialReady.json').exists() for peer in ('ClientA', 'ClientB'))
+            expired = now - state['social_preroll'] > 86.
+            if ready or expired:
+                both_joined = len(unreal.GameplayStatics.get_all_actors_of_class(game, unreal.PlayerController)) >= 2
+                slow_opening = ready or both_joined
+                unreal.GameplayStatics.set_global_time_dilation(game, .25 if slow_opening else 1.)
+                state['social_released'] = True
+                if slow_opening:
+                    state['social_opening_game_end'] = 4.
+                    state['social_opening_wall_end'] = now + 18.
+                unreal.log(f'ISLAND_SOCIAL_PREROLL_RELEASE peers_ready={ready} game_time={unreal.GameplayStatics.get_time_seconds(game)}')
+            else:
+                if now >= state.get('social_preroll_next', 0):
+                    state['social_preroll_next'] = now + .5
+                    source = unreal.EcoCreatureInspectionLibrary
+                    rows = []
+                    for key in source.get_authority_agent_ids(game):
+                        raw = source.capture_agent(game, key)
+                        if isinstance(raw, tuple): raw = next((s for s in raw if isinstance(s, str)), None)
+                        if raw: rows.append(json.loads(raw))
+                    if rows:
+                        observe_social(game, out, rows, state, now - state['start'])
+                return
+        if all_island_social and state.get('social_opening_game_end'):
+            if (unreal.GameplayStatics.get_time_seconds(game) >= state['social_opening_game_end']
+                    or now >= state['social_opening_wall_end']):
+                unreal.GameplayStatics.set_global_time_dilation(game, 1.)
+                state.pop('social_opening_game_end')
         spawners = unreal.GameplayStatics.get_all_actors_of_class(game, unreal.EcoCreatureIntegrationSpawner)
         if not spawners or not spawners[0].is_runtime_ready(): return
         fields = unreal.GameplayStatics.get_all_actors_of_class(game, unreal.EcoVegetationField)
         if len(fields) != expected_field_count: return
-        now = time.monotonic()
         if state['start'] is None: state['start'] = now
         elapsed = now - state['start']
         if (not pie or grass_profile) and not state['csv'] and elapsed>5:
@@ -431,10 +486,20 @@ def tick(dt):
                                                    previous=previous.get('native_world_position'), current=agent.get('native_world_position')))
                 state['last'][str(key)] = agent
                 agents.append(agent)
-        if island and '-vegetationislandnetworkobserver' in cmd.lower():
+        if all_island_social:
+            observe_social(game, out, agents, state, elapsed)
+        elif island and '-vegetationislandnetworkobserver' in cmd.lower():
+            focused = observe_social(game, out, agents, state, elapsed, late_join=True) if late_join_social else set()
+            fauna_targets = []
+            if watch_fauna_alarms:
+                prey_ids = {a.get('rule_fauna', {}).get('prey') for a in agents if a['hp'] > 0.}
+                fauna_targets = [a for a in agents if a['hp'] > 0. and (a.get('fauna_alarm') or
+                    (a['stable_id'] in prey_ids and not a.get('rule_fauna', {}).get('swimming')))]
+                fauna_targets.sort(key=lambda a: (not a.get('fauna_alarm', False), int(a['stable_id'])))
+                state['fauna_alarm_candidates'] = tuple(int(a['stable_id']) for a in fauna_targets[:12])
             for controller in unreal.GameplayStatics.get_all_actors_of_class(game, unreal.PlayerController):
                 viewer = controller.get_controlled_pawn()
-                if not viewer:
+                if not viewer or controller.get_path_name() in focused:
                     continue
                 first_seen = state.setdefault('observer_start', {}).setdefault(controller.get_path_name(), elapsed)
                 regions = ('Grassland', 'Riverbank', 'Highland', 'Snowfield', 'LowerRiver')
@@ -448,7 +513,7 @@ def tick(dt):
                     candidates = young or live
                 else:
                     candidates = live
-                target = min(candidates, key=lambda row: int(row['stable_id']))
+                target = fauna_targets[0] if fauna_targets else min(candidates, key=lambda row: int(row['stable_id']))
                 point = unreal.Vector(*map(float, re.findall(r'[XYZ]=([-+\d.eE]+)', target['position'])))
                 view = point + unreal.Vector(350., 250., 290.)
                 viewer.set_actor_location(view, False, True)
@@ -529,11 +594,52 @@ def tick(dt):
                 unreal.SystemLibrary.execute_console_command(game, 'HighResShot 1280x720 filename="' + path + '"')
                 state['shots'] += 1
     except Exception as error:
+        if all_island_social and state.get('social_preroll') and (not state.get('social_released') or state.get('social_opening_game_end')):
+            game = world()
+            if game: unreal.GameplayStatics.set_global_time_dilation(game, 1.)
+            state['social_released'] = True
         state['error'] = repr(error); unreal.log_error('VEGETATION_AUDIT_ERROR ' + repr(error)); finish('FAILED')
+def sample_authority_alarms(_dt):
+    # The completion relay is deliberately slower than a presentation pulse.
+    if state.get('fauna_alarm_finished'):
+        return False
+    game = world()
+    if not game:
+        return True
+    active = set()
+    for key in state.get('fauna_alarm_candidates', ()):
+        raw = unreal.EcoCreatureInspectionLibrary.capture_agent(game, key)
+        if isinstance(raw, tuple):
+            raw = next((value for value in raw if isinstance(value, str)), None)
+        if not raw:
+            continue
+        observed = json.loads(raw)
+        if observed.get('fauna_alarm'):
+            active.add(key)
+            if key not in state.get('fauna_alarm_active', ()):
+                state.setdefault('fauna_alarm_transitions', []).append(dict(id=str(key),
+                    species=observed['species'], server_time=observed['world_seconds']))
+    state['fauna_alarm_active'] = active
+    return True
+
+
 if pie: handle = unreal.register_slate_post_tick_callback(tick)
 else:
     game = world()
     relay = next(iter(unreal.GameplayStatics.get_all_actors_of_class(game, unreal.EcoCreatureIntegrationSpawner)), None) if game else None
     if not relay: raise RuntimeError('Dedicated runtime completion relay missing')
-    relay.on_runtime_sample.add_callable(tick)
+    if all_island_social:
+        # The completion relay follows simulated time. Camera preparation follows wall time.
+        def preroll_tick(dt):
+            tick(dt)
+            return (not state.get('social_released') or bool(state.get('social_opening_game_end'))) and not state.get('error')
+        def after_preroll(dt):
+            if state.get('social_released') and not state.get('error') and not state.get('social_finished'):
+                tick(dt)
+        unreal.register_ticker_callback(preroll_tick, .1)
+        relay.on_runtime_sample.add_callable(after_preroll)
+    else:
+        relay.on_runtime_sample.add_callable(tick)
+    if watch_fauna_alarms:
+        unreal.register_ticker_callback(sample_authority_alarms, .15)
 unreal.log('VEGETATION_AUDIT_BOUND')

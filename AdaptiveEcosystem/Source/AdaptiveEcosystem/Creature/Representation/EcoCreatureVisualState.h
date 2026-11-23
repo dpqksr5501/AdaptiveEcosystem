@@ -14,6 +14,10 @@ struct FEcoCreatureVisualState
 {
 	GENERATED_BODY()
     UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float BodyScale=1;
+    UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float BodyCondition=1;
+    UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") uint8 SocialSignal = 0; // 1 offer, 2 reply
+    UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float SocialYaw = 0.f;
+    UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bFaunaAlarm = false;
     UPROPERTY(BlueprintReadOnly,Category="Creature|Visual") float Maturity=1;
     UPROPERTY(BlueprintReadOnly,Category="Creature|Visual") float CoatTone=.5f;
     /** Server-selected presentation morph, transported in existing flag bits 6..7. */

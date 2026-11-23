@@ -4,6 +4,9 @@ param([string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8',
     [switch]$AuthoredWeather,[ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='Vegetation_20261023',
     [double]$Duration=125,[double]$ExitAfter=180,
     [int]$Seed=23,
+    [ValidateRange(0,2)][int]$FaunaExperienceMode=0,
+    [ValidateRange(-1,2)][int]$FaunaInteractionMode=-1,
+    [ValidateRange(-1,2)][int]$FaunaFoodVisitMode=-1,
     [ValidateRange(1,384)][int]$DeerPerRegion=48,
     [switch]$PatchLayout,
     [switch]$FoodPatchCheck,
@@ -11,13 +14,17 @@ param([string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8',
     [switch]$GrassTravelCheck,[ValidateRange(370,550)][double]$TravelDuration=380,
     [switch]$NetworkProfile,
     [switch]$OverlapClients,[switch]$ChildCoverage,[switch]$HabitatDynamics,
-    [ValidateRange(10,600)][double]$ClientAAt=30,[ValidateRange(45,600)][double]$ClientBAt=95)
+    [switch]$AllIslandSocial,[switch]$LateJoinSocial,
+    [switch]$WatchFaunaAlarms,
+    [ValidatePattern('^[A-Za-z]+\+[A-Za-z]+$')][string]$IslandSocialOpening='GoldenEagle+Mink',
+    [ValidateRange(10,600)][double]$ClientAAt=30,[ValidateRange(45,600)][double]$ClientBAt=95,
+    [ValidateRange(30,180)][double]$LateClientDuration=30)
 $ErrorActionPreference='Stop'
 foreach($taskValue in @($Duration,$ExitAfter,$ClientAAt,$ClientBAt)){
     if([double]::IsNaN($taskValue) -or [double]::IsInfinity($taskValue)){throw 'Run times must be finite; no engine process was started'}
 }
 if($Duration -lt 20 -or $Duration -gt 3600 -or $ExitAfter -gt 7200 -or $ExitAfter -le $Duration+10){throw 'Observer must finish at least 10 seconds before the bounded server exit'}
-if($ClientBAt -le $ClientAAt+35 -or $ExitAfter -le $ClientBAt+45){throw 'Client join times must leave separate 30-second sessions before server exit'}
+if($ClientBAt -le $ClientAAt+35 -or $ExitAfter -le $ClientBAt+$LateClientDuration+15){throw 'Client join times must leave enough time for both sessions before server exit'}
 if($GrassTravelCheck -and ($ExitAfter -le $ClientAAt+$TravelDuration+45 -or $Duration -lt $ClientAAt+$TravelDuration)){
     throw 'Travel check needs authority observation and normal exit after the long ClientA run'
 }
@@ -37,6 +44,22 @@ $taskServerLog=Join-Path $taskOut 'Server.log'
 $taskMode=if($AuthoredWeather){'-VegetationAuthored'}else{'-EcoVegetation'}
 $taskMapName=($Map -split '/')[-1]
 $taskIsland=$taskMapName -eq 'LV_JYU_IslandEcosystemRefreshed'
+if(($AllIslandSocial -or $LateJoinSocial) -and (!$taskIsland -or !$OverlapClients -or $FaunaExperienceMode -ne 2)){
+    throw 'Island social observation requires the saved island, apply mode and overlapping peers'
+}
+if($AllIslandSocial -and $LateJoinSocial){throw 'Choose the full-island or late-join observation'}
+if($WatchFaunaAlarms -and (!$taskIsland -or !$OverlapClients -or $FaunaInteractionMode -ne 2 -or $AllIslandSocial -or $LateJoinSocial)){
+    throw 'Alarm observation needs the saved island, overlapping peers, and active interspecies interactions'
+}
+if($LateJoinSocial){
+    foreach($peer in @('ClientA','ClientB')){
+        foreach($suffix in @('SocialView','SocialProgress','SocialReady')){
+            $previous=Join-Path $taskOut ($peer+'_'+$suffix+'.json')
+            if(Test-Path -LiteralPath $previous){Remove-Item -LiteralPath $previous}
+        }
+    }
+}
+$taskSocialArgument=if($AllIslandSocial){'-VegetationAllIslandSocial'}elseif($LateJoinSocial){'-VegetationLateJoinSocial'}else{'-VegetationDefaultObserver'}
 if($taskIsland -and (!$AuthoredWeather -or $PatchLayout -or $FoodPatchCheck -or $ChildCoverage -or $GrassTravelCheck)){
     throw 'The island check uses the saved weather, placement and roster'
 }
@@ -46,17 +69,23 @@ $taskConnectionMode=if($OverlapClients){'-VegetationOverlapExpected'}else{'-Vege
 $taskProfileArgument=if($NetworkProfile){'-VegetationNetworkProfile'}else{'-VegetationNetworkProfileDisabled'}
 $taskServerCommands=if($NetworkProfile){"netprofile enable,eco.Grass.NetAudit 1,py $taskRoot/Tools/Editor/audit_vegetation_runtime.py"}else{"py $taskRoot/Tools/Editor/audit_vegetation_runtime.py"}
 if($PatchLayout){$taskServerCommands="eco.Grass.PatchLayout 1,$taskServerCommands"}
+if($taskIsland -and ($FaunaExperienceMode -eq 2 -or $FaunaInteractionMode -gt 0)){$taskServerCommands="eco.Inspection.GameplayReasons 1,$taskServerCommands"}
 $taskPatchArgument=if($PatchLayout){'-VegetationPatchLayout'}else{'-VegetationPatchLayoutDisabled'}
 $taskServerArgs=@($taskProject,$Map,
     '-server','-NullRHI','-unattended','-nop4','-nosteam','-port=7777',$taskMode,$taskConnectionMode,"-EcoV3DeerPerRegion=$DeerPerRegion",$taskPatchArgument,'-EcoV3SocialControl=0',"-EcoV3Seed=$Seed",
     "-EcoIntegrationExitAfter=$ExitAfter",$taskObserverFlag,'-VegetationAuditName=Server',"-VegetationAuditDuration=$Duration",
     "-VegetationMap=$taskMapName","-VegetationAuditFolder=$AuditFolder",
-    $taskProfileArgument,"-ExecCmds=$taskServerCommands","-AbsLog=$taskServerLog")
+    $taskProfileArgument,$taskSocialArgument,"-ExecCmds=$taskServerCommands","-AbsLog=$taskServerLog")
 if($HabitatDynamics){$taskServerArgs+='-EcoHabitatDynamics'}
 if($taskIsland){
     $taskServerArgs=@($taskServerArgs | Where-Object { $_ -notmatch '^-EcoV3DeerPerRegion=' })
     $taskServerArgs+="-EcoV3AutoAdapt=0"
 }
+if($AllIslandSocial){$taskServerArgs+="-VegetationSocialOpening=$IslandSocialOpening"}
+if($FaunaExperienceMode -gt 0){$taskServerArgs+="-EcoFaunaExperience=$FaunaExperienceMode"}
+if($FaunaInteractionMode -ge 0){$taskServerArgs+="-EcoFaunaInteractions=$FaunaInteractionMode"}
+if($FaunaFoodVisitMode -ge 0){$taskServerArgs+="-EcoFaunaFoodVisits=$FaunaFoodVisitMode"}
+if($WatchFaunaAlarms){$taskServerArgs+='-VegetationWatchFaunaAlarms'}
 $taskServer=Start-VegetationProcess "$taskEngine/UnrealEditor-Cmd.exe" $taskServerArgs
 $taskReadyDeadline=[DateTime]::UtcNow.AddSeconds(90)
 while($true){
@@ -75,15 +104,15 @@ foreach($entry in @(@{Name='ClientA';At=$ClientAAt},@{Name='ClientB';At=$ClientB
         Start-Sleep -Seconds 1
     }
     $taskClientStart=[DateTime]::UtcNow
-    $taskLifetime=if($GrassTravelCheck -and $entry.Name -eq 'ClientA'){$TravelDuration+4}elseif($OverlapClients -and $entry.Name -eq 'ClientA'){$ClientBAt-$ClientAAt+40}else{30}
+    $taskLifetime=if($entry.Name -eq 'ClientB'){$LateClientDuration}elseif($WatchFaunaAlarms){$Duration-$ClientAAt+4}elseif($AllIslandSocial){$Duration-$ClientAAt-8}elseif($GrassTravelCheck){$TravelDuration+4}elseif($OverlapClients){$ClientBAt-$ClientAAt+40}else{30}
     $taskProbe=$taskLifetime-4
     $taskTravelArgument=if($GrassTravelCheck -and $entry.Name -eq 'ClientA'){'-VegetationGrassTravelCheck'}else{'-VegetationGrassTravelDisabled'}
-    $taskAddress="127.0.0.1:7777?EcoProtocol=1?Name=Vegetation$($entry.Name)"
+    $taskAddress="127.0.0.1:7777?EcoProtocol=3?Name=Vegetation$($entry.Name)"
     $taskClient=Start-VegetationProcess "$taskEngine/UnrealEditor.exe" @($taskProject,$taskAddress,'-game','-nosteam','-d3d11','-unattended','-nop4','-windowed',
         '-ResX=960','-ResY=540','-NoSound',"-EcoIntegrationExitAfter=$taskLifetime","-VegetationClientDuration=$taskProbe","-VegetationClientName=$($entry.Name)",
         "-VegetationMap=$taskMapName","-VegetationAuditFolder=$AuditFolder",
         "-VegetationClientVisualDistance=$ClientVisualDistanceCm",
-        $taskTravelArgument,
+        $taskTravelArgument,$taskSocialArgument,$(if($WatchFaunaAlarms){'-VegetationWatchFaunaAlarms'}else{'-VegetationDefaultFaunaView'}),
         "-ExecCmds=py $taskRoot/Tools/Editor/audit_vegetation_client.py","-AbsLog=$(Join-Path $taskOut ($entry.Name+'.log'))")
     $taskClients+=@{Name=$entry.Name;Process=$taskClient;Started=$taskClientStart;Lifetime=$taskLifetime}
 }
@@ -119,6 +148,16 @@ $taskResults|ConvertTo-Json -Depth 10|Set-Content (Join-Path $taskOut 'NetworkPr
 $taskPython=Join-Path $EngineRoot 'Engine/Binaries/ThirdParty/Python3/Win64/python.exe'
 $taskValidationArgs=@($taskOut)
 if($FoodPatchCheck){$taskValidationArgs+='--food-patch'}
+if($taskIsland -and $FaunaExperienceMode -eq 2 -and !$WatchFaunaAlarms){$taskValidationArgs+='--fauna-experience'}
+if($AllIslandSocial){$taskValidationArgs+='--all-island-social'}
+if($LateJoinSocial){$taskValidationArgs+='--late-join-social'}
+if($FaunaInteractionMode -eq 2){$taskValidationArgs+='--fauna-interactions'}
+if($WatchFaunaAlarms){$taskValidationArgs+='--watch-fauna-alarms'}
 & $taskPython (Join-Path $PSScriptRoot 'validate_vegetation_relevance.py') @taskValidationArgs
-if($LASTEXITCODE -ne 0){throw 'Client near-field delivery/region-transition evidence failed; inspect Relevance.json'}
+if($LASTEXITCODE -ne 0){
+    if($AllIslandSocial){throw 'Full 16-species screen coverage failed in this session; inspect Relevance.json for matched witnesses.'}
+    if($LateJoinSocial){throw 'Island late-join validation failed; inspect Relevance.json for the failed check.'}
+    if($WatchFaunaAlarms){throw 'Focused alarm delivery validation failed; inspect Relevance.json for the failed check.'}
+    throw 'Client near-field delivery/region-transition evidence failed; inspect Relevance.json'
+}
 Write-Output 'VEGETATION_NETWORK_FINISHED'

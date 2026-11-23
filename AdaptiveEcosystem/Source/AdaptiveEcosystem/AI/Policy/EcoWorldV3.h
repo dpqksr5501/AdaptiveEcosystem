@@ -103,6 +103,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -2288,6 +2289,47 @@ namespace EcoWorldV3
 	 * 참이면 통과, 거짓이면 막힘 — 그 개체는 이번 스텝 이동 전 자리에 남는다 (학습 세계에는 없는 막힘. 근사로 기록한다).
 	 * 움직이지 않은 개체(From == To)는 부르지 않는다.
 	 */
+	/** Optional single-deer diagnostic output. Vectors use native distance units per step. */
+	struct FHerbMoveObservation
+	{
+		std::int32_t Index = -1;
+		FVec2 Base, BeforeAdapter, BeforeDetour, AfterTerrain, Final;
+		bool bDetourFailed = false;
+		bool bDetourUsed = false;
+		bool bAvoidanceApplied = false;
+		bool bObstacleHit = false;
+		bool bIslandSteer = false;
+		std::int32_t IslandSlide = 0;
+		bool bMoveRejected = false;
+		bool bAlternativeAccepted = false;
+	};
+
+	/** Immutable input copied after all herbivore controls and before C1 moves any body.
+	 * Rows retain the caller's order (StableAgentId order in the integrated processor).
+	 * Deltas are native units per step. DesiredDelta precedes detour, shore and contact constraints.
+	 */
+	struct FHerbPreMoveRow
+	{
+		FVec2 Position, PreviousDelta, Heading, DesiredDelta;
+		std::int32_t Behavior, FlightOverride, Gait;
+		bool bStill;
+	};
+
+	struct FHerbSteeringRow
+	{
+		FVec2 Position, Delta;
+		bool bCanSteer, bTraveling;
+	};
+
+	struct FHerbDiscTiming
+	{
+		using FClock = std::chrono::steady_clock;
+		double* Seconds;
+		FClock::time_point Start;
+		explicit FHerbDiscTiming(double* InSeconds) : Seconds(InSeconds), Start(Seconds ? FClock::now() : FClock::time_point{}) {}
+		~FHerbDiscTiming() { if (Seconds) *Seconds += std::chrono::duration<double>(FClock::now() - Start).count(); }
+	};
+
 	struct FStepHooks
 	{
 		void* User = nullptr;
@@ -2299,7 +2341,16 @@ namespace EcoWorldV3
         /** Evidence/intent adapter before the existing threat Step; never integrates position or applies captures. */
         void (*ThreatInput)(void* User,std::int32_t Index,FThreatAgent& Threat,EcoThreatV3::FThreatStepInput& Input) = nullptr;
 		bool (*HerbMove)(void* User, std::int32_t Index, const FVec2& From, const FVec2& To) = nullptr;
+		// A real-world movement adapter replaces all three herbivore disc movement checks.
+		void (*HerbContactMove)(void* User, std::int32_t Index, const FVec2& From, FVec2& To) = nullptr;
+		double* HerbDiscMoveSeconds = nullptr;
 		bool (*ThreatMove)(void* User, std::int32_t Index, double FromX, double FromY, double ToX, double ToY) = nullptr;
+		FHerbMoveObservation* HerbMoveObservation = nullptr;
+		int32_t HerbMoveObservationCount = 0;
+		// Optional caller-owned scratch. Its lifetime must cover this step.
+		std::vector<FHerbPreMoveRow>* HerbPreMoveSnapshot = nullptr;
+		// Optional batch of direction proposals from the same post-detour, pre-integration instant.
+	void (*HerbAvoidance)(void* User, const FHerbSteeringRow* Inputs, FVec2* Deltas, std::int32_t Count) = nullptr;
 	};
 
 	/** 세계 상태 (Mass 경로는 UEcoPolicyV3Subsystem 이 하나 가진다). */
@@ -2343,6 +2394,8 @@ namespace EcoWorldV3
         double MaxThreatHearing = 0, MinPreyDetect = 1, MinPreyCatch = 1;
 
 		std::vector<EcoObservationV3::FThreatInput> ExternalThreats;
+		std::vector<FHerbSteeringRow> HerbSteeringRows;
+		std::vector<FVec2> HerbSteeringDeltas;
 		std::vector<FVec2> StepCatches;      // 이번 스텝에 잡힌 자리 (디버그)
 
 		// 작업 버퍼 (스텝마다 다시 쓴다)
@@ -3933,6 +3986,15 @@ namespace EcoWorldV3
 	{
 		namespace R3 = EcoRepertoireV3;
 		FStepReport Report;
+		const auto FindMoveObservation = [Hooks](int32_t Index) -> FHerbMoveObservation*
+		{
+			if (Hooks && Hooks->HerbMoveObservation)
+			{
+				for (int32_t Slot = 0; Slot < Hooks->HerbMoveObservationCount; ++Slot)
+					if (Hooks->HerbMoveObservation[Slot].Index == Index) return &Hooks->HerbMoveObservation[Slot];
+			}
+			return nullptr;
+		};
 		const R3::FRepertoireConfig& RC = W.RepCfg;
 		W.StepCatches.clear();
 		const bool bKeep = W.Config.WildFlight.bEnabled;   // 도주 반사 거리 (끄면 아래 bKeep 줄은 모두 건너뛴다 — 지금 그대로)
@@ -4009,6 +4071,8 @@ namespace EcoWorldV3
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			const FHerbView& H = Herbs[i];
+			auto* MoveObservation = FindMoveObservation(i);
+			const bool bObserve = MoveObservation != nullptr;
 			const int HideTarget=H.Rep->HideTarget;
 			const bool LostHideTarget=HideTarget>=0&&(HideTarget>=int(W.Config.Covers.size())||W.Config.Covers[HideTarget].Radius<=0);
 			if(W.Config.bProtectedRefuges&&H.Rep->Behavior==R3::kHide
@@ -4026,6 +4090,7 @@ namespace EcoWorldV3
 				R3::FControlInput In = Detail::MakeControlInput(W, H);
 				Detail::FlightControlInput(H, In);
 				*H.Control = R3::Control(*H.Rep, In, RC);
+				if (bObserve) MoveObservation->Base = H.Control->Velocity;
 				Detail::FlightAlertControl(W, H, In);
 				if (W.Config.WildFlight.bRestKeep)
 				{
@@ -4040,7 +4105,9 @@ namespace EcoWorldV3
 			else
 			{
 				*H.Control = R3::Control(*H.Rep, Detail::MakeControlInput(W, H), RC);
+				if (bObserve) MoveObservation->Base = H.Control->Velocity;
 			}
+			if (bObserve) MoveObservation->BeforeAdapter = H.Control->Velocity;
             if (Hooks && Hooks->HerbControl) {
                 Hooks->HerbControl(Hooks->User, i, H);
                 H.Decision->ExecutedBehavior = H.Rep->Behavior;
@@ -4067,10 +4134,26 @@ namespace EcoWorldV3
 			++W.Stats.BehaviorSteps[H.Rep->Behavior];
 		}
 
+		if (Hooks && Hooks->HerbPreMoveSnapshot)
+		{
+			auto& Snapshot = *Hooks->HerbPreMoveSnapshot;
+			Snapshot.clear();
+			Snapshot.reserve(static_cast<size_t>(N));
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				const FHerbView& H = Herbs[i];
+				Snapshot.push_back({H.Body->Pos, R3::Sub(H.Body->Pos, H.Body->PrevPos), H.Body->Head,
+					H.Control->Velocity, H.Decision->ExecutedBehavior, H.Decision->KeepActive, H.Control->Gait, H.Control->bStill});
+			}
+		}
+
 		// C1. 초식 이동 (벽에서 멈춤, heading = 속도 방향, FREEZE 는 위협 쪽)
 		const FObstacleConfig& Obs = W.Config.Obstacles;
 		const bool bObstacles = Obs.Active();   // 야생 2단계 3 세로 장애물 (끄거나 원판이 없으면 아래 bObstacles 줄은 모두 건너뛴다 — 지금 그대로)
-		for (std::int32_t i = 0; i < N; ++i)
+		const bool bHerbDiscs = bObstacles && !(Hooks && Hooks->HerbContactMove);
+		double* const DiscSeconds = Hooks ? Hooks->HerbDiscMoveSeconds : nullptr;
+		const EcoV3Island::FLandMask* const HerbIsland = W.Config.Island.get();
+		const auto PrepareHerbMove = [&](std::int32_t i, FHerbMoveObservation* MoveObservation)
 		{
 			FHerbBody& B = *Herbs[i].Body;
 			B.PrevPos = B.Pos;
@@ -4079,60 +4162,155 @@ namespace EcoWorldV3
 			B.bReproduced = false;
 			B.bRespawned = false;
 			B.bDetour = false;
+			const bool bObserve = MoveObservation != nullptr;
+			if (bObserve) MoveObservation->BeforeDetour = Herbs[i].Control->Velocity;
 			const bool Traveling=Hooks&&Hooks->HerbTravel&&Hooks->HerbTravel(Hooks->User,i);
-			if (bObstacles && Obs.Detour.bEnabled && !Traveling)
+			if (bHerbDiscs && Obs.Detour.bEnabled && !Traveling)
 			{
 				// 야생 2단계 3 의 6) 돌아가기 (world.py step 1 의 detour_moves — 이동 바로 앞, 같은 이동 시험으로 고른다): 막히면 가려던 쪽에서 가장 적게 돈 빈 방향.
 				// 속도 크기는 그대로, 제어 출력의 속도(적용 속도·heading)도 바꾼 값이다
 				EcoRepertoireV3::FControlOutput& Ctl = *Herbs[i].Control;
 				double VX = Ctl.Velocity.X;
 				double VY = Ctl.Velocity.Y;
-				const EcoThreatV3::FDetourResult Dr = EcoThreatV3::DetourStep(B.Pos.X, B.Pos.Y, VX, VY, B.Detour, Obs.Discs.data(), Obs.Num(), Obs.BodyR,
-																			 W.Config.WorldSize, true, nullptr, 0, Obs.Detour);
+				const auto Dr = [&]
+				{
+					const FHerbDiscTiming Timing(DiscSeconds);
+					return EcoThreatV3::DetourStep(B.Pos.X, B.Pos.Y, VX, VY, B.Detour, Obs.Discs.data(), Obs.Num(), Obs.BodyR,
+						W.Config.WorldSize, true, nullptr, 0, Obs.Detour);
+				}();
 				if (Dr.bUsed)
 				{
 					Ctl.Velocity.X = VX;
 					Ctl.Velocity.Y = VY;
 				}
 				B.bDetour = Dr.bUsed;
+				if (bObserve)
+				{
+					MoveObservation->bDetourFailed = Dr.bFail;
+					MoveObservation->bDetourUsed = Dr.bUsed;
+				}
 				W.Stats.DetourDeerUsed += Dr.bUsed ? 1 : 0;
 				W.Stats.DetourDeerStart += Dr.bStart ? 1 : 0;
 				W.Stats.DetourDeerFail += Dr.bFail ? 1 : 0;
 			}
-			const EcoV3Island::FLandMask* const Isl = W.Config.Island.get();
-			if (Isl && !Traveling)
+			if (HerbIsland && !Traveling)
 			{
 				// 섬 무대 (11-05): 해안 거리 kShoreEdgeR 안에서 해안 쪽으로 가면 해안을 따라가는 쪽으로 굽힌다 (크기 그대로 — 적용 속도·heading 도 굽힌 값)
 				EcoRepertoireV3::FControlOutput& Ctl = *Herbs[i].Control;
-				W.Stats.IslandDeerSteers += Isl->ShoreSteer(B.Pos.X, B.Pos.Y, Ctl.Velocity.X, Ctl.Velocity.Y) ? 1 : 0;
+				const bool bSteered = HerbIsland->ShoreSteer(B.Pos.X, B.Pos.Y, Ctl.Velocity.X, Ctl.Velocity.Y);
+				W.Stats.IslandDeerSteers += bSteered ? 1 : 0;
+				if (bObserve) MoveObservation->bIslandSteer = bSteered;
+			}
+			if (bObserve) MoveObservation->AfterTerrain = Herbs[i].Control->Velocity;
+			return Traveling;
+		};
+
+		const bool bAvoidance = Hooks && Hooks->HerbAvoidance;
+		if (bAvoidance)
+		{
+			W.HerbSteeringRows.resize(static_cast<size_t>(N));
+			W.HerbSteeringDeltas.resize(static_cast<size_t>(N));
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				const bool bTraveling = PrepareHerbMove(i, FindMoveObservation(i));
+				const auto& H = Herbs[i];
+				const auto Delta = H.Control->Velocity;
+				const bool bCanSteer = !bTraveling && !H.Control->bStill && H.Decision->KeepActive == kKeepNone
+					&& H.Decision->ExecutedBehavior != R3::kFlee && R3::IsNonZero(Delta);
+				W.HerbSteeringRows[i] = {H.Body->Pos, Delta, bCanSteer, bTraveling};
+				W.HerbSteeringDeltas[i] = Delta;
+			}
+			Hooks->HerbAvoidance(Hooks->User, W.HerbSteeringRows.data(), W.HerbSteeringDeltas.data(), N);
+		}
+
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			FHerbBody& B = *Herbs[i].Body;
+			auto* MoveObservation = FindMoveObservation(i);
+			const bool bObserve = MoveObservation != nullptr;
+			const bool Traveling = bAvoidance ? W.HerbSteeringRows[i].bTraveling : PrepareHerbMove(i, MoveObservation);
+			if (bAvoidance && W.HerbSteeringRows[i].bCanSteer)
+			{
+				const FVec2 Base = W.HerbSteeringRows[i].Delta;
+				const FVec2 Trial = W.HerbSteeringDeltas[i];
+				const FVec2 To = R3::Add(B.Pos, Trial);
+				const double Size = W.Config.WorldSize;
+				if (Base.X * Trial.X + Base.Y * Trial.Y > 0.0
+					&& std::abs(R3::SizeSquared(Trial) - R3::SizeSquared(Base)) <= 1.e-9
+					&& (Trial.X != Base.X || Trial.Y != Base.Y)
+					&& To.X >= 0.0 && To.X <= Size && To.Y >= 0.0 && To.Y <= Size)
+				{
+					FVec2 Checked = To;
+					const bool bObstacle = bHerbDiscs && [&]
+					{
+						const FHerbDiscTiming Timing(DiscSeconds);
+						return EcoThreatV3::DetourMoveTest(B.Pos.X, B.Pos.Y, Trial.X, Trial.Y, Obs.Discs.data(),
+							Obs.Num(), Obs.BodyR, Size, true, Checked.X, Checked.Y);
+					}();
+					if (!bObstacle && (!HerbIsland || HerbIsland->Slide(B.Pos.X, B.Pos.Y, Checked.X, Checked.Y) == 0))
+					{
+						Herbs[i].Control->Velocity = Trial;
+						if (bObserve) MoveObservation->bAvoidanceApplied = true;
+					}
+				}
+			}
+			if (bObserve) MoveObservation->Final = Herbs[i].Control->Velocity;
+			if (Hooks && Hooks->HerbContactMove)
+			{
+				FVec2 To = B.Pos, Head = B.Head;
+				const auto& Control = *Herbs[i].Control;
+				if (Traveling) To = R3::Add(To, Control.Velocity);
+				else R3::ApplyMove(To, Head, Control, W.Config.WorldSize);
+				if (HerbIsland && !Traveling)
+				{
+					const auto Slide = HerbIsland->Slide(B.PrevPos.X, B.PrevPos.Y, To.X, To.Y);
+					W.Stats.IslandDeerSlides += Slide == 1 ? 1 : 0;
+					W.Stats.IslandDeerStops += Slide == 2 ? 1 : 0;
+					if (bObserve) MoveObservation->IslandSlide = Slide;
+				}
+				if (R3::IsNonZero(R3::Sub(To, B.PrevPos)))
+				{
+					Hooks->HerbContactMove(Hooks->User, i, B.PrevPos, To);
+					if (!R3::IsNonZero(R3::Sub(To, B.PrevPos))) ++W.Stats.BlockedHerbMoves;
+				}
+				const FVec2 Actual = R3::Sub(To, B.PrevPos);
+				B.Pos = To;
+				B.Head = R3::IsNonZero(Actual) && !Control.bHasFace ? R3::Normalize(Actual) : Head;
+				continue;
 			}
 			if(Traveling){
                 const auto V=Herbs[i].Control->Velocity;B.Pos=R3::Add(B.Pos,V);
                 if(R3::IsNonZero(V))B.Head=R3::Normalize(V);
             }else R3::ApplyMove(B.Pos, B.Head, *Herbs[i].Control, W.Config.WorldSize);
-			if (bObstacles && !Traveling)
+			if (bHerbDiscs && !Traveling)
 			{
 				// 야생 2단계 3 세로 장애물 (world.py step 1 의 obstacle_slide — 되풀이마다 맵으로 자름): 원판 앞에서 멈춰 둘레를 따라 미끄러진다.
 				// heading 은 가려던 쪽 그대로 (ApplyMove)
-				const EcoThreatV3::FObstacleSlideResult Sl = EcoThreatV3::ObstacleSlide(
-					B.PrevPos.X, B.PrevPos.Y, B.Pos.X, B.Pos.Y, Obs.Discs.data(), Obs.Num(), Obs.BodyR, W.Config.WorldSize);
+				const auto Sl = [&]
+				{
+					const FHerbDiscTiming Timing(DiscSeconds);
+					return EcoThreatV3::ObstacleSlide(B.PrevPos.X, B.PrevPos.Y, B.Pos.X, B.Pos.Y, Obs.Discs.data(),
+						Obs.Num(), Obs.BodyR, W.Config.WorldSize);
+				}();
 				++W.Stats.ObstacleDeerSteps;
 				W.Stats.ObstacleDeerHit += Sl.bHit ? 1 : 0;
 				W.Stats.ObstacleDeerBack += Sl.bBack ? 1 : 0;
+				if (bObserve) MoveObservation->bObstacleHit = Sl.bHit;
 			}
-			if (Isl && !Traveling)
+			if (HerbIsland && !Traveling)
 			{
 				// 섬 무대 (11-05): 다음 자리가 막힌 칸이면 x 만 → y 만 순서로 미끄러지고, 둘 다 안 되면 제자리 (heading 은 가려던 쪽 그대로 — 원판 미끄러짐과 같은 꼴)
-				const std::int32_t Sl = Isl->Slide(B.PrevPos.X, B.PrevPos.Y, B.Pos.X, B.Pos.Y);
+				const std::int32_t Sl = HerbIsland->Slide(B.PrevPos.X, B.PrevPos.Y, B.Pos.X, B.Pos.Y);
 				W.Stats.IslandDeerSlides += Sl == 1 ? 1 : 0;
 				W.Stats.IslandDeerStops += Sl == 2 ? 1 : 0;
+				if (bObserve) MoveObservation->IslandSlide = Sl;
 			}
 			// 통합 모드: 지형·장애물 제약. 막히면 이동 전 자리 (heading 은 가려던 쪽 그대로)
 			if (Hooks && Hooks->HerbMove && (B.Pos.X != B.PrevPos.X || B.Pos.Y != B.PrevPos.Y)
 				&& !Hooks->HerbMove(Hooks->User, i, B.PrevPos, B.Pos))
 			{
 				bool bAlt = false;
-				if (Isl && !Traveling)
+				if (HerbIsland && !Traveling)
 				{
 					// 섬 무대 (11-05 확인 뒤): 팀 이동 제약(4 m 지도보다 잘게 보는 벼랑·비탈)이 막으면 같은 길이 걸음을 +35°·−35°·+70°·−70° 돌려 차례로
 					// 다시 묻는다 (땅 칸·세계 안만 — 통합 이동 길의 우회와 같은 각). 그래도 막히면 지금처럼 제자리. heading 은 가려던 쪽 그대로
@@ -4144,13 +4322,18 @@ namespace EcoWorldV3
 					for (std::int32_t a = 0; a < 4 && !bAlt; ++a)
 					{
 						const FVec2 To{B.PrevPos.X + kAltCos[a] * Dx - kAltSin[a] * Dy, B.PrevPos.Y + kAltSin[a] * Dx + kAltCos[a] * Dy};
-						if (To.X >= 0.0 && To.Y >= 0.0 && To.X <= Ws && To.Y <= Ws && Isl->IsOpen(To.X, To.Y) && Hooks->HerbMove(Hooks->User, i, B.PrevPos, To))
+						if (To.X >= 0.0 && To.Y >= 0.0 && To.X <= Ws && To.Y <= Ws && HerbIsland->IsOpen(To.X, To.Y) && Hooks->HerbMove(Hooks->User, i, B.PrevPos, To))
 						{
 							B.Pos = To;
 							bAlt = true;
 						}
 					}
 					W.Stats.IslandDeerHookAlts += bAlt ? 1 : 0;
+				}
+				if (bObserve)
+				{
+					MoveObservation->bMoveRejected = true;
+					MoveObservation->bAlternativeAccepted = bAlt;
 				}
 				if (!bAlt)
 				{
@@ -4697,9 +4880,10 @@ namespace EcoWorldV3
 		std::int32_t NumThreats() const { return static_cast<std::int32_t>(ThreatPtrs.size()); }
 
 		/** world.reset: 세계 → 초식 슬롯 순서 → 위협 슬롯 순서 → 첫 관측·요청. Mass 스폰과 같은 순서다. */
-		void Init(const FWorldConfig& C)
+		void Init(const FWorldConfig& C, bool bUseSpatialKin = true)
 		{
 			InitWorld(World, C);
+			World.bSpatialKin = bUseSpatialKin;
 			const size_t N = static_cast<size_t>(C.NumHerbivores > 0 ? C.NumHerbivores : 0);
 			const size_t M = static_cast<size_t>(C.NumThreats() > 0 ? C.NumThreats() : 0);
 			Reps.assign(N, EcoRepertoireV3::FRepState());

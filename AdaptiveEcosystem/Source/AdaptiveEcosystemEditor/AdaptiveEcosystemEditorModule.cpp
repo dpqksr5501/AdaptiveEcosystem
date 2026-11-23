@@ -129,6 +129,7 @@ bool FAdaptiveEcosystemEditorModule::BuildPoseGraph(UAnimBlueprint* BP,UEcoCreat
         auto* IK=NewNode.operator()<UAnimGraphNode_EcoGroundFeet>(650,0);
         IK->Node.Body.BoneName=P->BodyBone;
         IK->Node.MaximumCorrection=P->MaxFootCorrectionCm;IK->Node.Clearance=P->FootClearanceCm;
+        IK->Node.MaximumPlantCorrection = P->MaxPlantCorrectionCm;
         for(int32 Index=0;Index<P->FootBones.Num();++Index){FEcoGroundLeg& Leg=IK->Node.Legs.AddDefaulted_GetRef();Leg.Contact.BoneName=P->FootBones[Index];Leg.End.BoneName=P->IKEndBones[Index];Leg.ContactHeight=P->ContactHeights[Index];}
         for(auto& Pin:IK->ShowPinForProperties)if(Pin.PropertyName==TEXT("Alpha"))Pin.bShowPin=true;
         IK->ReconstructNode();Root->FindPin(TEXT("Result"))->BreakAllPinLinks();

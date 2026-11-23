@@ -35,11 +35,14 @@ struct FReplicatedEcoMassAgent : public FReplicatedAgentBase
     uint8 GetCoatTone() const { return CoatTone; }
     uint8 GetMaturity() const { return Maturity; }
     uint8 GetBodyScale() const { return BodyScale; }
-	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy, uint8 InActivity = 0, int16 InFocusYaw = 0, uint8 InBodyScale=128, uint8 InMaturity=255, uint8 InCoatTone=128)
+	uint8 GetBodyCondition() const { return BodyCondition; }
+	uint16 GetSocialPresentation() const { return SocialPresentation; }
+	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy, uint8 InActivity = 0, int16 InFocusYaw = 0, uint8 InBodyScale=128, uint8 InMaturity=255, uint8 InCoatTone=128, uint8 InBodyCondition=128, uint16 InSocialPresentation=0)
 	{
-		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy && Activity == InActivity && FocusYaw == InFocusYaw && BodyScale==InBodyScale && Maturity==InMaturity && CoatTone==InCoatTone) return false;
+		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy && Activity == InActivity && FocusYaw == InFocusYaw && BodyScale==InBodyScale && Maturity==InMaturity && CoatTone==InCoatTone && BodyCondition==InBodyCondition && SocialPresentation==InSocialPresentation) return false;
 		Velocity = InVelocity; VisualFlags = InFlags; Health = InHealth; Energy = InEnergy; Activity = InActivity; FocusYaw = InFocusYaw;
-        BodyScale=InBodyScale;Maturity=InMaturity;CoatTone=InCoatTone;
+        BodyScale=InBodyScale;Maturity=InMaturity;CoatTone=InCoatTone;BodyCondition=InBodyCondition;
+		SocialPresentation = InSocialPresentation;
 		++VisualRevision;
 		return true;
 	}
@@ -117,6 +120,8 @@ private:
     UPROPERTY(Transient) uint8 CoatTone = 128;
     UPROPERTY(Transient) uint8 Maturity = 255;
     UPROPERTY(Transient) uint8 BodyScale = 128;
+    UPROPERTY(Transient) uint8 BodyCondition = 128;
+    UPROPERTY(Transient) uint16 SocialPresentation = 0;
 };
 
 /** Fast-array entry used by one connection-specific client bubble. */

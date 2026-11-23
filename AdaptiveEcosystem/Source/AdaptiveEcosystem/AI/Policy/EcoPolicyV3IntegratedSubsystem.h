@@ -207,6 +207,7 @@
 #include "EcoV3BigChange.h"
 #include "EcoV3Brain.h"
 #include "EcoV3FlightTally.h"
+#include "EcoV3StaticMeshMovement.h"
 #include "EcoV3ForestGrowth.h"
 #include "EcoV3WatchLauncher.h"
 #include "EcoWorldV3.h"
@@ -583,12 +584,13 @@ struct FEcoV3WolfEatTally
 
 /**
  * 무대 안 세로 장애물 읽기 결과 (야생 2단계 3, 명세 RL_V3_WILD2_SPEC.md 6절). 레벨을 읽기만 한다 — 액터·컴포넌트를 바꾸지 않는다.
- * 원판 = 무대 안의 충돌하는 스태틱 메시(인스턴스 하나하나 포함 — 폴리지·HISM)의 충돌 상자 가로 반지름. 팀 이동 제약(EcoCreatureMovement::ConstrainStep)이
- * 막는 것과 같은 조건(쿼리 충돌 켬 ∧ WorldStatic 채널 막음)만 넣는다. 기록 칸은 [EcoV3I] '<지역> 장애물' 시작 줄에 적는다.
+ * 단일 단순 캡슐은 변환된 중심과 반지름으로 원판을 만든다. 다른 형상은 충돌 상자의 가로 반폭 평균을 사용한다.
+ * 폴리지·HISM도 인스턴스별로 읽으며, 팀 이동 제약과 같은 채널 조건(쿼리 충돌 켬 ∧ WorldStatic 채널 막음)을 적용한다.
+ * 기록 칸은 [EcoV3I] '<지역> 장애물' 시작 줄에 적는다.
  */
 struct ADAPTIVEECOSYSTEM_API FEcoV3ObstacleScan
 {
-	static constexpr double kMinRadiusCm = 25.0;   // 이보다 가는 것은 뺀다 (사슴이 비켜 디딘다 — 어림)
+	static constexpr double kMinRadiusCm = 5.0;    // 월드 반지름 5 cm 미만은 제외
 	static constexpr double kMinHeightCm = 50.0;   // 이보다 낮은 것은 뺀다 (뛰어넘거나 디딘다 — 어림)
 	static constexpr int32 kMaxDiscs = 512;        // 무대마다 많아야 (스텝 비용 상한)
 
@@ -1493,10 +1495,28 @@ public:
 	 * 지형 제약 이동 검사: FromCm → ToCm 를 30 cm 이하 토막으로 나눠 팀 공개 함수 EcoCreatureMovement::ConstrainStep (지역 안·장애물·
 	 * 지면·물) 을 부른다. 통과하면 OutZ = 끝 지면 높이, 막히면 거짓 (OutZ = FromCm.Z).
 	 */
-	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false, float BodyRadiusCm=30.f) const;
+	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false,
+		float BodyRadiusCm=30.f, EcoCreatureMovement::FGroundMoveStats* Stats=nullptr) const;
+	bool UsesStaticMeshContact(const FEcoV3RegionContext& Context) const;
+	FEcoV3StaticMeshPath TraceStaticMeshPath(const FEcoV3RegionContext& Context, const FVector& From, const FVector& To,
+		bool bTraveling, float Radius, TFunctionRef<bool(const FVector&, const FVector&)> AllowsAgentContact,
+		EcoCreatureMovement::FGroundMoveStats* Stats, int32* RemainingSweeps=nullptr) const;
+	void BeginStaticMeshFrame();
+	bool WantsStaticMeshTangent(FEcoV3StaticMeshMemory& Memory, const FVector& Position, int64 Step, int64 Id) const;
+	int32 ReserveStaticMeshTangent(int64 Id, double Distance);
+	void CancelStaticMeshTangent(int64 Id);
+	void ReturnStaticMeshSweeps(int32 Unused) { StaticSweepCredits += Unused; }
+	bool IsObstacleDebugEnabled() const;
     /** Serialized M4 boundary for opt-in fauna sharing the Native spatial food ledger. */
+    struct FFaunaPlantMeal
+    {
+        FIntVector Cell = FIntVector::ZeroValue;
+        double StockBefore = 0.;
+        double Requested = 0.;
+        double Paid = 0.;
+    };
     bool ConsumeFaunaFood(FName RegionId, const FVector& Position, double Requested, double NutritionHeadroom,
-        double& OutNutrition);
+        double& OutNutrition, FFaunaPlantMeal* Meal = nullptr);
 
 	// ---- 시험·조정자 없이 쓰는 길 ----
 
@@ -1531,6 +1551,18 @@ protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 
 private:
+	struct FPendingStaticTangent
+	{
+		uint64 QueuedFrame = 0;
+		int64 LastRequestStep = 0;
+		int32 Sweeps = 0;
+	};
+	uint64 StaticMeshFrame = MAX_uint64;
+	int32 StaticSweepLimit = 0, StaticSweepCredits = 0, StaticCandidateLimit = 0, StaticCandidateCredits = 0;
+	TMap<int64, FPendingStaticTangent> PendingStaticTangents;
+	TMap<int64, int32> ReservedStaticTangents;
+	TArray<FVector> StaticMeshViewers;
+	double StaticMeshNearDistance = 0., StaticMeshMiddleDistance = 0.;
 	friend struct FEcoV3PreStartTickFunction;
     friend struct FEcoEcosystemCheckpoint;
 
@@ -1608,8 +1640,6 @@ private:
 	 * - 엔진은 한 액터에 디버그 글자를 128개까지만 그린다(r.DebugSafeZone.MaxDebugTextStringsPerActor). 우리 글자는 모두 WorldSettings 에
 	 *   붙으므로 eco.V3Debug 를 켠 동안만 한도를 푼다(0 = 한도 없음). 그릴 수 없는 실행(-NullRHI)에서는 풀지 않는다 — HUD 가 그려지지
 	 *   않아 엔진이 글자 목록을 비우지 않으므로, 한도가 없으면 목록이 끝없이 늘어 프레임이 점점 느려진다.
-	 * - 팀 이주 디버그 글자('ID n Forest Resident')는 v3 모드에서 이주를 꺼 두므로 뜻이 없고 행동 글자를 가린다. v3 모드 동안만
-	 *   UEcoRuntimeSettings 기본 객체의 bDrawMigrationDebug 를 끈다. 설정 파일에는 쓰지 않는다.
 	 */
 	void UpdateViewEnvironment();
 	void RestoreViewEnvironment();
@@ -1737,7 +1767,4 @@ private:
 
 	bool bTextLimitRaised = false;
 	int32 SavedTextLimit = 128;
-	bool bMigrationDebugHidden = false;
-	bool bSavedMigrationDebug = true;
-	double NextScreenTally = 0.0;
 };

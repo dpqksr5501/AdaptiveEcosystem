@@ -16,10 +16,24 @@
 #include "Engine/World.h"
 #include "Engine/Engine.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 #include "MassSpawnerSubsystem.h"
 #include "MassEntityManager.h"
 #include "MassEntityQuery.h"
 #include "MassExecutionContext.h"
+
+static TAutoConsoleVariable<int32> CVarEcoPeriodicClockLog(TEXT("eco.Clock.PeriodicLog"), -1,
+	TEXT("Server clock Output Log. -1: use project default, 0: off, 1: on."));
+static TAutoConsoleVariable<int32> CVarEcoPopulationLog(TEXT("eco.Population.Log"), -1,
+	TEXT("Daily population Output Log. -1: use project default, 0: off, 1: on."));
+
+static FAutoConsoleCommandWithWorld CmdEcoClockReport(TEXT("eco.Clock.Report"),
+	TEXT("Write the current authority clock once to the Output Log."),
+	FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* World)
+	{
+		if (const auto* Clock = World ? World->GetSubsystem<UEcoWorldClockSubsystem>() : nullptr)
+			Clock->PrintServerTime(false);
+	}));
 
 bool UEcoMassLifecycleSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
@@ -85,8 +99,6 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	const FEcoFoodEventSettings DayEvent = Settings->DayFoodEvent;
 	const FEcoFoodEventSettings NightEvent = Settings->NightFoodEvent;
 	bSpawnWaves = Settings->bEnableSpawnWaves;
-	bReportDaily = Settings->bPrintDailyPopulation;
-	bReportDailyToScreen = Settings->bPrintDailyPopulationToScreen;
 	if (!FeedingSettings.IsValid() || !DayEvent.IsValid() || !NightEvent.IsValid() || !MigrationSettings.IsValid()
 		|| !SurvivalSettings.IsValid() || !PressureSettings.IsValid())
 		return Fail(TEXT("Invalid feeding, food-event, migration, survival or overcrowding settings. Restart PIE after correcting Project Settings."));
@@ -287,9 +299,11 @@ void UEcoMassLifecycleSubsystem::AdvanceSimulation(double DeltaSeconds)
 	const FEcoServerTimeSnapshot Now = Clock->GetServerTime();
 	const UEcoRuntimeSettings* Settings = GetDefault<UEcoRuntimeSettings>();
 	const double PrintInterval = FMath::IsFinite(Settings->ServerTimePrintInterval) ? FMath::Max(0.25, Settings->ServerTimePrintInterval) : 1.0;
-	if (Settings->bPrintServerTime && (LastPrintTime < 0.0 || Now.ServerTimeSeconds - LastPrintTime >= PrintInterval))
+	const int32 ClockLog = CVarEcoPeriodicClockLog.GetValueOnGameThread();
+	if ((ClockLog < 0 ? Settings->bPrintServerTime : ClockLog != 0)
+		&& (LastPrintTime < 0.0 || Now.ServerTimeSeconds - LastPrintTime >= PrintInterval))
 	{
-		Clock->PrintServerTime(Settings->bPrintServerTimeToScreen);
+		Clock->PrintServerTime(false);
 		LastPrintTime = Now.ServerTimeSeconds;
 	}
 	// This callback precedes actor/Mass ticks. Never spawn/query while an external Mass task is processing.
@@ -400,7 +414,8 @@ void UEcoMassLifecycleSubsystem::ReportDailyPopulation(const FEcoServerTimeSnaps
 {
 	if (Time.DayCycle.Phase != EEcoDayPhase::Day || LastReportedCycle == Time.DayCycle.CycleId) return;
 	LastReportedCycle = Time.DayCycle.CycleId;
-	if (!bReportDaily) return;
+	const int32 PopulationLog = CVarEcoPopulationLog.GetValueOnGameThread();
+	if (PopulationLog < 0 ? !GetDefault<UEcoRuntimeSettings>()->bPrintDailyPopulation : PopulationLog == 0) return;
 	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
 	TArray<FName> RegionIds;
 	Ecology->GetRegionIds(RegionIds);
@@ -416,8 +431,6 @@ void UEcoMassLifecycleSubsystem::ReportDailyPopulation(const FEcoServerTimeSnaps
 			*GetWorld()->GetName(), Time.DayCycle.CycleId + 1, Time.WorldEpoch, StepId, Time.ServerTimeSeconds,
 			ActualTime, *RegionId.ToString(), State.Population, Delta, State.FoodAmount, State.FoodCapacity);
 		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("%s"), *Message);
-		if (bReportDailyToScreen && GEngine && GetWorld()->GetNetMode() != NM_DedicatedServer)
-			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(HashCombine(GetUniqueID(), GetTypeHash(RegionId))), 8.0f, FColor::Green, Message);
 		PreviousDawnPopulation.Add(RegionId, State.Population);
 	}
 	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Daily Total] Day=%lld Epoch=%d Step=%lld AliveEntities=%d"),

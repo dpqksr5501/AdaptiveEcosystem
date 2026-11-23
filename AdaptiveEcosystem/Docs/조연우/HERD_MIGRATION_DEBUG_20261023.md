@@ -4,19 +4,18 @@
 
 ## 에디터에서 확인
 
-`/Game/JYU/Maps/LV_JYU_HerdMigration`을 열어 Play하면 오른쪽에 이주 지도가 자동으로 표시된다. 기존 이주 opt-in이 꺼진 맵에는 자동 표시하지 않는다. Client는 논리 지도 대신 기존 수신 표현만 사용한다.
+서버 또는 Standalone Play 중 `eco.HerdMigration.Debug 1`로 오른쪽에 지도를 표시한다. 기본값은 0이다. 지도는 플레이어 폰의 XY 위치에서 가장 가까운 Native 지역을 선택한다. 지역 안에 있으면 해당 지역을 우선하며, 관찰 카메라의 위치는 선택에 영향을 주지 않는다.
 
 | 조작 | 표시/동작 |
 |---|---|
 | `M` | 이주 지도·월드 경로 표시 켜기/끄기 |
-| `[` / `]` | 현재 세션의 무리 계획 선택. 완료된 계획도 확인 가능 |
+| `[` / `]` | 표시 중인 지역을 출발지 또는 목적지로 하는 무리 계획 선택 |
 | `Tab` / 가운데 마우스 | 기존 Inspector로 동물을 선택하면 그 개체의 계획을 선택 |
 | `eco.HerdMigration.Debug 1` | 지도, 알려진 경로, 선택한 무리와 목적지 표시 |
-| `eco.HerdMigration.Debug 2` | 모든 이동 구성원의 실제 위치와 다음 목표 연결선도 표시 |
+| `eco.HerdMigration.Debug 2` | 표시 중인 지역의 이동 구성원과 다음 목표 연결선도 표시 |
 | `eco.HerdMigration.Debug 0` | 이주 표시 숨기기 |
-| `eco.HerdMigration.Debug -1` | authored 이주 world 자동 표시로 복귀 |
-| `eco.Creature.Labels 0` | 동물 이름표만 숨기기. 기본값 1 유지 |
-| `eco.Inspector.Visible 0` | 왼쪽 상세 패널만 숨기기. 기본값 1 유지 |
+| `eco.Creature.Labels 1` | 동물 이름표 표시 |
+| `eco.Inspector.Visible 1` | 왼쪽 개체 상세 패널 표시 |
 
 가뭄 시연은 `eco.HerdMigration.Test.Drought Barren`을 한 번 실행한다. 명령은 즉시 모든 동물을 이동시키는 대신 실제 먹이 감소와 재생 중단을 적용한다. 지속 부족 확인·집결·경로 이동·실제 진입에는 별도의 시간이 걸린다. Play 종료/재시작으로 초기 조건에 돌아간다.
 
@@ -25,7 +24,7 @@
 - **하늘색 선:** authored 경로. 선택한 계획이 있으면 화살표는 그 계획의 진행 방향을 따른다. 복귀 계획은 실제로 뒤집힌 경로 방향을 표시한다.
 - **노란 영역/구:** 선택한 계획의 현재 목적지와 경로 끝. 원래 Forest가 목적지였더라도 복귀하면 현재 목적지 Barren을 표시한다.
 - **작은 점:** 현재 살아 있는 Native 사슴의 실제 세계 위치. 흰 점/구와 연결선은 선택한 계획의 구성원과 다음 목표다.
-- **지역의 사각형:** 전체 `AEcologyRegion` 경계가 아니라 Native habitat footprint다. 현재 경로와 연결된 지역만 범위에 포함해 카메라 밖의 이동을 볼 수 있다.
+- **지역의 사각형:** 선택된 지역의 Native 무대 범위다. 지도에 표시되는 경로와 개체 위치는 이 범위 안으로 제한한다.
 - **Food/Pop:** 기존 Native `FoodFraction()`과 M4 Ecology의 마지막 완료 개체군 집계를 읽는다. 지도 표시는 자원이나 개체를 만들지 않는다.
 - **Active herds / Finished:** 진행 중/종료된 공동 계획 수. Finished에는 복귀와 생존자 도착/사망 정리로 종료한 계획도 포함하므로 Forest 성공 수와 같지 않다.
 - **In target:** 실제 RegionId가 현재 목적지인 살아 있는 계획 구성원 수. **Finished:** 경로 끝 여행을 완료한 수. 목적지 지역 진입과 여행 완료는 서로 다른 시점이다.
