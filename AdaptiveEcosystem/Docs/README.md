@@ -1,7 +1,8 @@
 # AdaptiveEcosystem Documentation Hub
 
-AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입니다.  
-최종 목표는 **MassEntity 기반 동적 생태계 + Python PPO 학습 + Unreal C++ Native Inference + Social Runtime + Steering/Movement의 폐루프**입니다. 현재 main `295ac2f`(2026-09-30 감사)에는 M3 관찰 경로와 PPO/Social/표현 구현이 있지만 전체 production 연결은 진행 중입니다. MassFlock/Aquarium은 초기 설계 참조이며, 현재 PPO는 `herbivore_rl/`과 자체 격자·조향을 사용합니다.
+AdaptiveEcosystem은 **환경·식생·동물과 여러 플레이어가 서로 영향을 주고, 그 결과가 개체 행동·먹이망·다음 세대에 나타나는 MMORPG 생태계**를 목표로 합니다. MassEntity와 Unreal C++ Native 실행, Python PPO 학습, Social Runtime, 단일 Steering/Movement 경로를 연결합니다. 최신 저장 섬의 실제 실행기와 검증 범위는 [프로젝트 공통 맥락](PROJECT_CONTEXT.md)에서 확인합니다. MassFlock과 Aquarium은 초기 설계 참조이며 PPO 학습은 `herbivore_rl/`을 사용합니다.
+
+구현 전 검토의 시작점은 [플레이어 공존·형질과 세대 적응](Architecture/MMORPG_ECOSYSTEM_ADAPTATION_DESIGN_20261122.md)입니다. [Unreal 체형 표현과 가상 본](Architecture/UNREAL_HERITABLE_MORPHOLOGY_GUIDE_20261122.md)은 기존 리그, Morph Target, 실제 본·IK, 검토할 플러그인과 검증 순서를 다룹니다.
 
 ---
 
